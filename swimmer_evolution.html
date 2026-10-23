@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Klubby - Swimmer Evolution (Duolingo Style)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes bobbing {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(1deg); }
+    }
+    @keyframes paddleSlow {
+      0% { transform: rotate(-15deg); }
+      50% { transform: rotate(20deg); }
+      100% { transform: rotate(-15deg); }
+    }
+    @keyframes paddleMedium {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes windmillFast {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes waterWaves {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-40px); }
+    }
+    @keyframes splashJets {
+      0%, 100% { opacity: 0.3; transform: scale(0.9) translateX(0); }
+      50% { opacity: 1; transform: scale(1.2) translateX(-15px); }
+    }
+    .bob-anim {
+      animation: bobbing 2s ease-in-out infinite;
+    }
+    .wave-anim {
+      animation: waterWaves 1s linear infinite;
+    }
+    .splash-anim {
+      animation: splashJets 0.25s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 md:p-8 flex flex-col items-center justify-center min-h-screen font-sans">
+
+  <div class="max-w-2xl w-full bg-white rounded-3xl shadow-xl p-6 md:p-8 border-4 border-slate-200 flex flex-col items-center">
+    
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <div class="inline-block px-4 py-1 rounded-full bg-amber-100 border-2 border-amber-400 text-amber-800 text-xs font-black uppercase tracking-wider mb-2">
+        🔥 Streak Character Evolution
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black text-slate-800">Karakter Perenang "Klubby"</h1>
+      <p class="text-sm text-slate-500 mt-1">Evolusi gaya renang ala karakter Duolingo: makin panjang streak, makin ngebut!</p>
+    </div>
+
+    <!-- Animation Stage / Pool View -->
+    <div class="w-full h-80 rounded-3xl bg-gradient-to-b from-sky-200 via-cyan-300 to-blue-500 relative overflow-hidden flex items-center justify-center border-4 border-cyan-400 shadow-inner">
+      
+      <!-- Pool lane lines (floating ropes) -->
+      <div class="absolute top-8 left-0 right-0 h-4 flex space-x-3 opacity-60">
+        <div class="w-8 h-4 bg-red-400 rounded-full"></div>
+        <div class="w-8 h-4 bg-white rounded-full"></div>
+        <div class="w-8 h-4 bg-red-400 rounded-full"></div>
+        <div class="w-8 h-4 bg-white rounded-full"></div>
+        <div class="w-8 h-4 bg-red-400 rounded-full"></div>
+        <div class="w-8 h-4 bg-white rounded-full"></div>
+        <div class="w-8 h-4 bg-red-400 rounded-full"></div>
+        <div class="w-8 h-4 bg-white rounded-full"></div>
+      </div>
+
+      <!-- Water Jet / Turbo Sprays (Visible in Streak Mode) -->
+      <div id="turboSpray" class="hidden absolute left-12 top-1/2 -translate-y-1/2 splash-anim flex flex-col space-y-2">
+        <div class="w-16 h-4 bg-white rounded-full blur-[1px] opacity-90"></div>
+        <div class="w-24 h-6 bg-cyan-100 rounded-full blur-[2px] opacity-80"></div>
+        <div class="w-20 h-5 bg-white rounded-full blur-[1px] opacity-90"></div>
+      </div>
+
+      <!-- THE CHARACTER SVG STAGE -->
+      <div id="characterStage" class="relative z-10 bob-anim flex items-center justify-center">
+        <!-- SVG will be dynamically updated by JS -->
+        <svg id="swimmerSvg" width="280" height="220" viewBox="0 0 280 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Rendered by script below -->
+        </svg>
+      </div>
+
+      <!-- Animated Water Surface Waves -->
+      <div class="absolute bottom-0 left-0 right-0 h-24 pointer-events-none opacity-80">
+        <svg class="w-[600px] h-full wave-anim" viewBox="0 0 600 100" preserveAspectRatio="none">
+          <path d="M0,40 C50,20 100,60 150,40 C200,20 250,60 300,40 C350,20 400,60 450,40 C500,20 550,60 600,40 L600,100 L0,100 Z" fill="#0284C7" opacity="0.6"/>
+          <path d="M0,55 C40,35 90,75 140,55 C190,35 240,75 290,55 C340,35 390,75 440,55 C490,35 540,75 600,55 L600,100 L0,100 Z" fill="#0369A1" opacity="0.9"/>
+        </svg>
+      </div>
+
+      <!-- Speed Badge Floating Tag -->
+      <div id="speedBadge" class="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-2xl border-2 border-slate-300 shadow flex items-center space-x-1.5">
+        <span id="badgeIcon" class="text-base">🦆</span>
+        <span id="badgeText" class="text-xs font-black text-slate-700">Pace: 0.8 km/h</span>
+      </div>
+
+    </div>
+
+    <!-- Interactive Stage Controls -->
+    <div class="w-full mt-6 flex flex-col space-y-4">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Pilih Level Streak Olahraga:</div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        
+        <!-- Button Level 1 -->
+        <button onclick="setLevel(1)" id="btnLvl1" class="p-4 rounded-2xl border-b-4 border-slate-300 bg-emerald-50 border-emerald-400 flex flex-col items-center transition-all transform active:translate-y-1">
+          <span class="text-2xl mb-1">🏊‍♂️</span>
+          <span class="text-sm font-black text-emerald-800">Hari ke-1 (Pemula)</span>
+          <span class="text-xs text-emerald-600 font-medium">Pelampung bebek & santai</span>
+        </button>
+
+        <!-- Button Level 2 -->
+        <button onclick="setLevel(2)" id="btnLvl2" class="p-4 rounded-2xl border-b-4 border-slate-300 bg-white border-slate-200 flex flex-col items-center hover:bg-slate-50 transition-all transform active:translate-y-1">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="text-sm font-black text-slate-700">Hari ke-3 (Mulai Gesit)</span>
+          <span class="text-xs text-slate-500 font-medium">Gaya bebas & kacamata</span>
+        </button>
+
+        <!-- Button Level 3 -->
+        <button onclick="setLevel(3)" id="btnLvl3" class="p-4 rounded-2xl border-b-4 border-slate-300 bg-white border-slate-200 flex flex-col items-center hover:bg-slate-50 transition-all transform active:translate-y-1">
+          <span class="text-2xl mb-1">🌪️</span>
+          <span class="text-sm font-black text-slate-700">Streak 7 Hari+ (Turbo)</span>
+          <span class="text-xs text-rose-500 font-bold">Tangan kincir angin! 🚤</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Description Box -->
+    <div id="descCard" class="w-full mt-5 p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 flex items-start space-x-3">
+      <div id="descIcon" class="text-3xl">🦆</div>
+      <div>
+        <h4 id="descTitle" class="text-sm font-bold text-slate-800">Level 1: Perenang Pemula (Day 1)</h4>
+        <p id="descText" class="text-xs text-slate-600 mt-0.5 leading-relaxed">
+          Karakter memakai pelampung bebek kuning dengan kacamata renang miring di dahi. Mengayuh pelan gaya kepik santai sambil tersenyum bangga menyelesaikan hari pertamanya!
+        </p>
+      </div>
+    </div>
+
+    <!-- Lottie JSON Snippet Link -->
+    <div class="w-full mt-4 flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-100">
+      <span>Format: Lottie-Ready Vector Motion</span>
+      <span class="font-bold text-emerald-600">✓ Export Ready (.json)</span>
+    </div>
+
+  </div>
+
+  <script>
+    const swimmerSvg = document.getElementById("swimmerSvg");
+    const turboSpray = document.getElementById("turboSpray");
+    const speedBadge = document.getElementById("speedBadge");
+    const badgeIcon = document.getElementById("badgeIcon");
+    const badgeText = document.getElementById("badgeText");
+    const descIcon = document.getElementById("descIcon");
+    const descTitle = document.getElementById("descTitle");
+    const descText = document.getElementById("descText");
+
+    const btnLvl1 = document.getElementById("btnLvl1");
+    const btnLvl2 = document.getElementById("btnLvl2");
+    const btnLvl3 = document.getElementById("btnLvl3");
+
+    function setLevel(lvl) {
+      // Reset button styles
+      [btnLvl1, btnLvl2, btnLvl3].forEach(b => {
+        b.className = "p-4 rounded-2xl border-b-4 border-slate-300 bg-white border-slate-200 flex flex-col items-center hover:bg-slate-50 transition-all transform active:translate-y-1";
+      });
+
+      if (lvl === 1) {
+        btnLvl1.className = "p-4 rounded-2xl border-b-4 border-emerald-500 bg-emerald-50 border-emerald-400 flex flex-col items-center transition-all transform active:translate-y-1 shadow-sm";
+        turboSpray.classList.add("hidden");
+        badgeIcon.textContent = "🦆";
+        badgeText.textContent = "Pace: 0.8 km/h (Santai)";
+        descIcon.textContent = "🦆";
+        descTitle.textContent = "Level 1: Perenang Pemula (Day 1)";
+        descText.textContent = "Karakter memakai pelampung bebek kuning dengan kacamata renang miring di dahi. Mengayuh pelan gaya anjing/kepik sambil tersenyum bangga sudah mulai berolahraga!";
+        renderLevel1();
+      } else if (lvl === 2) {
+        btnLvl2.className = "p-4 rounded-2xl border-b-4 border-blue-500 bg-blue-50 border-blue-400 flex flex-col items-center transition-all transform active:translate-y-1 shadow-sm";
+        turboSpray.classList.add("hidden");
+        badgeIcon.textContent = "⚡";
+        badgeText.textContent = "Pace: 2.4 km/h (Gesit)";
+        descIcon.textContent = "⚡";
+        descTitle.textContent = "Level 2: Gaya Bebas Cepat (Day 3-5)";
+        descText.textContent = "Pelampung dilepas! Karakter berganti pakaian renang sporty dengan kacamata renang terpasang di mata. Mengayuh gaya bebas ritmis dengan cipratan buih air!";
+        renderLevel2();
+      } else {
+        btnLvl3.className = "p-4 rounded-2xl border-b-4 border-rose-500 bg-rose-50 border-rose-400 flex flex-col items-center transition-all transform active:translate-y-1 shadow-sm";
+        turboSpray.classList.remove("hidden");
+        badgeIcon.textContent = "🔥";
+        badgeText.textContent = "Pace: 9.8 km/h (MODE KINCIR ANGIN)";
+        descIcon.textContent = "🌪️";
+        descTitle.textContent = "Level 3: Mode Kincir Angin Turbo (Streak 7 Hari+)";
+        descText.textContent = "Karakter tertawa ngakak lepas bahagia persis foto Duolingo! Kedua tangannya berputar kencang seperti baling-baling kincir angin dan kakinya menyemburkan pusaran air seperti mesin tempel perahu!";
+        renderLevel3();
+      }
+    }
+
+    // LEVEL 1: Pemula (Day 1) - Pelampung Bebek & Kayuhan Lambat
+    function renderLevel1() {
+      swimmerSvg.innerHTML = `
+        <g transform="translate(40, 20)">
+          <!-- Pelampung Bebek Kuning -->
+          <ellipse cx="100" cy="115" rx="55" ry="32" fill="#FACC15" stroke="#CA8A04" stroke-width="4"/>
+          <!-- Kepala Bebek -->
+          <circle cx="150" cy="95" r="18" fill="#FACC15" stroke="#CA8A04" stroke-width="3"/>
+          <ellipse cx="162" cy="98" rx="8" ry="4" fill="#EA580C"/>
+          <circle cx="152" cy="90" r="3" fill="#1E293B"/>
+
+          <!-- Badan Karakter (Baju Merah ala Eddy Duolingo) -->
+          <rect x="75" y="70" width="50" height="45" rx="20" fill="#EF4444" stroke="#DC2626" stroke-width="4"/>
+          <!-- Ritsleting Putih -->
+          <line x1="100" y1="75" x2="100" y2="105" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+
+          <!-- Kepala & Rambut Kuning Blonde -->
+          <circle cx="100" cy="50" r="32" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+          <!-- Rambut Blonde Khas Duolingo -->
+          <path d="M72,40 C75,20 125,20 128,40 C130,55 125,55 125,45 C115,25 85,25 75,45 Z" fill="#FACC15"/>
+          <path d="M68,45 C60,40 58,60 70,60 Z" fill="#FACC15"/>
+
+          <!-- Headband Merah -->
+          <path d="M70,36 C80,30 120,30 130,36" stroke="#EF4444" stroke-width="8" stroke-linecap="round"/>
+
+          <!-- Muka Bahagia Ketawa (Open Mouth ala Foto) -->
+          <circle cx="92" cy="46" r="3" fill="#1E293B"/>
+          <circle cx="108" cy="46" r="3" fill="#1E293B"/>
+          <path d="M90,54 Q100,72 110,54 Z" fill="#991B1B" stroke="#7F1D1D" stroke-width="2"/>
+          <path d="M93,54 Q100,58 107,54" fill="#FFFFFF"/>
+
+          <!-- Kacamata Renang Miring Lucu di Dahi -->
+          <rect x="80" y="24" width="18" height="12" rx="4" fill="#38BDF8" stroke="#0284C7" stroke-width="2" transform="rotate(-15 80 24)"/>
+          <rect x="102" y="20" width="18" height="12" rx="4" fill="#38BDF8" stroke="#0284C7" stroke-width="2" transform="rotate(-5 102 20)"/>
+
+          <!-- Tangan Mengayuh Pelan (Animasi CSS) -->
+          <g style="transform-origin: 75px 85px; animation: paddleSlow 1.5s ease-in-out infinite;">
+            <rect x="45" y="80" width="35" height="14" rx="7" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+            <circle cx="45" cy="87" r="8" fill="#FED7AA"/>
+          </g>
+          <g style="transform-origin: 125px 85px; animation: paddleSlow 1.5s ease-in-out infinite 0.75s;">
+            <rect x="120" y="80" width="35" height="14" rx="7" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+            <circle cx="155" cy="87" r="8" fill="#FED7AA"/>
+          </g>
+
+          <!-- Cipratan Air Lucu -->
+          <circle cx="40" cy="110" r="5" fill="#E0F2FE" opacity="0.8"/>
+          <circle cx="160" cy="115" r="4" fill="#E0F2FE" opacity="0.8"/>
+        </g>
+      `;
+    }
+
+    // LEVEL 2: Gaya Bebas Cepat (Day 3-5)
+    function renderLevel2() {
+      swimmerSvg.innerHTML = `
+        <g transform="translate(40, 20)">
+          <!-- Badan streamline sporty -->
+          <rect x="75" y="70" width="60" height="40" rx="20" fill="#0284C7" stroke="#0369A1" stroke-width="4"/>
+          <!-- Garis Strip Olahraga -->
+          <line x1="80" y1="90" x2="130" y2="90" stroke="#FACC15" stroke-width="4"/>
+
+          <!-- Kaki mengepak dengan buih air -->
+          <rect x="50" y="80" width="30" height="12" rx="6" fill="#FED7AA" transform="rotate(15 50 80)"/>
+          <rect x="45" y="92" width="30" height="12" rx="6" fill="#FED7AA" transform="rotate(-10 45 92)"/>
+
+          <!-- Kepala dengan Swim Cap Biru & Kacamata Pas di Mata -->
+          <circle cx="120" cy="60" r="30" fill="#FED7AA"/>
+          <!-- Swim Cap Sporty -->
+          <path d="M95,55 C98,30 145,30 148,55 Z" fill="#0284C7"/>
+          
+          <!-- Kacamata Renang Terpasang Keren -->
+          <rect x="112" y="52" width="16" height="12" rx="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+          <rect x="130" y="52" width="16" height="12" rx="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+          <line x1="126" y1="58" x2="132" y2="58" stroke="#0F172A" stroke-width="2"/>
+
+          <!-- Senyum Semangat -->
+          <path d="M120,70 Q130,80 140,70" stroke="#991B1B" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+          <!-- Tangan Berputar Rotasi Freestyle (Medium Speed) -->
+          <g style="transform-origin: 110px 85px; animation: paddleMedium 0.6s linear infinite;">
+            <rect x="110" y="80" width="55" height="14" rx="7" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+            <circle cx="165" cy="87" r="8" fill="#FED7AA"/>
+          </g>
+
+          <!-- Buih & Ombak -->
+          <ellipse cx="60" cy="110" rx="25" ry="8" fill="#FFFFFF" opacity="0.7"/>
+          <circle cx="40" cy="85" r="7" fill="#E0F2FE"/>
+        </g>
+      `;
+    }
+
+    // LEVEL 3: MODE KINCIR ANGIN TURBO (Streak 7 Hari+)
+    function renderLevel3() {
+      swimmerSvg.innerHTML = `
+        <g transform="translate(40, 20)">
+          <!-- Aura Api Kecepatan Emas -->
+          <ellipse cx="110" cy="80" rx="95" ry="55" fill="#FEF08A" opacity="0.4" stroke="#F59E0B" stroke-width="3" stroke-dasharray="8 6"/>
+
+          <!-- Badan Turbo dengan Baju Renang Juara Merah -->
+          <rect x="80" y="70" width="65" height="42" rx="21" fill="#EF4444" stroke="#B91C1C" stroke-width="4"/>
+          <!-- Emblem Bintang Juara -->
+          <circle cx="112" cy="91" r="10" fill="#FACC15"/>
+          <text x="108" y="95" font-size="12" font-weight="bold" fill="#78350F">★</text>
+
+          <!-- Kaki seperti Baling-Baling Motorboat (Gerakan Cepat) -->
+          <g style="transform-origin: 80px 90px; animation: paddleSlow 0.15s linear infinite;">
+            <rect x="40" y="78" width="45" height="14" rx="7" fill="#FED7AA" transform="rotate(-20 40 78)"/>
+            <rect x="40" y="92" width="45" height="14" rx="7" fill="#FED7AA" transform="rotate(25 40 92)"/>
+          </g>
+
+          <!-- Kepala Karakter: Ngakak Lepas Bahagia (Persis Foto Duolingo!) -->
+          <circle cx="130" cy="55" r="34" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+          
+          <!-- Rambut Kuning Mengembang Kencang Kena Angin -->
+          <path d="M98,40 C105,15 155,15 162,35 C165,50 160,50 160,40 C150,20 110,20 100,40 Z" fill="#FACC15"/>
+          <path d="M90,45 C80,40 75,65 95,65 Z" fill="#FACC15"/>
+
+          <!-- Headband Juara Berapi -->
+          <path d="M96,36 C105,28 150,28 160,36" stroke="#EF4444" stroke-width="9" stroke-linecap="round"/>
+
+          <!-- Kacamata Renang Keren Memantulkan Api Kecepatan -->
+          <rect x="115" y="44" width="16" height="11" rx="4" fill="#FDE047" stroke="#EA580C" stroke-width="2" transform="rotate(5 115 44)"/>
+          <rect x="135" y="46" width="16" height="11" rx="4" fill="#FDE047" stroke="#EA580C" stroke-width="2" transform="rotate(5 135 46)"/>
+
+          <!-- Mulut Tertawa Lebar Banget (Happy Laugh ala Foto Eddy) -->
+          <path d="M115,55 Q135,82 150,55 Z" fill="#991B1B" stroke="#7F1D1D" stroke-width="3"/>
+          <path d="M120,55 Q135,62 145,55" fill="#FFFFFF"/>
+
+          <!-- TANGAN KINCIR ANGIN (WINDMILL ARMS - 4 Lengan Transparan Berputar Super Cepat) -->
+          <g style="transform-origin: 115px 85px; animation: windmillFast 0.18s linear infinite;">
+            <!-- Lengan 1 (Atas) -->
+            <rect x="110" y="30" width="16" height="60" rx="8" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+            <circle cx="118" cy="30" r="10" fill="#FED7AA"/>
+            <!-- Lengan 2 (Bawah) -->
+            <rect x="110" y="85" width="16" height="60" rx="8" fill="#FED7AA" stroke="#FDBA74" stroke-width="2"/>
+            <circle cx="118" cy="145" r="10" fill="#FED7AA"/>
+            <!-- Lengan 3 (Kiri - Efek Ghosting Kecepatan) -->
+            <rect x="55" y="77" width="60" height="16" rx="8" fill="#FED7AA" opacity="0.6"/>
+            <!-- Lengan 4 (Kanan - Efek Ghosting Kecepatan) -->
+            <rect x="115" y="77" width="60" height="16" rx="8" fill="#FED7AA" opacity="0.6"/>
+            <!-- Efek Garis Gerak Kincir Putar -->
+            <circle cx="118" cy="85" r="50" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="16 12" opacity="0.7"/>
+          </g>
+
+          <!-- Pusaran Air & Gelembung Dahsyat -->
+          <circle cx="30" cy="85" r="10" fill="#FFFFFF" opacity="0.9"/>
+          <circle cx="15" cy="95" r="14" fill="#E0F2FE" opacity="0.8"/>
+          <circle cx="5" cy="75" r="8" fill="#FFFFFF" opacity="0.9"/>
+        </g>
+      `;
+    }
+
+    // Default to Level 1
+    renderLevel1();
+  </script>
+</body>
+</html>
