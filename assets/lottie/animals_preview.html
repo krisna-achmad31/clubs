@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klubby Animal Lottie</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<style>
+  :root { --ink:#3C3C3C; --muted:#777; --line:#E5E5E5; }
+  body { margin:0; background:#fff; color:var(--ink); font-family:Nunito, system-ui, sans-serif; padding:24px 16px; }
+  h1 { margin:0 0 4px; font-size:26px; font-weight:900; }
+  p.sub { margin:0 0 20px; color:var(--muted); font-weight:700; }
+  .row { margin-bottom:22px; }
+  .row h2 { font-size:20px; font-weight:900; margin:0 0 8px; }
+  .row h2 span { color:var(--muted); font-size:15px; font-weight:800; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; }
+  .card { border:2px solid var(--line); border-bottom-width:5px; border-radius:18px; padding:8px; text-align:center; }
+  .anim { aspect-ratio:1; }
+  .card b { display:block; font-size:13px; font-weight:900; margin-top:4px; }
+</style>
+</head>
+<body>
+<h1>Karakter Hewan Klubby</h1>
+<p class="sub">18 hewan × 5 tahap streak, versi sebadan. Gerakan makin cepat seiring streak naik (loop 2 detik).</p>
+<div id="rows"></div>
+<script>
+const animals = [
+  ["otto_berang","Otto","Berang-berang · Renang & Selam"],
+  ["pingo_pinguin","Pingo","Pinguin · Selancar & Perahu"],
+  ["kiki_kelinci","Kiki","Kelinci · Lari"],
+  ["gugun_kambing","Gugun","Kambing Gunung · Alam & Ketinggian"],
+  ["rubi_rubah","Rubi","Rubah · Roda"],
+  ["doni_corgi","Doni","Anjing Corgi · Lempar & Tangkap"],
+  ["ciko_ayam","Ciko","Anak Ayam · Badminton & Takraw"],
+  ["pandu_panda","Pandu","Panda · Padel & Tenis"],
+  ["cimot_kucing","Cimot","Kucing · Raket Kecil & Refleks"],
+  ["koko_koala","Koko","Koala · Sepak Bola"],
+  ["jeri_jerapah","Jeri","Jerapah · Basket & Voli"],
+  ["bento_banteng","Bento","Banteng · Rugby & Hoki"],
+  ["tara_harimau","Tara","Harimau · Bela Diri"],
+  ["gembul_gajah","Gembul","Gajah · Fitness"],
+  ["kura_kurakura","Kura","Kura-kura · Yoga & Fokus"],
+  ["flami_flamingo","Flami","Flamingo · Dansa & Senam"],
+  ["momo_monyet","Momo","Monyet · Panjat"],
+  ["eko_elang","Eko","Elang Jawa · Presisi"],
+];
+const stages = [["day1_pemula","Hari 1 · Pemula"],["day3_gesit","Hari 3 · Gesit"],["day7_turbo","Streak 7 · Turbo"],["day14_juara","Streak 14 · Juara"],["day30_legend","Streak 30 · Legend"]];
+const rows = document.getElementById("rows");
+const only = new URLSearchParams(location.search).get("a"); // ?a=pandu_panda untuk satu hewan saja
+for (const [key, name, sub] of animals.filter(([k]) => !only || k === only)) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<h2>${name} <span>${sub}</span></h2><div class="grid"></div>`;
+  const grid = row.querySelector(".grid");
+  const boxes = stages.map(([sk, label]) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="anim"></div><b>${label}</b>`;
+    grid.appendChild(card);
+    return [sk, card.querySelector(".anim")];
+  });
+  // animals_js/*.js membuat halaman ini jalan juga saat dibuka dobel-klik (file://)
+  const play = (useData) => boxes.forEach(([sk, box]) => lottie.loadAnimation({
+    container: box, renderer: "svg", loop: true, autoplay: true,
+    ...(useData ? { animationData: window.KLUBBY_ANIM[`${key}_${sk}`] } : { path: `animals/${key}_${sk}.json` }),
+  }));
+  const script = document.createElement("script");
+  script.src = `animals_js/${key}.js`;
+  script.onload = () => play(true);
+  script.onerror = () => play(false);
+  document.head.appendChild(script);
+  rows.appendChild(row);
+}
+</script>
+</body>
+</html>

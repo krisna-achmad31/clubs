@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klubby Swimmer Lottie Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<style>
+  :root { --bg:#FFFFFF; --ink:#3C3C3C; --muted:#AFAFAF; --line:#E5E5E5; --green:#58CC02; --green-d:#58A700; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:Nunito, system-ui, sans-serif; padding:24px 16px; }
+  .bar { height:16px; background:var(--line); border-radius:99px; overflow:hidden; margin-bottom:20px; max-width:520px; }
+  .bar i { display:block; height:100%; width:60%; background:var(--green); border-radius:99px; box-shadow:inset 0 -5px 0 rgba(255,255,255,.0), inset 0 4px 0 rgba(255,255,255,.3); }
+  h1 { margin:0 0 4px; font-size:26px; font-weight:900; }
+  p.sub { margin:0 0 22px; color:#777; font-weight:700; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+  .card { border:2px solid var(--line); border-bottom-width:5px; border-radius:18px; padding:12px; }
+  .anim { aspect-ratio:5/4; border-radius:12px; overflow:hidden; }
+  .card h2 { font-size:18px; font-weight:900; margin:10px 4px 2px; }
+  .card span { font-size:14px; color:#777; font-weight:700; margin:0 4px; }
+  .chip { display:inline-block; margin:10px 4px 0; border:2px solid; border-radius:14px; overflow:hidden; font-weight:900; font-size:12px; text-align:center; min-width:96px; }
+  .chip b { display:block; color:#fff; padding:3px 8px; letter-spacing:.5px; }
+  .chip em { display:block; font-style:normal; font-size:16px; padding:6px 8px; background:#fff; }
+</style>
+</head>
+<body>
+<div class="bar"><i></i></div>
+<h1>Evolusi Perenang Klubby</h1>
+<p class="sub">Setiap kartu adalah file .json terpisah yang berulang (loop 2 detik).</p>
+<div class="grid" id="grid"></div>
+<script>
+const stages = [
+  ["swimmer_day1_pemula","Hari 1 · Pemula","Pelampung bebek, kayuh pelan","0.8 km/j","#FFC800"],
+  ["swimmer_day3_gesit","Hari 3 · Gesit","Ganti baju renang, gaya bebas","2.4 km/j","#1CB0F6"],
+  ["swimmer_day7_turbo","Streak 7 · Turbo Kincir","Tangan kincir angin + ombak speedboat","9.8 km/j","#FF9600"],
+  ["swimmer_day14_champion","Streak 14 · Juara","Jubah, kacamata hitam, medali","11 km/j","#CE82FF"],
+  ["swimmer_day30_legend","Streak 30 · Golden Legend","Mahkota, sayap emas, aura bintang","∞ km/j","#58CC02"],
+  ["swimmer_streak_evolution","Gabungan","Satu file, marker per tahap","5 tahap","#FF4B4B"],
+];
+const grid = document.getElementById("grid");
+for (const [file, title, sub, pace, color] of stages) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `<div class="anim"></div><h2>${title}</h2><span>${sub}</span><br>
+    <div class="chip" style="border-color:${color}"><b style="background:${color}">PACE</b><em style="color:${color}">${pace}</em></div>`;
+  grid.appendChild(card);
+  lottie.loadAnimation({ container: card.querySelector(".anim"), renderer: "svg", loop: true, autoplay: true, path: file + ".json" });
+}
+</script>
+</body>
+</html>
