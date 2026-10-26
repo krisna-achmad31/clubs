@@ -41,6 +41,9 @@ abstract final class R {
   static String slot(String id) => '/session/$id/slot';
   static const claim = '/claim';
 
+  /// WhatsApp RSVP deep link (klubby.id/m/:id) → claim the guest ticket.
+  static String claimLink(String id) => '/m/$id';
+
   // Host (G)
   static const hostNew = '/host/new';
   static String hostPublished(String id) => '/host/$id/published';
@@ -77,12 +80,17 @@ abstract final class R {
   static const settings = '/settings';
   static const privacy = '/settings/privacy';
   static const goyangSettings = '/settings/goyang';
+  static const account = '/settings/account';
+  static const devices = '/settings/devices';
   static const geng = '/geng';
+  static const help = '/settings/help';
+  static const notifPrefs = '/settings/notifications';
 
   // Misc (N, O, P)
   static const error = '/error';
   static const shop = '/shop';
   static const venue = '/venue';
+  static String venueOf(String id) => '/venue?id=$id';
   static const goyangLobby = '/goyang/lobby';
   static const goyangInvite = '/goyang/invite';
   static const goyangBareng = '/goyang/bareng';

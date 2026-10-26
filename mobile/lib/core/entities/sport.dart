@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../theme/app_colors.dart';
 import 'mascot.dart';
 
 enum SportCategory {
@@ -41,6 +42,18 @@ class Sport extends Equatable {
   final Animal animal;
   final String emoji;
   final List<String> positions;
+
+  /// One colour per sport family, used for stamps, charts and chips everywhere.
+  Hue get hue => switch (category) {
+        SportCategory.raket => Hue.primary,
+        SportCategory.air => Hue.blue,
+        SportCategory.lari => Hue.purple,
+        SportCategory.tim => Hue.orange,
+        SportCategory.kebugaran || SportCategory.belaDiri => Hue.red,
+        SportCategory.roda => Hue.yellow,
+        SportCategory.petualangan => Hue.green,
+        SportCategory.presisi => Hue.purple,
+      };
 
   /// GPS-recordable sports show distance/pace; the rest track time + score.
   bool get tracksDistance => const {'lari', 'trail', 'jalan', 'sepeda', 'mtb', 'renang', 'hiking', 'kayak', 'dayung', 'triathlon', 'skate', 'sepatu_roda'}.contains(id);

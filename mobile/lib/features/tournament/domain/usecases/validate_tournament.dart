@@ -4,7 +4,11 @@ import '../entities/tournament.dart';
 class ValidateTournament {
   const ValidateTournament();
 
-  String? call({required TournamentFormat format, required int players, required int courts}) {
+  String? call({
+    required TournamentFormat format,
+    required int players,
+    required int courts,
+  }) {
     if (players < 4) return 'Butuh minimal 4 pemain untuk mulai turnamen';
     if (format.needsMultipleOf4 && players % 4 != 0) {
       final add = 4 - players % 4;

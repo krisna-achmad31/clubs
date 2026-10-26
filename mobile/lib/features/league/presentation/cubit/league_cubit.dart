@@ -19,11 +19,21 @@ class LeagueCubit extends Cubit<LeagueState> {
 
   final LeagueRepository _repo;
 
-  Future<void> load() async => emit(LeagueState(national: state.national, division: await _repo.division(national: state.national)));
+  Future<void> load() async => emit(
+    LeagueState(
+      national: state.national,
+      division: await _repo.division(national: state.national),
+    ),
+  );
 
   Future<void> setNational(bool v) async {
     emit(LeagueState(national: v, division: state.division));
-    emit(LeagueState(national: v, division: await _repo.division(national: v)));
+    emit(
+      LeagueState(
+        national: v,
+        division: await _repo.division(national: v),
+      ),
+    );
   }
 
   Future<Segment> segment(String id) => _repo.segment(id);

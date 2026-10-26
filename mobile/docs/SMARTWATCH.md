@@ -27,9 +27,12 @@ Watch → phone:
 
 ```jsonc
 { "type": "hr", "bpm": 148 }
+{ "type": "cadence", "spm": 120 }
 { "type": "control", "action": "pause" | "resume" | "stop" }
 { "type": "workout", "sport": "lari", "start": 1761300000000, "end": 1761302400000, "distance": 5020, "avgHr": 151 }
 ```
+
+`cadence` berisi putaran per menit untuk sepeda atau langkah per menit untuk jalan/lari; nama field transport tetap `spm`. Pembacaan live disimpan pada titik waktu/jarak rekaman, sehingga dapat dibuka dari detail posting. Lihat `ACTIVITY_DETAILS.md` untuk alur persistensi dan grafik. Pesan `workout` tetap berupa ringkasan status koneksi; sinkronisasi ini tidak otomatis menerbitkan workout lama sebagai posting baru.
 
 ## Izin
 

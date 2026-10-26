@@ -43,7 +43,7 @@ class KInput extends StatelessWidget {
     this.controller,
     this.hint,
     this.icon,
-    this.iconColor = AppColors.blue,
+    this.iconColor = AppColors.primary,
     this.keyboardType,
     this.onChanged,
     this.trailing,
@@ -74,9 +74,9 @@ class KInput extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: focused ? AppColors.blueL : AppColors.soft,
+        color: focused ? AppColors.primaryL : AppColors.soft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: focused ? AppColors.blueM : AppColors.line, width: 2),
+        border: Border.all(color: focused ? AppColors.primaryM : AppColors.line, width: 2),
       ),
       child: Row(
         crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
@@ -114,7 +114,7 @@ class KInput extends StatelessWidget {
 
 /// Static value "input" used for pickers (date, time, area…).
 class KField extends StatelessWidget {
-  const KField({super.key, required this.text, this.icon, this.iconColor = AppColors.blue, this.trailing, this.onTap, this.placeholder = false});
+  const KField({super.key, required this.text, this.icon, this.iconColor = AppColors.primary, this.trailing, this.onTap, this.placeholder = false});
 
   final String text;
   final IconData? icon;
@@ -224,7 +224,7 @@ class ProgressHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      KIconButton(LucideIcons.arrowLeft, onTap: onBack ?? () => context.pop()),
+      KIconButton(LucideIcons.arrowLeft, onTap: onBack ?? () => context.canPop() ? context.pop() : context.go('/welcome')),
       const SizedBox(width: 12),
       Expanded(child: KProgress(value: value)),
       if (trailing != null) ...[const SizedBox(width: 12), trailing!],
@@ -263,7 +263,7 @@ class KHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(children: [
       if (leading != null) ...[
-        KIconButton(leading!, color: iconColor, onTap: onLeading ?? () => context.canPop() ? context.pop() : null),
+        KIconButton(leading!, color: iconColor, onTap: onLeading ?? () => context.canPop() ? context.pop() : context.go('/feed')),
         const SizedBox(width: 12),
       ],
       Expanded(child: Text(title, style: AppText.custom(titleSize, c: color), overflow: TextOverflow.ellipsis)),
@@ -365,7 +365,7 @@ class KBanner extends StatelessWidget {
 
 /// Grey segmented control with a white selected pill (KOMUNITAS / PUBLIK).
 class KSegmented extends StatelessWidget {
-  const KSegmented({super.key, required this.items, required this.index, required this.onChanged, this.activeColor = AppColors.blue, this.fontSize = 14});
+  const KSegmented({super.key, required this.items, required this.index, required this.onChanged, this.activeColor = AppColors.primary, this.fontSize = 14});
 
   final List<String> items;
   final int index;
@@ -463,7 +463,7 @@ class KTabs extends StatelessWidget {
 
 /// Rounded square icon container ("bell" in yellow-l box).
 class IconBox extends StatelessWidget {
-  const IconBox(this.icon, {super.key, this.bg = AppColors.blueL, this.fg = AppColors.blue, this.size = 44, this.iconSize = 22, this.radius = 12, this.emoji});
+  const IconBox(this.icon, {super.key, this.bg = AppColors.primaryL, this.fg = AppColors.primary, this.size = 44, this.iconSize = 22, this.radius = 12, this.emoji});
 
   final IconData? icon;
   final String? emoji;
@@ -487,7 +487,7 @@ class IconBox extends StatelessWidget {
 
 /// Circle avatar with initials.
 class LetterAvatar extends StatelessWidget {
-  const LetterAvatar(this.letters, {super.key, this.color = AppColors.blue, this.size = 40, this.textColor = AppColors.white, this.border});
+  const LetterAvatar(this.letters, {super.key, this.color = AppColors.primary, this.size = 40, this.textColor = AppColors.white, this.border});
 
   final String letters;
   final Color color;
@@ -546,6 +546,16 @@ class ReactionPill extends StatefulWidget {
 class _ReactionPillState extends State<ReactionPill> {
   late bool _on = widget.active;
   late int _count = widget.count;
+
+  @override
+  void didUpdateWidget(ReactionPill old) {
+    super.didUpdateWidget(old);
+    // Follow the source of truth when it changes elsewhere (e.g. the reaction picker).
+    if (old.active != widget.active || old.count != widget.count) {
+      _on = widget.active;
+      _count = widget.count;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -622,7 +632,7 @@ class OrDivider extends StatelessWidget {
 
 /// Settings-style row: icon box, title/subtitle, trailing (toggle/chevron/value).
 class KRow extends StatelessWidget {
-  const KRow({super.key, required this.title, this.subtitle, this.icon, this.iconBg = AppColors.blueL, this.iconFg = AppColors.blue, this.trailing, this.onTap, this.emoji, this.titleColor = AppColors.ink, this.padding = const EdgeInsets.symmetric(vertical: 10)});
+  const KRow({super.key, required this.title, this.subtitle, this.icon, this.iconBg = AppColors.primaryL, this.iconFg = AppColors.primary, this.trailing, this.onTap, this.emoji, this.titleColor = AppColors.ink, this.padding = const EdgeInsets.symmetric(vertical: 10)});
 
   final String title;
   final String? subtitle;
@@ -650,7 +660,7 @@ class KRow extends StatelessWidget {
         trailing ?? (onTap != null ? const Icon(LucideIcons.chevronRight, size: 22, color: AppColors.faint) : const SizedBox()),
       ]),
     );
-    return onTap == null ? row : GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: row);
+    return onTap == null ? row : Pressable(onTap: onTap, depth: 0, child: ColoredBox(color: const Color(0x00FFFFFF), child: row));
   }
 }
 
@@ -721,7 +731,7 @@ class KCheck extends StatelessWidget {
 
 /// Date tile used in session lists (SAB / 1 / NOV).
 class DateBadge extends StatelessWidget {
-  const DateBadge({super.key, required this.day, required this.date, required this.month, this.hue = Hue.blue, this.size = 54});
+  const DateBadge({super.key, required this.day, required this.date, required this.month, this.hue = Hue.primary, this.size = 54});
 
   final String day;
   final String date;
@@ -746,7 +756,7 @@ class DateBadge extends StatelessWidget {
 
 /// Section title in caps with optional right action.
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.action, this.onAction, this.actionColor = AppColors.blue});
+  const SectionTitle(this.text, {super.key, this.action, this.onAction, this.actionColor = AppColors.primary});
 
   final String text;
   final String? action;
@@ -757,7 +767,8 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(children: [
       Expanded(child: Text(text.toUpperCase(), style: AppText.label())),
-      if (action != null) GestureDetector(onTap: onAction, child: Text(action!, style: AppText.label(actionColor))),
+      if (action != null && onAction != null)
+        Pressable(onTap: onAction, depth: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), child: Text(action!, style: AppText.label(actionColor)))),
     ]);
   }
 }
@@ -834,6 +845,8 @@ class KSheet extends StatelessWidget {
 Future<T?> showKSheet<T>(BuildContext context, WidgetBuilder builder) {
   return showModalBottomSheet<T>(
     context: context,
+    // Root navigator so the sheet and its barrier cover the tab bar.
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     barrierColor: AppColors.ink.withValues(alpha: .4),

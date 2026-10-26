@@ -56,6 +56,16 @@ class HealthService {
     }
   }
 
+  /// Android only; on iOS the user revokes in the Health app.
+  Future<void> revokeAccess() async {
+    await _configure();
+    try {
+      await _health.revokePermissions();
+    } on Exception {
+      // Already revoked or Health Connect missing.
+    }
+  }
+
   Future<bool> hasAccess() async {
     await _configure();
     return await _health.hasPermissions(_platformTypes) ?? false;
@@ -86,6 +96,19 @@ class HealthService {
     final values = [for (final p in pts) if (p.value is NumericHealthValue) (p.value as NumericHealthValue).numericValue];
     if (values.isEmpty) return null;
     return (values.reduce((a, b) => a + b) / values.length).round();
+  }
+
+  /// Sensor readings already shared by the user's health app for this window.
+  Future<List<HealthMetricReading>> metricReadings(DateTime from, DateTime to) async {
+    await _configure();
+    final points = await _health.getHealthDataFromTypes(types: const [HealthDataType.HEART_RATE, HealthDataType.STEPS], startTime: from, endTime: to);
+    return [for (final point in _health.removeDuplicates(points))
+      if (point.value is NumericHealthValue && !point.dateFrom.isBefore(from) && !point.dateTo.isAfter(to))
+        if (point.type == HealthDataType.HEART_RATE)
+          HealthMetricReading(point.dateFrom, heartRate: (point.value as NumericHealthValue).numericValue.toDouble())
+        else if (point.type == HealthDataType.STEPS && point.dateTo.difference(point.dateFrom).inSeconds > 0 && point.dateTo.difference(point.dateFrom).inSeconds <= 60)
+          HealthMetricReading(point.dateTo, cadence: (point.value as NumericHealthValue).numericValue * 60 / point.dateTo.difference(point.dateFrom).inSeconds),
+    ];
   }
 
   /// Writes a Klubby-recorded session back so it appears in the user's health app.
@@ -119,4 +142,10 @@ class HealthService {
         'hiking' => HealthWorkoutActivityType.HIKING,
         _ => HealthWorkoutActivityType.OTHER,
       };
+}
+
+class HealthMetricReading {
+  const HealthMetricReading(this.at, {this.heartRate, this.cadence});
+  final DateTime at;
+  final double? heartRate, cadence;
 }

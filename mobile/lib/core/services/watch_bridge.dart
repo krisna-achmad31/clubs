@@ -11,6 +11,7 @@ sealed class WatchEvent {
 
   static WatchEvent? parse(Map<String, dynamic> m) => switch (m['type']) {
         'hr' => WatchHeartRate((m['bpm'] as num).toInt()),
+        'cadence' when m['spm'] is num => WatchCadence((m['spm'] as num).toDouble()),
         'control' => WatchControl(m['action'] as String? ?? ''),
         'workout' => WatchWorkout(
             sportId: m['sport'] as String? ?? 'lari',
@@ -26,6 +27,11 @@ sealed class WatchEvent {
 class WatchHeartRate extends WatchEvent {
   const WatchHeartRate(this.bpm);
   final int bpm;
+}
+
+class WatchCadence extends WatchEvent {
+  const WatchCadence(this.perMinute);
+  final double perMinute;
 }
 
 /// pause | resume | stop pressed on the watch.

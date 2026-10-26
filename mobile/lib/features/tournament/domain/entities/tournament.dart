@@ -16,7 +16,15 @@ enum TournamentFormat {
 }
 
 class CourtMatch extends Equatable {
-  const CourtMatch({required this.court, required this.game, required this.teamA, required this.teamB, this.scoreA = 0, this.scoreB = 0, this.done = false});
+  const CourtMatch({
+    required this.court,
+    required this.game,
+    required this.teamA,
+    required this.teamB,
+    this.scoreA = 0,
+    this.scoreB = 0,
+    this.done = false,
+  });
 
   final int court;
   final int game;
@@ -26,7 +34,15 @@ class CourtMatch extends Equatable {
   final int scoreB;
   final bool done;
 
-  CourtMatch withScore(int a, int b) => CourtMatch(court: court, game: game, teamA: teamA, teamB: teamB, scoreA: a, scoreB: b, done: true);
+  CourtMatch withScore(int a, int b) => CourtMatch(
+    court: court,
+    game: game,
+    teamA: teamA,
+    teamB: teamB,
+    scoreA: a,
+    scoreB: b,
+    done: true,
+  );
 
   @override
   List<Object?> get props => [court, game, scoreA, scoreB, done];

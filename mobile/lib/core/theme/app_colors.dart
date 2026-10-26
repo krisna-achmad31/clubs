@@ -15,6 +15,7 @@ abstract final class AppColors {
   static const yellow = Color(0xFFFFC800);
   static const yellowD = Color(0xFFE5A800);
   static const yellowL = Color(0xFFFFF4D6);
+  static const yellowM = Color(0xFFFFE59E);
 
   static const red = Color(0xFFFF4B4B);
   static const redD = Color(0xFFEA2B2B);
@@ -23,6 +24,7 @@ abstract final class AppColors {
   static const orange = Color(0xFFFF9600);
   static const orangeD = Color(0xFFE58600);
   static const orangeL = Color(0xFFFFF1DC);
+  static const orangeM = Color(0xFFFFD9A8);
 
   static const purple = Color(0xFFCE82FF);
   static const purpleD = Color(0xFFA568CC);
@@ -41,6 +43,14 @@ abstract final class AppColors {
   static const soft = Color(0xFFF7F7F7);
   static const white = Color(0xFFFFFFFF);
   static const scanner = Color(0xFF2B2B2B);
+  static const scannerSoft = Color(0xFF2B3A42);
+  static const ice = Color(0xFFBEE9FF);
+
+  // Flat map illustration.
+  static const mapGround = Color(0xFFE6F4DC);
+  static const mapPark = Color(0xFFB8EB8E);
+  static const mapGrass = Color(0xFFC9EBB0);
+  static const mapWater = Color(0xFFBDE6FB);
 }
 
 /// A colour family: base fill, the darker "chunky" shadow shade and the light tint.
@@ -59,4 +69,7 @@ class Hue {
   static const purple = Hue(AppColors.purple, AppColors.purpleD, AppColors.purpleL);
   static const green = Hue(AppColors.green, AppColors.greenD, AppColors.greenL);
   static const white = Hue(AppColors.white, AppColors.line, AppColors.soft);
+
+  /// Muted grey, for neutral/casual states.
+  static const grey = Hue(AppColors.faint, AppColors.muted, AppColors.soft);
 }

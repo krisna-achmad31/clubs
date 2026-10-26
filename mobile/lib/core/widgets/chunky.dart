@@ -141,8 +141,9 @@ class KMiniButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final h = hue;
-    final fg = textColor ?? (h == null ? AppColors.muted : AppColors.white);
+    final disabled = onTap == null;
+    final h = disabled && hue != null ? const Hue(AppColors.line, AppColors.faint, AppColors.soft) : hue;
+    final fg = disabled ? AppColors.faint : textColor ?? (h == null ? AppColors.muted : AppColors.white);
     return Pressable(
       onTap: onTap,
       child: Container(
@@ -154,14 +155,14 @@ class KMiniButton extends StatelessWidget {
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-          Text(label, style: AppText.label(fg)),
+          Flexible(child: Text(label, style: AppText.label(fg), maxLines: 1, overflow: TextOverflow.ellipsis)),
         ]),
       ),
     );
   }
 }
 
-/// Selectable chip/tile with chunky bottom stroke (blue when selected).
+/// Selectable chip/tile with chunky bottom stroke (primary when selected).
 class KChoice extends StatelessWidget {
   const KChoice({
     super.key,
@@ -170,7 +171,7 @@ class KChoice extends StatelessWidget {
     this.onTap,
     this.radius = 12,
     this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    this.hue = Hue.blue,
+    this.hue = Hue.primary,
     this.expand = false,
     this.height,
   });
@@ -184,11 +185,11 @@ class KChoice extends StatelessWidget {
   final bool expand;
   final double? height;
 
-  static Color fg(bool selected, [Hue hue = Hue.blue]) => selected ? hue.base : AppColors.muted;
+  static Color fg(bool selected, [Hue hue = Hue.primary]) => selected ? hue.dark : AppColors.muted;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? (hue == Hue.blue ? AppColors.blueM : hue.base.withValues(alpha: .5)) : AppColors.line;
+    final borderColor = selected ? (hue == Hue.primary ? AppColors.primaryM : hue == Hue.blue ? AppColors.blueM : hue.base.withValues(alpha: .5)) : AppColors.line;
     return Pressable(
       onTap: onTap,
       child: AnimatedContainer(
@@ -211,7 +212,7 @@ class KChoice extends StatelessWidget {
 
 /// Text chip shortcut over [KChoice].
 class KChip extends StatelessWidget {
-  const KChip(this.label, {super.key, required this.selected, this.onTap, this.expand = false, this.hue = Hue.blue, this.leading});
+  const KChip(this.label, {super.key, required this.selected, this.onTap, this.expand = false, this.hue = Hue.primary, this.leading});
 
   final String label;
   final bool selected;
@@ -237,7 +238,7 @@ class KChip extends StatelessWidget {
 
 /// Rounded pill tag ("LUNAS ✓", "ANTREAN #4").
 class KPill extends StatelessWidget {
-  const KPill(this.label, {super.key, this.bg = AppColors.blueL, this.fg = AppColors.blue, this.icon, this.size = 12, this.padding});
+  const KPill(this.label, {super.key, this.bg = AppColors.primaryL, this.fg = AppColors.primaryD, this.icon, this.size = 12, this.padding});
 
   final String label;
   final Color bg;
@@ -253,7 +254,7 @@ class KPill extends StatelessWidget {
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         if (icon != null) ...[Icon(icon, size: size + 2, color: fg), const SizedBox(width: 4)],
-        Text(label, style: AppText.custom(size, c: fg, ls: .4)),
+        Flexible(child: Text(label, style: AppText.custom(size, c: fg, ls: .4), maxLines: 1, overflow: TextOverflow.ellipsis)),
       ]),
     );
   }

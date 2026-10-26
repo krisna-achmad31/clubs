@@ -34,28 +34,54 @@ Future<void> showSportSwitcher(BuildContext context) {
     context,
     (ctx) => BlocBuilder<MeCubit, UserProfile>(
       bloc: cubit,
-      builder: (ctx, me) => KSheet(children: [
-        Text('Olahraga aktif', style: AppText.title()),
-        for (final u in me.sports)
-          KChoice(
-            selected: u.sport.id == me.activeSportId,
-            onTap: () {
-              cubit.setActiveSport(u.sport.id);
-              Navigator.pop(ctx);
-            },
-            padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              MascotHead(animal: u.sport.animal, stage: me.stage, size: 44, bg: AppColors.yellowL, float: false),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${u.sport.emoji} ${u.sport.name}', style: AppText.name()),
-                  Text(u.level?.label ?? 'Pilih level', style: AppText.bodySm()),
-                ]),
+      builder: (ctx, me) => KSheet(
+        children: [
+          Text('Olahraga aktif', style: AppText.title()),
+          for (final u in me.sports)
+            KChoice(
+              selected: u.sport.id == me.activeSportId,
+              onTap: () {
+                cubit.setActiveSport(u.sport.id);
+                Navigator.pop(ctx);
+              },
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  MascotHead(
+                    animal: u.sport.animal,
+                    stage: me.stage,
+                    size: 44,
+                    bg: AppColors.yellowL,
+                    float: false,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${u.sport.emoji} ${u.sport.name}',
+                          style: AppText.name(),
+                        ),
+                        Text(
+                          u.level?.label ?? 'Pilih level',
+                          style: AppText.bodySm(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ]),
+            ),
+          KLink(
+            '🐾 Lihat Geng Gemoy (${me.adopted.length}/${Animal.values.length})',
+            onTap: () {
+              Navigator.pop(ctx);
+              context.push(R.geng);
+            },
           ),
-      ]),
+        ],
+      ),
     ),
   );
 }

@@ -93,7 +93,7 @@ class KSplit extends StatelessWidget {
 
 /// Centered text link ("Nggak jadi", "Batalkan ikut").
 class KLink extends StatelessWidget {
-  const KLink(this.text, {super.key, this.onTap, this.color = AppColors.blue});
+  const KLink(this.text, {super.key, this.onTap, this.color = AppColors.primary});
 
   final String text;
   final VoidCallback? onTap;
@@ -106,7 +106,7 @@ class KLink extends StatelessWidget {
           depth: 0,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color)),
+            child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: onTap == null ? AppColors.faint : color)),
           ),
         ),
       );

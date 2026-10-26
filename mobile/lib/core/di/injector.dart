@@ -15,8 +15,11 @@ import '../../features/league/data/league_repository_impl.dart';
 import '../../features/league/domain/repositories/league_repository.dart';
 import '../../features/league/presentation/cubit/league_cubit.dart';
 import '../../features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import '../../features/profile/data/gear_repository_impl.dart';
 import '../../features/profile/data/profile_repository_impl.dart';
+import '../../features/profile/domain/repositories/gear_repository.dart';
 import '../../features/profile/domain/repositories/profile_repository.dart';
+import '../../features/profile/presentation/cubit/gear_cubit.dart';
 import '../../features/profile/presentation/cubit/me_cubit.dart';
 import '../../features/session/data/session_repository_impl.dart';
 import '../../features/session/domain/repositories/session_repository.dart';
@@ -44,13 +47,15 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(WatchBridge.new)
     // Data
     ..registerLazySingleton<ProfileRepository>(() => ProfileRepositoryImpl(sl()))
+    ..registerLazySingleton<GearRepository>(() => GearRepositoryImpl(sl()))
     ..registerLazySingleton<ClubRepository>(ClubRepositoryImpl.new)
     ..registerLazySingleton<SessionRepository>(SessionRepositoryImpl.new)
     ..registerLazySingleton<ActivityRepository>(ActivityRepositoryImpl.new)
-    ..registerLazySingleton<FeedRepository>(FeedRepositoryImpl.new)
+    ..registerLazySingleton<FeedRepository>(() => FeedRepositoryImpl(activities: sl(), profiles: sl()))
     ..registerLazySingleton<LeagueRepository>(LeagueRepositoryImpl.new)
     // App-wide state
     ..registerLazySingleton(() => MeCubit(sl(), ProfileRepositoryImpl.seed)..load())
+    ..registerLazySingleton(() => GearCubit(sl())..load())
     ..registerLazySingleton(() => SessionsCubit(sl())..load())
     ..registerLazySingleton(() => ClubsCubit(sl())..load())
     ..registerLazySingleton(() => FeedCubit(sl())..load())

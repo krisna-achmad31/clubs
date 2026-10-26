@@ -30,26 +30,54 @@ class WearableState extends Equatable {
   final DateTime? lastSync;
   final bool busy;
 
-  int get activeCount => [healthConnected, strava, watchPaired].where((v) => v).length;
+  int get activeCount =>
+      [healthConnected, strava, watchPaired].where((v) => v).length;
 
   /// "Health Connect" on Android, "Apple Health" on iOS.
-  String get platformHealth => Platform.isIOS ? 'Apple Health' : 'Health Connect';
+  String get platformHealth =>
+      Platform.isIOS ? 'Apple Health' : 'Health Connect';
 
-  WearableState copyWith({bool? healthAvailable, bool? healthConnected, bool? strava, bool? watchPaired, bool? watchReachable, int? bpm, WorkoutRecord? lastWorkout, DateTime? lastSync, bool? busy}) =>
-      WearableState(
-        healthAvailable: healthAvailable ?? this.healthAvailable,
-        healthConnected: healthConnected ?? this.healthConnected,
-        strava: strava ?? this.strava,
-        watchPaired: watchPaired ?? this.watchPaired,
-        watchReachable: watchReachable ?? this.watchReachable,
-        bpm: bpm ?? this.bpm,
-        lastWorkout: lastWorkout ?? this.lastWorkout,
-        lastSync: lastSync ?? this.lastSync,
-        busy: busy ?? this.busy,
-      );
+  /// Names of the sources that are on, for the M4 row subtitle.
+  List<String> get activeNames => [
+    if (watchPaired) 'Jam Klubby',
+    if (healthConnected) platformHealth,
+    if (strava) 'Strava',
+  ];
+
+  WearableState copyWith({
+    bool? healthAvailable,
+    bool? healthConnected,
+    bool? strava,
+    bool? watchPaired,
+    bool? watchReachable,
+    int? bpm,
+    WorkoutRecord? lastWorkout,
+    DateTime? lastSync,
+    bool? busy,
+  }) => WearableState(
+    healthAvailable: healthAvailable ?? this.healthAvailable,
+    healthConnected: healthConnected ?? this.healthConnected,
+    strava: strava ?? this.strava,
+    watchPaired: watchPaired ?? this.watchPaired,
+    watchReachable: watchReachable ?? this.watchReachable,
+    bpm: bpm ?? this.bpm,
+    lastWorkout: lastWorkout ?? this.lastWorkout,
+    lastSync: lastSync ?? this.lastSync,
+    busy: busy ?? this.busy,
+  );
 
   @override
-  List<Object?> get props => [healthAvailable, healthConnected, strava, watchPaired, watchReachable, bpm, lastWorkout, lastSync, busy];
+  List<Object?> get props => [
+    healthAvailable,
+    healthConnected,
+    strava,
+    watchPaired,
+    watchReachable,
+    bpm,
+    lastWorkout,
+    lastSync,
+    busy,
+  ];
 }
 
 /// Smartwatch & health-platform status (A9, I1, I2, M4).
@@ -68,7 +96,14 @@ class WearableCubit extends Cubit<WearableState> {
       final connected = available && await _health.hasAccess();
       final paired = await _watch.isPaired;
       final reachable = paired && await _watch.isReachable;
-      emit(state.copyWith(healthAvailable: available, healthConnected: connected, watchPaired: paired, watchReachable: reachable));
+      emit(
+        state.copyWith(
+          healthAvailable: available,
+          healthConnected: connected,
+          watchPaired: paired,
+          watchReachable: reachable,
+        ),
+      );
       if (paired) _listen();
       if (connected) await sync();
     } on Exception {
@@ -81,9 +116,26 @@ class WearableCubit extends Cubit<WearableState> {
       switch (e) {
         case WatchHeartRate(:final bpm):
           emit(state.copyWith(bpm: bpm));
-        case WatchWorkout(:final sportId, :final start, :final end, :final distanceMeters):
-          emit(state.copyWith(lastWorkout: WorkoutRecord(start: start, end: end, activity: sportId, distanceMeters: distanceMeters, source: 'watch'), lastSync: DateTime.now()));
+        case WatchWorkout(
+          :final sportId,
+          :final start,
+          :final end,
+          :final distanceMeters,
+        ):
+          emit(
+            state.copyWith(
+              lastWorkout: WorkoutRecord(
+                start: start,
+                end: end,
+                activity: sportId,
+                distanceMeters: distanceMeters,
+                source: 'watch',
+              ),
+              lastSync: DateTime.now(),
+            ),
+          );
         case WatchControl():
+        case WatchCadence():
           break;
       }
     });
@@ -108,16 +160,38 @@ class WearableCubit extends Cubit<WearableState> {
   }
 
   /// Strava uses OAuth in the browser; the token exchange lives on the backend.
-  void connectStrava() => emit(state.copyWith(strava: true));
+  /// OAuth/token exchange is unavailable until the backend is connected.
+  void connectStrava() {}
 
-  Future<void> sync() async {
+  void disconnectStrava() => emit(state.copyWith(strava: false));
+
+  Future<void> disconnectHealth() async {
+    await _health.revokeAccess();
+    emit(state.copyWith(healthConnected: false));
+  }
+
+  Future<bool> sync() async {
+    if (!state.healthConnected) return false;
     try {
       final now = DateTime.now();
-      final list = await _health.workouts(from: now.subtract(const Duration(days: 2)), to: now);
-      final hr = await _health.averageHeartRate(now.subtract(const Duration(minutes: 10)), now);
-      emit(state.copyWith(lastWorkout: list.isEmpty ? null : list.last, lastSync: now, bpm: hr));
+      final list = await _health.workouts(
+        from: now.subtract(const Duration(days: 2)),
+        to: now,
+      );
+      final hr = await _health.averageHeartRate(
+        now.subtract(const Duration(minutes: 10)),
+        now,
+      );
+      emit(
+        state.copyWith(
+          lastWorkout: list.isEmpty ? null : list.last,
+          lastSync: now,
+          bpm: hr,
+        ),
+      );
+      return true;
     } on Exception {
-      emit(state.copyWith(lastSync: DateTime.now()));
+      return false;
     }
   }
 

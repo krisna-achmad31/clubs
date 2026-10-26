@@ -4,7 +4,15 @@ import '../../../profile/domain/usecases/streak_rules.dart';
 
 /// L1 row.
 class Standing extends Equatable {
-  const Standing({required this.rank, required this.name, required this.emoji, required this.members, required this.points, this.mine = false});
+  const Standing({
+    required this.rank,
+    required this.name,
+    required this.emoji,
+    required this.members,
+    required this.points,
+    this.mine = false,
+    this.clubId,
+  });
 
   final int rank;
   final String name;
@@ -13,12 +21,21 @@ class Standing extends Equatable {
   final int points;
   final bool mine;
 
+  /// Club profile id, null when the club has no profile in the app yet.
+  final String? clubId;
+
   @override
-  List<Object?> get props => [rank, name, points];
+  List<Object?> get props => [rank, name, points, clubId];
 }
 
 class Contributor extends Equatable {
-  const Contributor(this.rank, this.name, this.emoji, this.points, {this.me = false});
+  const Contributor(
+    this.rank,
+    this.name,
+    this.emoji,
+    this.points, {
+    this.me = false,
+  });
 
   final int rank;
   final String name;
@@ -62,13 +79,29 @@ class Division extends Equatable {
 
   Standing get mine => standings.firstWhere((s) => s.mine);
 
+  /// Division one step up, null when there is no ladder (national board).
+  String? get nextLabel {
+    final n = int.tryParse(label.replaceAll(RegExp(r'\D'), ''));
+    if (n == null) return null;
+    return n > 1 ? 'Divisi ${n - 1}' : 'Divisi Utama';
+  }
+
   @override
   List<Object?> get props => [label, standings, score];
 }
 
 /// L4 segment leaderboard.
 class SegmentEffort extends Equatable {
-  const SegmentEffort(this.rank, this.name, this.emoji, this.time, {this.me = false, this.pr = false});
+  const SegmentEffort(
+    this.rank,
+    this.name,
+    this.emoji,
+    this.time, {
+    this.me = false,
+    this.pr = false,
+    this.club = false,
+    this.following = false,
+  });
 
   final int rank;
   final String name;
@@ -76,13 +109,23 @@ class SegmentEffort extends Equatable {
   final String time;
   final bool me;
   final bool pr;
+  final bool club;
+  final bool following;
 
   @override
   List<Object?> get props => [rank, name, time];
 }
 
 class Segment extends Equatable {
-  const Segment({required this.name, required this.sportId, required this.km, required this.climb, required this.crown, required this.legend, required this.efforts});
+  const Segment({
+    required this.name,
+    required this.sportId,
+    required this.km,
+    required this.climb,
+    required this.crown,
+    required this.legend,
+    required this.efforts,
+  });
 
   final String name;
   final String sportId;

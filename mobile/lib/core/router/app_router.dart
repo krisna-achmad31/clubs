@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -98,7 +99,8 @@ GoRouter buildRouter() => GoRouter(
         _r('/session/:id/expired', (s) => ExpiredPage(id: _id(s))),
         _r('/session/:id/waitlist', (s) => WaitlistPage(id: _id(s))),
         _r('/session/:id/slot', (s) => SlotPage(id: _id(s))),
-        _r(R.claim, (_) => const ClaimPage()),
+        _r(R.claim, (s) => ClaimPage(id: s.uri.queryParameters['id'] ?? 'rabu-malam')),
+        _r('/m/:id', (s) => ClaimPage(id: _id(s))),
 
         // G · host
         _r(R.hostNew, (_) => const HostNewPage()),
@@ -124,7 +126,7 @@ GoRouter buildRouter() => GoRouter(
         _r(R.manual, (_) => const ManualPage()),
         _r(R.done, (_) => const DonePage()),
         _r(R.evolve, (_) => const EvolvePage()),
-        _r(R.story, (_) => const StoryPage()),
+        _r(R.story, (s) => StoryPage(extra: s.extra)),
 
         // K, L · streak & league
         _r(R.streakSaved, (_) => const StreakSavedPage()),
@@ -141,18 +143,22 @@ GoRouter buildRouter() => GoRouter(
         _r(R.settings, (_) => const SettingsPage()),
         _r(R.privacy, (_) => const PrivacyPage()),
         _r(R.goyangSettings, (_) => const GoyangSettingsPage()),
+        _r(R.account, (_) => const AccountPage()),
+        _r(R.devices, (_) => const DevicesPage()),
         _r(R.geng, (_) => const GengPage()),
+        _r(R.help, (_) => const HelpPage()),
+        _r(R.notifPrefs, (_) => const NotifPrefsPage()),
 
         // N, O, P · misc
         _r(R.error, (s) => ErrorPage(variant: s.uri.queryParameters['v'])),
         _r(R.shop, (_) => const ShopPage()),
-        _r(R.venue, (_) => const VenuePage()),
+        _r(R.venue, (s) => VenuePage(id: s.uri.queryParameters['id'])),
         _r(R.goyangLobby, (_) => const GoyangLobbyPage()),
         _r(R.goyangInvite, (_) => const GoyangInvitePage()),
         _r(R.goyangBareng, (_) => const GoyangBarengPage()),
         _r(R.goyangJadi, (_) => const GoyangJadiPage()),
       ],
-      errorPageBuilder: (_, s) => _page(s, const ErrorPage(variant: 'server')),
+      errorPageBuilder: (_, s) => _page(s, const ErrorPage(variant: 'notFound')),
     );
 
 /// Bottom tab bar + the shake-to-invite listener (only while tabs are visible
@@ -192,7 +198,10 @@ class _TabShellState extends State<_TabShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return BlocListener<GoyangCubit, GoyangState>(
       listenWhen: (a, b) => b.shakeCount > a.shakeCount && ModalRoute.of(context)?.isCurrent != false,
-      listener: (context, _) => showGoyangSheet(context),
+      listener: (context, _) {
+        HapticFeedback.heavyImpact();
+        showGoyangSheet(context);
+      },
       child: Scaffold(
         body: widget.shell,
         bottomNavigationBar: KTabBar(

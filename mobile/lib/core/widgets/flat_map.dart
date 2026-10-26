@@ -137,9 +137,9 @@ class _MapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size s) {
-    final ground = onboarding ? AppColors.primaryL : const Color(0xFFE6F4DC);
-    final park = onboarding ? const Color(0xFFB8EB8E) : const Color(0xFFC9EBB0);
-    final water = onboarding ? AppColors.blueM : const Color(0xFFBDE6FB);
+    final ground = onboarding ? AppColors.primaryL : AppColors.mapGround;
+    final park = onboarding ? AppColors.mapPark : AppColors.mapGrass;
+    final water = onboarding ? AppColors.blueM : AppColors.mapWater;
     canvas.drawRect(Offset.zero & s, Paint()..color = ground);
 
     final p = Paint();

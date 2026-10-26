@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/entities/mascot.dart';
@@ -6,7 +8,7 @@ import '../domain/entities/user_profile.dart';
 import '../domain/repositories/profile_repository.dart';
 
 /// Mock profile store seeded with the design's demo user (Budi Santoso).
-/// Only the onboarding flag and a few scalars persist; swap for an API later.
+/// The whole profile persists as JSON on-device; swap for an API later.
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl(this._prefs);
 
@@ -14,13 +16,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
   UserProfile? _cache;
 
   static const _kOnboarded = 'onboarded';
-  static const _kStreak = 'streak';
-  static const _kXp = 'xp';
-  static const _kGems = 'gems';
-  static const _kFreezes = 'freezes';
-  static const _kSport = 'sport';
-  static const _kAvatar = 'avatar';
-  static const _kName = 'name';
+  static const _kProfile = 'profile';
 
   static final seed = UserProfile(
     name: 'Budi Santoso',
@@ -50,30 +46,27 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<UserProfile> load() async {
     if (_cache != null) return _cache!;
-    final avatarName = _prefs.getString(_kAvatar);
-    return _cache = seed.copyWith(
-      name: _prefs.getString(_kName),
-      streak: _prefs.getInt(_kStreak),
-      xp: _prefs.getInt(_kXp),
-      gems: _prefs.getInt(_kGems),
-      freezes: _prefs.getInt(_kFreezes),
-      activeSportId: _prefs.getString(_kSport),
-      avatar: avatarName == null ? null : ProfileAvatar.values.asNameMap()[avatarName],
-    );
+    final raw = _prefs.getString(_kProfile);
+    if (raw != null) {
+      try {
+        return _cache = UserProfile.fromJson((jsonDecode(raw) as Map).cast<String, Object?>());
+      } on Object {
+        // Corrupt or older format: fall back to the seed below.
+      }
+    }
+    return _cache = seed;
   }
 
   @override
   Future<void> save(UserProfile p) async {
     _cache = p;
-    await Future.wait([
-      _prefs.setString(_kName, p.name),
-      _prefs.setInt(_kStreak, p.streak),
-      _prefs.setInt(_kXp, p.xp),
-      _prefs.setInt(_kGems, p.gems),
-      _prefs.setInt(_kFreezes, p.freezes),
-      _prefs.setString(_kSport, p.activeSportId),
-      _prefs.setString(_kAvatar, p.avatar.name),
-    ]);
+    await _prefs.setString(_kProfile, jsonEncode(p.toJson()));
+  }
+
+  @override
+  Future<void> clear() async {
+    _cache = null;
+    await Future.wait([_prefs.remove(_kProfile), _prefs.setBool(_kOnboarded, false)]);
   }
 
   @override
