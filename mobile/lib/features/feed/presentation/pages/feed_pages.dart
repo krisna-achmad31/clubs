@@ -10,6 +10,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../activity/presentation/pages/record_sheet.dart';
 import '../../../activity/domain/entities/activity_analysis.dart';
 import '../../../activity/presentation/widgets/activity_data_sections.dart';
+import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../../profile/presentation/pages/profile_pages.dart'
     show ProfileAvatarView;
@@ -36,36 +37,56 @@ class _FeedPageState extends State<FeedPage> {
     final feed = context.watch<FeedCubit>().state;
     final streak = context.select((MeCubit c) => c.state.streak);
     final last = context.select((MeCubit c) => c.state.lastActive);
-    return KPage(
-      header: const MeTopStats(),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: KSegmented(
-                items: const ['KOMUNITAS', 'PUBLIK'],
-                index: feed.publik ? 1 : 0,
-                onChanged: (i) => context.read<FeedCubit>().setPublik(i == 1),
+    // The feed lives in an IndexedStack tab, so it must reload itself when a
+    // new activity is saved (stamps/XP/last active change) or edited.
+    return BlocListener<MeCubit, UserProfile>(
+      listenWhen: (a, b) =>
+          a.stamps != b.stamps ||
+          a.xp != b.xp ||
+          a.lastActive != b.lastActive ||
+          a.name != b.name,
+      listener: (context, _) => context.read<FeedCubit>().load(),
+      child: KPage(
+        header: const MeTopStats(),
+        onRefresh: () => context.read<FeedCubit>().load(),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: KSegmented(
+                  items: const ['KOMUNITAS', 'PUBLIK'],
+                  index: feed.publik ? 1 : 0,
+                  onChanged: (i) => context.read<FeedCubit>().setPublik(i == 1),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _Bell(unread: feed.unread),
+            ],
+          ),
+          Text(
+            feed.publik
+                ? 'Aktivitas yang dibagikan publik oleh semua pemain Klubby.'
+                : 'Aktivitasmu, teman yang kamu ikuti, dan anggota klubmu.',
+            style: AppText.bodySm(),
+          ),
+          _StreakBanner(
+            streak: streak,
+            safeToday:
+                last != null && DateUtils.isSameDay(last, DateTime.now()),
+          ),
+          for (final p in feed.posts) _PostCard(post: p),
+          if (feed.posts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: MascotSays(
+                animal: Animal.kiki,
+                text: feed.publik
+                    ? 'Belum ada aktivitas publik. Simpan aktivitasmu sebagai Publik biar semua bisa lihat!'
+                    : 'Belum ada aktivitas di sini. Yuk jadi yang pertama!',
               ),
             ),
-            const SizedBox(width: 10),
-            _Bell(unread: feed.unread),
-          ],
-        ),
-        _StreakBanner(
-          streak: streak,
-          safeToday: last != null && DateUtils.isSameDay(last, DateTime.now()),
-        ),
-        for (final p in feed.posts) _PostCard(post: p),
-        if (feed.posts.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: MascotSays(
-              animal: Animal.kiki,
-              text: 'Belum ada aktivitas di sini. Yuk jadi yang pertama!',
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -618,23 +639,10 @@ class _CommentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => c.sticker
-      ? Wobble(
-          trigger: c.text,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: c.stickerBg ?? AppColors.yellowL,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: (c.stickerFg ?? AppColors.orangeD).withValues(alpha: .3),
-                width: 2,
-              ),
-            ),
-            child: Text(
-              c.text,
-              style: AppText.custom(13, c: c.stickerFg ?? AppColors.orangeD),
-            ),
-          ),
+      ? KSticker(
+          c.text,
+          bg: c.stickerBg ?? AppColors.yellowL,
+          fg: c.stickerFg ?? AppColors.orangeD,
         )
       : Text(
           c.text,
@@ -734,7 +742,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
           KIconButton(LucideIcons.share2, onTap: () => _sharePost(post)),
           KIconButton(
             LucideIcons.ellipsis,
-            onTap: () => _showPostMenu(context, post),
+            onTap: () => _showPostMenu(
+              context,
+              post,
+              // The post is gone from the feed, so don't leave the user on it.
+              onGone: () =>
+                  context.canPop() ? context.pop() : context.go(R.feed),
+            ),
           ),
         ],
       ),
@@ -759,21 +773,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             Navigator.pop(ctx);
                             _send(cubit, sticker: t, bg: bg, fg: fg);
                           },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: bg,
-                              borderRadius: BorderRadius.circular(14),
-                              border: chunkyBorder(
-                                fg.withValues(alpha: .4),
-                                bottom: 4,
-                              ),
-                            ),
-                            child: Text(t, style: AppText.custom(15, c: fg)),
-                          ),
+                          child: KStickerChip(t, bg: bg, fg: fg),
                         ),
                     ],
                   ),
@@ -995,16 +995,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: AppColors.soft,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                    ),
+                    padding: c.sticker
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.all(10),
+                    decoration: c.sticker
+                        ? null
+                        : const BoxDecoration(
+                            color: AppColors.soft,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(4),
+                              topRight: Radius.circular(16),
+                              bottomLeft: Radius.circular(16),
+                              bottomRight: Radius.circular(16),
+                            ),
+                          ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

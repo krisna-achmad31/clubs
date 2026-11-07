@@ -18,7 +18,16 @@ class KPage extends StatelessWidget {
     this.bottomBorder = false,
     this.headerPadding = const EdgeInsets.fromLTRB(16, 8, 16, 10),
     this.controller,
+    this.embedded = false,
+    this.onRefresh,
   });
+
+  /// Renders just the body (children, then [bottom]) as a plain column with no
+  /// Scaffold or header, so the screen can live inside another page's tab.
+  final bool embedded;
+
+  /// Enables pull-to-refresh on the scrolling body.
+  final Future<void> Function()? onRefresh;
 
   final Widget? header;
   final List<Widget> children;
@@ -33,7 +42,27 @@ class KPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (embedded) {
+      final items = [...children, ?bottom];
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          stagger ? StaggerIn(index: i, child: items[i]) : items[i],
+        ],
+      ]);
+    }
     final inset = MediaQuery.paddingOf(context).bottom;
+    final body = ListView(
+      controller: controller,
+      padding: padding,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          stagger ? StaggerIn(index: i, child: children[i]) : children[i],
+        ],
+      ],
+    );
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
@@ -41,17 +70,7 @@ class KPage extends StatelessWidget {
         child: Column(children: [
           if (header != null) Padding(padding: headerPadding, child: header),
           Expanded(
-            child: ListView(
-              controller: controller,
-              padding: padding,
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0) SizedBox(height: gap),
-                  stagger ? StaggerIn(index: i, child: children[i]) : children[i],
-                ],
-              ],
-            ),
+            child: onRefresh == null ? body : RefreshIndicator(onRefresh: onRefresh!, color: AppColors.primary, child: body),
           ),
           if (bottom != null)
             Container(

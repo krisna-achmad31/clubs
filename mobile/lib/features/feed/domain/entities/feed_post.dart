@@ -120,6 +120,7 @@ class FeedPost extends Equatable {
     this.club,
     this.emoji,
     this.publik = false,
+    this.circle = true,
     this.activity,
     this.activityId,
     this.mine = false,
@@ -149,7 +150,13 @@ class FeedPost extends Equatable {
 
   /// Animal emoji avatar (J2 uses 🐰 for Rian).
   final String? emoji;
+
+  /// Shared as Publik: shows on the PUBLIK tab.
   final bool publik;
+
+  /// Author is in one of my clubs or someone I follow: shows on KOMUNITAS.
+  /// Strangers' public posts only reach me through PUBLIK.
+  final bool circle;
   final Activity? activity;
   final String? activityId;
   final bool mine;
@@ -176,6 +183,7 @@ class FeedPost extends Equatable {
     club: club,
     emoji: emoji,
     publik: publik,
+    circle: circle,
     activity: activity ?? this.activity,
     activityId: activityId,
     mine: mine,

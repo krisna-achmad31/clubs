@@ -1025,21 +1025,7 @@ class _ChatViewState extends State<_ChatView> {
                                     Navigator.pop(ctx);
                                     _send(t, sticker: true, stickerBg: bg);
                                   },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: bg,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: chunkyBorder(
-                                        AppColors.line,
-                                        bottom: 4,
-                                      ),
-                                    ),
-                                    child: Text(t, style: AppText.custom(15)),
-                                  ),
+                                  child: KStickerChip(t, bg: bg),
                                 ),
                             ],
                           ),
@@ -1137,24 +1123,7 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final sticker = m.kind == MessageKind.sticker;
     final body = sticker
-        ? Wobble(
-            trigger: m.id,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 150, minHeight: 90),
-              padding: const EdgeInsets.all(14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: m.stickerBg ?? AppColors.orangeL,
-                borderRadius: BorderRadius.circular(20),
-                border: chunkyBorder(AppColors.line, bottom: 4),
-              ),
-              child: Text(
-                m.text,
-                textAlign: TextAlign.center,
-                style: AppText.custom(17),
-              ),
-            ),
-          )
+        ? KSticker(m.text, bg: m.stickerBg ?? AppColors.orangeL, trigger: m.id)
         : Container(
             constraints: const BoxConstraints(maxWidth: 240),
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),

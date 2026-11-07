@@ -186,7 +186,10 @@ class StreakSavedPage extends StatelessWidget {
 }
 
 class StampsPage extends StatefulWidget {
-  const StampsPage({super.key});
+  const StampsPage({super.key, this.embedded = false});
+
+  /// Shown as a tab inside Profil instead of its own screen.
+  final bool embedded;
   @override
   State<StampsPage> createState() => _StampsPageState();
 }
@@ -300,6 +303,7 @@ class _StampsPageState extends State<StampsPage> {
           .length;
       final sports = {for (final entry in byDay.values) ...entry.sportIds};
       return KPage(
+        embedded: widget.embedded,
         header: const KHeader('Buku Stempel'),
         bottom: KButton(
           'EKSPOR KE STORY',

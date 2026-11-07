@@ -13,3 +13,4 @@ export 'flat_map.dart';
 export 'mascot_view.dart';
 export 'page.dart';
 export 'sheets.dart';
+export 'sticker.dart';

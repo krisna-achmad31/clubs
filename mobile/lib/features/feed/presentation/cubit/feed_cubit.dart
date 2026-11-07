@@ -46,16 +46,28 @@ class FeedCubit extends Cubit<FeedState> {
 
   final FeedRepository _repo;
 
-  Future<void> load() async => emit(
-    state.copyWith(
-      posts: await _repo.feed(publik: state.publik),
-      notifications: await _repo.notifications(),
-    ),
-  );
+  // Every update awaits first and reads [state] only afterwards: reading it
+  // before the await would re-emit a stale snapshot (e.g. flip PUBLIK back to
+  // KOMUNITAS when a reload finishes after the user switched tabs).
+  Future<void> load() async {
+    final publik = state.publik;
+    final posts = await _repo.feed(publik: publik);
+    final notifications = await _repo.notifications();
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        // Drop posts fetched for a tab the user has since left.
+        posts: state.publik == publik ? posts : null,
+        notifications: notifications,
+      ),
+    );
+  }
 
   Future<void> setPublik(bool v) async {
     emit(state.copyWith(publik: v));
-    emit(state.copyWith(posts: await _repo.feed(publik: v)));
+    final posts = await _repo.feed(publik: v);
+    if (isClosed || state.publik != v) return;
+    emit(state.copyWith(posts: posts));
   }
 
   /// Fetches a post for J2 and keeps it in [FeedState.details] so later changes render.
@@ -97,11 +109,13 @@ class FeedCubit extends Cubit<FeedState> {
 
   Future<void> markRead(String id) async {
     await _repo.markRead(id);
-    emit(state.copyWith(notifications: await _repo.notifications()));
+    final notifications = await _repo.notifications();
+    if (!isClosed) emit(state.copyWith(notifications: notifications));
   }
 
   Future<void> markAllRead() async {
     await _repo.markAllRead();
-    emit(state.copyWith(notifications: await _repo.notifications()));
+    final notifications = await _repo.notifications();
+    if (!isClosed) emit(state.copyWith(notifications: notifications));
   }
 }

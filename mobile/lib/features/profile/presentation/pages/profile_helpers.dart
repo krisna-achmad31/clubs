@@ -12,6 +12,9 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<List<Activity>>? _recent;
   int? _recentKey;
 
+  /// 0 Dashboard · 1 Stempel · 2 Tanding · 3 Gear.
+  var _tab = 0;
+
   /// Re-reads the activity log whenever a new session lands on the profile.
   Future<List<Activity>> _activities(UserProfile p) {
     final key = Object.hash(p.stamps, p.xp, p.lastActive);
@@ -82,133 +85,134 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
-        // Quick-nav: Dashboard is this page, the rest open their own screens.
+        // Tabs switch the content below in place; they never push a route.
         KSegmented(
           items: const ['Dashboard', 'Stempel', 'Tanding', 'Gear'],
-          index: 0,
+          index: _tab,
           fontSize: 13,
-          onChanged: (i) {
-            if (i == 1) context.push(R.stamps);
-            if (i == 2) context.push(R.rating);
-            if (i == 3) context.push(R.gear);
-          },
+          onChanged: (i) => setState(() => _tab = i),
         ),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final (emoji, value, label, route) in [
-              ('🔥', p.streak, 'Hari streak', R.stamps),
-              ('⚡', p.xp, 'Total XP', R.challenges),
-              ('🧊', p.freezes, 'Es Batu', R.shop),
-              ('💎', p.gems, 'Permata', R.shop),
-            ])
-              SizedBox(
-                width: (MediaQuery.sizeOf(context).width - 50) / 2,
-                child: _Stat(
-                  emoji,
-                  value,
-                  label,
-                  onTap: () => context.push(route),
-                ),
-              ),
-          ],
-        ),
-        KCard(
-          color: AppColors.purpleL,
-          border: AppColors.purpleM,
-          onTap: () => context.push(R.geng),
-          child: Row(
-            children: [
-              MascotHead(
-                animal: p.partner,
-                stage: p.stage,
-                size: 64,
-                bg: AppColors.white,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Geng Gemoy', style: AppText.cardTitle()),
-                    Text(
-                      'Partner: ${p.partner.label} · ${p.stage.label}',
-                      style: AppText.bodySm(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    KPill(
-                      '${p.adopted.length}/${Animal.values.length} hewan',
-                      bg: AppColors.white,
-                      fg: AppColors.purpleD,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(LucideIcons.chevronRight, color: AppColors.purpleD),
-            ],
-          ),
-        ),
-        FutureBuilder<List<Activity>>(
-          future: _activities(p),
-          builder: (context, snap) {
-            final all = [...?snap.data]
-              ..sort((a, b) => b.start.compareTo(a.start));
-            final stamps = StampCalendar.days(p, all).values.toList()
-              ..sort((a, b) => b.day.compareTo(a.day));
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 12,
-              children: [
-                SectionTitle(
-                  'Buku Stamp',
-                  action: 'LIHAT SEMUA',
-                  onAction: () => context.push(R.stamps),
-                ),
-                _StampRow(stamps.take(6).toList()),
-                const SectionTitle('Aktivitas minggu ini'),
-                KCard(child: _WeekBars(all)),
-                _MonthSplit(all),
-              ],
-            );
-          },
-        ),
-        for (final (title, icon, route) in [
-          ('Tantangan', LucideIcons.flag, R.challenges),
-          ('Toko', LucideIcons.shoppingBag, R.shop),
-        ])
-          KRow(
-            title: title,
-            icon: icon,
-            trailing: const Icon(LucideIcons.chevronRight),
-            onTap: () => context.push(route),
-          ),
-        SectionTitle(
-          'Olahraga kamu',
-          action: 'TAMBAH',
-          onAction: () => _addProfileSport(context),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final u in p.sports)
-              KChip(
-                '${u.sport.emoji} ${u.sport.name}',
-                hue: u.sport.hue,
-                selected: p.activeSportId == u.sport.id,
-                onTap: () => context.read<MeCubit>().setActiveSport(u.sport.id),
-              ),
-          ],
-        ),
-        Text(
-          '${p.stamps} stempel terkumpul · Rekor streak ${p.bestStreak} hari',
-          style: AppText.bodySm(),
-        ),
+        if (_tab == 1)
+          const StampsPage(embedded: true)
+        else if (_tab == 2)
+          const RatingPage(embedded: true)
+        else if (_tab == 3)
+          const GearPage(embedded: true)
+        else
+          ..._dashboard(context, p),
       ],
     );
   }
+
+  List<Widget> _dashboard(BuildContext context, UserProfile p) => [
+    Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final (emoji, value, label, route) in [
+          ('🔥', p.streak, 'Hari streak', R.stamps),
+          ('⚡', p.xp, 'Total XP', R.challenges),
+          ('🧊', p.freezes, 'Es Batu', R.shop),
+          ('💎', p.gems, 'Permata', R.shop),
+        ])
+          SizedBox(
+            width: (MediaQuery.sizeOf(context).width - 50) / 2,
+            child: _Stat(emoji, value, label, onTap: () => context.push(route)),
+          ),
+      ],
+    ),
+    KCard(
+      color: AppColors.purpleL,
+      border: AppColors.purpleM,
+      onTap: () => context.push(R.geng),
+      child: Row(
+        children: [
+          MascotHead(
+            animal: p.partner,
+            stage: p.stage,
+            size: 64,
+            bg: AppColors.white,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Geng Gemoy', style: AppText.cardTitle()),
+                Text(
+                  'Partner: ${p.partner.label} · ${p.stage.label}',
+                  style: AppText.bodySm(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                KPill(
+                  '${p.adopted.length}/${Animal.values.length} hewan',
+                  bg: AppColors.white,
+                  fg: AppColors.purpleD,
+                ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.chevronRight, color: AppColors.purpleD),
+        ],
+      ),
+    ),
+    FutureBuilder<List<Activity>>(
+      future: _activities(p),
+      builder: (context, snap) {
+        final all = [...?snap.data]..sort((a, b) => b.start.compareTo(a.start));
+        final stamps = StampCalendar.days(p, all).values.toList()
+          ..sort((a, b) => b.day.compareTo(a.day));
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
+            SectionTitle(
+              'Buku Stamp',
+              action: 'LIHAT SEMUA',
+              onAction: () => context.push(R.stamps),
+            ),
+            _StampRow(stamps.take(6).toList()),
+            const SectionTitle('Aktivitas minggu ini'),
+            KCard(child: _WeekBars(all)),
+            _MonthSplit(all),
+          ],
+        );
+      },
+    ),
+    for (final (title, icon, route) in [
+      ('Tantangan', LucideIcons.flag, R.challenges),
+      ('Toko', LucideIcons.shoppingBag, R.shop),
+    ])
+      KRow(
+        title: title,
+        icon: icon,
+        trailing: const Icon(LucideIcons.chevronRight),
+        onTap: () => context.push(route),
+      ),
+    SectionTitle(
+      'Olahraga kamu',
+      action: 'TAMBAH',
+      onAction: () => _addProfileSport(context),
+    ),
+    Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final u in p.sports)
+          KChip(
+            '${u.sport.emoji} ${u.sport.name}',
+            hue: u.sport.hue,
+            selected: p.activeSportId == u.sport.id,
+            onTap: () => context.read<MeCubit>().setActiveSport(u.sport.id),
+          ),
+      ],
+    ),
+    Text(
+      '${p.stamps} stempel terkumpul · Rekor streak ${p.bestStreak} hari',
+      style: AppText.bodySm(),
+    ),
+  ];
 
   void _people(BuildContext context, String title) => showKSheet<void>(
     context,

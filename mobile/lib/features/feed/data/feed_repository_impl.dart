@@ -112,6 +112,57 @@ class FeedRepositoryImpl implements FeedRepository {
         ),
       ],
     ),
+    const FeedPost(
+      id: 'sisca-padel',
+      author: 'Sisca Lestari',
+      initials: 'SL',
+      color: AppColors.orange,
+      meta: 'Padel · Hari ini 07.30 · Padel Pondok Indah',
+      title: 'Padel pagi, smash pertama masuk! 🎾',
+      sportId: 'padel',
+      publik: true,
+      circle: false,
+      stats: [
+        PostStat('DURASI', '1j 10m', AppColors.primary),
+        PostStat('SET', '2-1', AppColors.primary),
+        PostStat('KALORI', '480', AppColors.red),
+      ],
+      reactions: [
+        Reaction('🎾', 9, AppColors.primaryD),
+        Reaction('🔥', 3, AppColors.orange),
+      ],
+    ),
+    const FeedPost(
+      id: 'bayu-sepeda',
+      author: 'Bayu Nugroho',
+      initials: 'BN',
+      color: AppColors.blue,
+      meta: 'Sepeda · Kemarin · Car Free Day Sudirman',
+      title: 'Gowes CFD Sudirman–Thamrin 🚴',
+      sportId: 'sepeda',
+      publik: true,
+      circle: false,
+      stats: [
+        PostStat('JARAK', '24,6 km', AppColors.ink),
+        PostStat('WAKTU', '1:02:40', AppColors.ink),
+        PostStat('KEC.', '23,5 km/j', AppColors.primary),
+      ],
+      reactions: [
+        Reaction('🚴', 14, AppColors.primary),
+        Reaction('👑', 2, AppColors.purple),
+      ],
+      comments: [
+        Comment(
+          author: 'Sisca',
+          emoji: '🦊',
+          avatarBg: AppColors.orangeL,
+          text: '🔥 Gacor!',
+          sticker: true,
+          stickerBg: AppColors.orangeL,
+          stickerFg: AppColors.orange,
+        ),
+      ],
+    ),
   ];
 
   Future<void> _syncActivities() async {
@@ -266,8 +317,10 @@ class FeedRepositoryImpl implements FeedRepository {
     await _syncActivities();
     return _posts
         .where(
+          // KOMUNITAS: my posts + my clubs/followings, any privacy.
+          // PUBLIK: only posts shared as Publik, from anyone.
           (p) =>
-              (p.mine ? !publik || p.publik : publik || !p.publik) &&
+              (publik ? p.publik : p.mine || p.circle) &&
               !_hidden.contains(p.id) &&
               !_muted.contains(p.author),
         )

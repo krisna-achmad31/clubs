@@ -819,23 +819,38 @@ class MiniBars extends StatelessWidget {
 }
 
 /// Grabber + sheet body. Use with [showKSheet].
+///
+/// Every sheet is capped at [maxHeightFactor] of the screen (half by default);
+/// longer content scrolls under a fixed grabber. The keyboard is added on top
+/// of the cap so forms keep the same visible area while typing.
 class KSheet extends StatelessWidget {
-  const KSheet({super.key, required this.children, this.padding = const EdgeInsets.fromLTRB(16, 10, 16, 24), this.gap = 14});
+  const KSheet({super.key, required this.children, this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 24), this.gap = 14, this.maxHeightFactor = .5});
 
   final List<Widget> children;
   final EdgeInsetsGeometry padding;
   final double gap;
+  final double maxHeightFactor;
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom + MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
-      child: SingleChildScrollView(
-        padding: padding,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(3)))),
-          for (final c in children) ...[SizedBox(height: gap), c],
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(3)))),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: padding,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+                for (final c in children) ...[SizedBox(height: gap), c],
+              ]),
+            ),
+          ),
         ]),
       ),
     );

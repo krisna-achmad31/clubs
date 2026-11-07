@@ -21,6 +21,7 @@ import '../../domain/entities/stamp_calendar.dart';
 import '../../domain/entities/stamp_entry.dart';
 import '../cubit/gear_cubit.dart';
 import '../cubit/me_cubit.dart';
+import 'streak_calendar_pages.dart' show StampsPage;
 
 part 'profile_helpers.dart';
 
@@ -301,7 +302,10 @@ class _AvatarPageState extends State<AvatarPage> {
 
 /// M2 Rating tanding.
 class RatingPage extends StatefulWidget {
-  const RatingPage({super.key});
+  const RatingPage({super.key, this.embedded = false});
+
+  /// Shown as a tab inside Profil instead of its own screen.
+  final bool embedded;
 
   @override
   State<RatingPage> createState() => _RatingPageState();
@@ -315,6 +319,7 @@ class _RatingPageState extends State<RatingPage> {
     final sports = context.watch<MeCubit>().state.sports;
     if (sports.isEmpty) {
       return KPage(
+        embedded: widget.embedded,
         header: const KHeader('Rating Tanding'),
         children: [
           Text(
@@ -342,6 +347,7 @@ class _RatingPageState extends State<RatingPage> {
         ),
     ];
     return KPage(
+      embedded: widget.embedded,
       header: const KHeader('Rating Tanding'),
       children: [
         SingleChildScrollView(
@@ -507,7 +513,10 @@ class _LinePainter extends CustomPainter {
 
 /// M3 Gear saya.
 class GearPage extends StatefulWidget {
-  const GearPage({super.key});
+  const GearPage({super.key, this.embedded = false});
+
+  /// Shown as a tab inside Profil instead of its own screen.
+  final bool embedded;
 
   @override
   State<GearPage> createState() => _GearPageState();
@@ -568,6 +577,7 @@ class _GearPageState extends State<GearPage> {
         final retired = cubit.retired;
         final sports = {for (final g in active) g.sportId};
         return KPage(
+          embedded: widget.embedded,
           header: KHeader(
             'Gear Saya',
             actions: [KLink('+ TAMBAH', onTap: _add)],
@@ -586,6 +596,10 @@ class _GearPageState extends State<GearPage> {
                   selected: _retired,
                   onTap: () => setState(() => _retired = true),
                 ),
+                if (widget.embedded) ...[
+                  const Spacer(),
+                  KLink('+ TAMBAH', onTap: _add),
+                ],
               ],
             ),
             if (_retired) ...[
