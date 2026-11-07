@@ -8,10 +8,13 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
+import '../../../../core/services/contacts_service.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../feed/domain/entities/feed_post.dart';
 import '../../../feed/presentation/cubit/feed_cubit.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../../session/domain/entities/mabar_session.dart';
@@ -23,6 +26,16 @@ import '../cubit/clubs_cubit.dart';
 import '../../../tournament/presentation/cubit/tournament_cubit.dart';
 
 part 'club_actions.dart';
+part 'club_invite.dart';
+
+/// "+" / BUAT KLUB on the Klub tab: create, then open the new club.
+Future<void> _createClub(BuildContext context) async {
+  final club = await context.push<Club>(R.newClub);
+  if (club == null || !context.mounted) return;
+  // Open the new club, with the invite step on top of it.
+  context.push(R.club(club.id));
+  context.push(R.invite(club.id, fresh: true));
+}
 
 /// B1 Klub tab.
 class ClubsPage extends StatelessWidget {
@@ -49,7 +62,7 @@ class ClubsPage extends StatelessWidget {
             LucideIcons.plus,
             color: AppColors.primary,
             size: 26,
-            onTap: () => context.push(R.newClub),
+            onTap: () => _createClub(context),
           ),
         ],
       ),
@@ -110,7 +123,7 @@ class ClubsPage extends StatelessWidget {
             'BUAT KLUB',
             small: true,
             icon: LucideIcons.plus,
-            onTap: () => context.push(R.newClub),
+            onTap: () => _createClub(context),
           ),
         ]),
       ],
@@ -412,6 +425,23 @@ class ClubPage extends StatefulWidget {
 
 class _ClubPageState extends State<ClubPage> {
   int _tab = 0;
+  Future<List<FeedPost>>? _feed;
+  Object? _feedKey;
+
+  /// Last loaded club posts, kept on screen while a refetch runs.
+  List<FeedPost>? _feedShown;
+
+  /// The club's own posts, refetched whenever the feed changes (new post,
+  /// reaction, hide). Independent of the Feed tab's KOMUNITAS/PUBLIK toggle.
+  Future<List<FeedPost>> _clubFeed(BuildContext context, Club club) {
+    final state = context.watch<FeedCubit>().state;
+    final key = Object.hash(state.posts, club.name);
+    if (_feed == null || key != _feedKey) {
+      _feedKey = key;
+      _feed = context.read<FeedCubit>().clubPosts(club.name);
+    }
+    return _feed!;
+  }
 
   @override
   Widget build(BuildContext context) =>
@@ -453,8 +483,54 @@ class _ClubPageState extends State<ClubPage> {
           ),
         ),
     ];
-    final tabs = ['Jadwal', 'Feed', 'Chat', 'Kas', 'Anggota'];
+    // Tabs swap the content in place. Chat needs its own screen, so it is the
+    // floating button instead of a tab.
+    final tabs = ['Jadwal', 'Feed', 'Kas', 'Anggota'];
     return Scaffold(
+      bottomNavigationBar: member
+          ? null
+          : Container(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 20 + inset.bottom),
+              decoration: const BoxDecoration(
+                color: AppColors.bg,
+                border: Border(
+                  top: BorderSide(color: AppColors.line, width: 2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Gabung gratis', style: AppText.name()),
+                        Text(
+                          '${club.needsApproval ? 'Butuh persetujuan admin' : 'Gabung instan'}${sessions.isEmpty ? '' : ' · mabar ${Fmt.rpShort(sessions.map((s) => s.fee).reduce((a, b) => a < b ? a : b))}'}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.bodySm(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  KButton(
+                    clubs.pending.contains(club.id)
+                        ? 'MENUNGGU'
+                        : (club.needsApproval ? 'MINTA GABUNG' : 'GABUNG KLUB'),
+                    expand: false,
+                    hue: club.needsApproval ? Hue.purple : Hue.primary,
+                    onTap: clubs.pending.contains(club.id)
+                        ? null
+                        : () => context.read<ClubsCubit>().join(club),
+                  ),
+                ],
+              ),
+            ),
+      floatingActionButton: _ChatFab(
+        unread: member ? club.unread : 0,
+        onTap: () => _openMemberRoute(context, club, R.chat(club.id)),
+      ),
       body: Column(
         children: [
           Container(
@@ -564,15 +640,7 @@ class _ClubPageState extends State<ClubPage> {
                     horizontal: 12,
                     vertical: 7,
                   ),
-                  onTap: () {
-                    if (i == 2) {
-                      _openMemberRoute(context, club, R.chat(club.id));
-                    } else if (i == 3) {
-                      _openMemberRoute(context, club, R.kas(club.id));
-                    } else {
-                      setState(() => _tab = i);
-                    }
-                  },
+                  onTap: () => setState(() => _tab = i),
                   child: Text(
                     tabs[i],
                     style: AppText.custom(14, c: KChoice.fg(_tab == i)),
@@ -583,7 +651,8 @@ class _ClubPageState extends State<ClubPage> {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              // Bottom room so the chat button never covers the last item.
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
                 if (_tab == 0) ...[
                   if (club.pinnedNote.isNotEmpty)
@@ -615,30 +684,63 @@ class _ClubPageState extends State<ClubPage> {
                       ),
                     ),
                 ],
-                if (_tab == 1 &&
-                    !context.watch<FeedCubit>().state.posts.any(
-                      (p) => p.meta.contains(club.name) || p.club == club.name,
-                    ))
+                if (_tab == 1 && !member)
                   const MascotSays(
                     animal: Animal.ciko,
-                    text: 'Belum ada posting klub. Aktivitas anggota akan muncul di sini.',
+                    text: 'Feed klub khusus anggota. Gabung dulu untuk lihat aktivitas mereka.',
                   ),
-                if (_tab == 1)
-                  for (final p in context.watch<FeedCubit>().state.posts.where(
-                    (p) => p.meta.contains(club.name) || p.club == club.name,
-                  ))
+                if (_tab == 1 && member)
+                  FutureBuilder<List<FeedPost>>(
+                    future: _clubFeed(context, club),
+                    builder: (context, snap) {
+                      final posts = snap.data ?? _feedShown;
+                      if (snap.data != null) _feedShown = snap.data;
+                      if (posts == null) {
+                        return const Padding(
+                          padding: EdgeInsets.only(top: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (posts.isEmpty) {
+                        return const MascotSays(
+                          animal: Animal.ciko,
+                          text: 'Belum ada posting klub. Aktivitas anggota akan muncul di sini.',
+                        );
+                      }
+                      return Column(
+                        children: [
+                          for (final p in posts)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: KCard(
+                                onTap: () => context.push(R.post(p.id)),
+                                child: KRow(
+                                  title: p.title,
+                                  subtitle: '${p.author} · ${p.meta}',
+                                  icon: LucideIcons.activity,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                if (_tab == 2 && !member)
+                  const MascotSays(
+                    animal: Animal.ciko,
+                    text: 'Kas klub khusus anggota. Gabung dulu untuk lihat laporan kas.',
+                  ),
+                if (_tab == 2 && member) KasPage(id: club.id, embedded: true),
+                if (_tab == 3) ...[
+                  if (member)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: KCard(
-                        onTap: () => context.push(R.post(p.id)),
-                        child: KRow(
-                          title: p.title,
-                          subtitle: '${p.author} · ${p.meta}',
-                          icon: LucideIcons.activity,
-                        ),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: KButton.secondary(
+                        'UNDANG ANGGOTA',
+                        icon: LucideIcons.userPlus,
+                        onTap: () => context.push(R.invite(club.id)),
                       ),
                     ),
-                if (_tab == 4) ...[
                   for (final name in _memberNames(context, club).take(5))
                     KRow(
                       title: name,
@@ -660,49 +762,68 @@ class _ClubPageState extends State<ClubPage> {
               ],
             ),
           ),
-          if (!member)
-            Container(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 20 + inset.bottom),
-              decoration: const BoxDecoration(
-                color: AppColors.bg,
-                border: Border(
-                  top: BorderSide(color: AppColors.line, width: 2),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Gabung gratis', style: AppText.name()),
-                        Text(
-                          '${club.needsApproval ? 'Butuh persetujuan admin' : 'Gabung instan'}${sessions.isEmpty ? '' : ' · mabar ${Fmt.rpShort(sessions.map((s) => s.fee).reduce((a, b) => a < b ? a : b))}'}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.bodySm(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  KButton(
-                    clubs.pending.contains(club.id)
-                        ? 'MENUNGGU'
-                        : (club.needsApproval ? 'MINTA GABUNG' : 'GABUNG KLUB'),
-                    expand: false,
-                    hue: club.needsApproval ? Hue.purple : Hue.primary,
-                    onTap: clubs.pending.contains(club.id)
-                        ? null
-                        : () => context.read<ClubsCubit>().join(club),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
+}
+
+/// Floating chat entry on a club page, with the unread count.
+class _ChatFab extends StatelessWidget {
+  const _ChatFab({required this.unread, required this.onTap});
+
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: unread > 0 ? 'Chat klub, $unread belum dibaca' : 'Chat klub',
+    child: Pressable(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+              boxShadow: lip(AppColors.primaryD, 4),
+            ),
+            child: const Icon(
+              LucideIcons.messageCircle,
+              color: AppColors.white,
+              size: 28,
+            ),
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: PopIn(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.red,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.white, width: 2),
+                  ),
+                  child: Text(
+                    '$unread',
+                    style: AppText.custom(11, c: AppColors.white),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SessionCard extends StatelessWidget {
@@ -1239,6 +1360,9 @@ class _NewClubPageState extends State<NewClubPage> {
   late String _area = context.read<MeCubit>().state.area;
   PayoutAccount? _payout;
 
+  /// Klubby users picked in "Anggota awal"; they join when the club is made.
+  var _members = <KlubbyUser>[];
+
   @override
   void dispose() {
     _name.dispose();
@@ -1254,16 +1378,29 @@ class _NewClubPageState extends State<NewClubPage> {
       return toast(context, 'Tambahkan rekening pencairan kas dulu');
     }
     setState(() => _busy = true);
-    final c = await context.read<ClubsCubit>().create(
-      name: _name.text.trim(),
-      sportId: _sport.id,
-      area: _area,
-      privacy: _privacy,
-      logoPath: _logo,
-      payout: _payout,
-    );
-    if (!mounted) return;
-    context.canPop() ? context.pop(c) : context.go(R.club(c.id));
+    final clubs = context.read<ClubsCubit>();
+    try {
+      final c = await clubs.create(
+        name: _name.text.trim(),
+        sportId: _sport.id,
+        area: _area,
+        privacy: _privacy,
+        logoPath: _logo,
+        payout: _payout,
+      );
+      for (final u in _members) {
+        await clubs.addMember(c.id, u);
+      }
+      if (!mounted) return;
+      // Callers decide what comes next: the Klub tab opens the new club,
+      // onboarding and the host form return to their own step.
+      context.canPop() ? context.pop(c) : context.go(R.club(c.id));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        toast(context, 'Klub belum tersimpan. Coba lagi.');
+      }
+    }
   }
 
   Future<void> _pickLogo() async {
@@ -1440,31 +1577,14 @@ class _NewClubPageState extends State<NewClubPage> {
                 color: AppColors.faint,
                 size: 18,
               ),
-              onTap: () => showKSheet<void>(
-                context,
-                (ctx) => KSheet(
-                  children: [
-                    Text('Olahraga utama', style: AppText.title()),
-                    SizedBox(
-                      height: 320,
-                      child: ListView(
-                        children: [
-                          for (final s in Sports.all)
-                            KRow(
-                              title: s.name,
-                              emoji: s.emoji.isEmpty ? null : s.emoji,
-                              icon: s.icon,
-                              onTap: () {
-                                setState(() => _sport = s);
-                                Navigator.pop(ctx);
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              onTap: () async {
+                final s = await showSportPicker(
+                  context,
+                  selectedId: _sport.id,
+                  title: 'Olahraga utama',
+                );
+                if (s != null && mounted) setState(() => _sport = s);
+              },
             ),
           ],
         ),
@@ -1505,6 +1625,53 @@ class _NewClubPageState extends State<NewClubPage> {
               LucideIcons.lock,
               'Butuh persetujuan',
               'Admin menyetujui tiap anggota',
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FieldLabel(
+              _members.isEmpty
+                  ? 'ANGGOTA AWAL · OPSIONAL'
+                  : 'ANGGOTA AWAL · ${_members.length}',
+            ),
+            const SizedBox(height: 8),
+            if (_members.isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final u in _members)
+                    KChip(
+                      '${u.name}  ✕',
+                      selected: true,
+                      onTap: () =>
+                          setState(() => _members = [..._members]..remove(u)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            KButton.secondary(
+              'TAMBAH ANGGOTA',
+              icon: LucideIcons.userPlus,
+              textColor: AppColors.primary,
+              onTap: () async {
+                final picked = await showKSheet<List<KlubbyUser>>(
+                  context,
+                  (_) => _PickMembersSheet(initial: _members),
+                );
+                if (picked != null && mounted) {
+                  setState(() => _members = picked);
+                }
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Teman yang belum pakai Klubby bisa diundang lewat WhatsApp '
+              'setelah klub jadi.',
+              style: AppText.caption(AppColors.muted),
             ),
           ],
         ),
@@ -1603,8 +1770,21 @@ class _PayoutSheet extends StatefulWidget {
 }
 
 class _PayoutSheetState extends State<_PayoutSheet> {
-  late String _provider =
-      widget.initial?.provider ?? PayoutAccount.providers.first;
+  static const _other = 'Lainnya';
+
+  /// Validation message shown inside the sheet (a toast would sit behind it).
+  String? _error;
+
+  /// A saved provider that isn't in the list was typed under "Lainnya".
+  late final _custom =
+      widget.initial != null &&
+      !PayoutAccount.providers.contains(widget.initial!.provider);
+  late String _provider = _custom
+      ? _other
+      : widget.initial?.provider ?? PayoutAccount.providers.first;
+  late final _otherName = TextEditingController(
+    text: _custom ? widget.initial!.provider : null,
+  );
   late final _number = TextEditingController(text: widget.initial?.number);
   late final _holder = TextEditingController(text: widget.initial?.holder);
 
@@ -1612,26 +1792,33 @@ class _PayoutSheetState extends State<_PayoutSheet> {
 
   @override
   void dispose() {
+    _otherName.dispose();
     _number.dispose();
     _holder.dispose();
     super.dispose();
   }
 
   void _save() {
+    final other = _otherName.text.trim();
     final n = _number.text.trim();
     final h = _holder.text.trim();
-    if (n.length < 8 || n.length > 16) {
-      return toast(
-        context,
-        _wallet
-            ? 'Nomor HP harus 8–16 digit'
-            : 'Nomor rekening harus 8–16 digit',
-      );
-    }
-    if (h.isEmpty) return toast(context, 'Isi nama pemilik rekening');
+    final error = _provider == _other && other.isEmpty
+        ? 'Isi nama bank atau e-wallet'
+        : n.length < 8 || n.length > 16
+        ? (_wallet
+              ? 'Nomor HP harus 8–16 digit (sekarang ${n.length})'
+              : 'Nomor rekening harus 8–16 digit (sekarang ${n.length})')
+        : h.isEmpty
+        ? 'Isi nama pemilik rekening'
+        : null;
+    if (error != null) return setState(() => _error = error);
     Navigator.pop(
       context,
-      PayoutAccount(provider: _provider, number: n, holder: h),
+      PayoutAccount(
+        provider: _provider == _other ? other : _provider,
+        number: n,
+        holder: h,
+      ),
     );
   }
 
@@ -1649,17 +1836,32 @@ class _PayoutSheetState extends State<_PayoutSheet> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final p in PayoutAccount.providers)
+            for (final p in [...PayoutAccount.providers, _other])
               KChip(
                 p,
                 selected: _provider == p,
-                onTap: () => setState(() => _provider = p),
+                onTap: () => setState(() {
+                  _provider = p;
+                  _error = null;
+                }),
               ),
           ],
         ),
+        if (_provider == _other)
+          KInput(
+            controller: _otherName,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            hint: 'Nama bank / e-wallet, mis. Bank Jago',
+            icon: LucideIcons.landmark,
+          ),
         const FieldLabel('NOMOR'),
         KInput(
           controller: _number,
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
           hint: _wallet ? 'Nomor HP terdaftar' : 'Nomor rekening',
           icon: _wallet ? LucideIcons.smartphone : LucideIcons.landmark,
           keyboardType: TextInputType.number,
@@ -1671,9 +1873,13 @@ class _PayoutSheetState extends State<_PayoutSheet> {
         const FieldLabel('NAMA PEMILIK'),
         KInput(
           controller: _holder,
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
           hint: 'Sesuai buku tabungan',
           icon: LucideIcons.user,
         ),
+        if (_error case final e?) KBanner.error(e),
         KButton('SIMPAN', onTap: _save),
       ],
     );

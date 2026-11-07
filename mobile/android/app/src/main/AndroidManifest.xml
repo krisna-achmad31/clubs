@@ -20,6 +20,9 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- Contacts: find friends on Klubby and invite them to a club (B5) -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
     <!-- Accelerometer: Goyang Ajak Main (P1) and cadence detection -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />

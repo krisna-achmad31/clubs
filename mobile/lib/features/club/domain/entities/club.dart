@@ -31,7 +31,11 @@ class Club extends Equatable {
     this.admin = false,
     this.pro = false,
     this.pinnedNote = '',
+    this.addedMembers = const [],
   });
+
+  /// People added in-app (from contacts or by number), newest first.
+  final List<String> addedMembers;
 
   final String id;
   final String name;
@@ -93,6 +97,7 @@ class Club extends Equatable {
     int? unread,
     PayoutAccount? payout,
     bool? pro,
+    List<String>? addedMembers,
   }) => Club(
     id: id,
     name: name,
@@ -117,10 +122,11 @@ class Club extends Equatable {
     admin: admin,
     pro: pro ?? this.pro,
     pinnedNote: pinnedNote,
+    addedMembers: addedMembers ?? this.addedMembers,
   );
 
   @override
-  List<Object?> get props => [id, members, unread, payout, pro];
+  List<Object?> get props => [id, members, unread, payout, pro, addedMembers];
 }
 
 /// Bank account or e-wallet that receives kas withdrawals.
@@ -246,4 +252,39 @@ class KasSummary extends Equatable {
 
   @override
   List<Object?> get props => [balance, entries];
+}
+
+/// Someone with a Klubby account, found by phone number or username.
+class KlubbyUser extends Equatable {
+  const KlubbyUser({
+    required this.name,
+    required this.username,
+    required this.phone,
+    this.sportId = 'badminton',
+  });
+
+  final String name;
+  final String username;
+
+  /// Normalised local form, e.g. `081234560001`.
+  final String phone;
+  final String sportId;
+
+  @override
+  List<Object?> get props => [username];
+}
+
+/// Normalises Indonesian numbers so `+62 812-3456`, `62812…` and `0812…`
+/// compare equal. Returns digits only, starting with `0`.
+String normalizePhone(String raw) {
+  var d = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (d.startsWith('62')) d = '0${d.substring(2)}';
+  if (d.startsWith('8')) d = '0$d';
+  return d;
+}
+
+/// `0812…` → `62812…` for wa.me links.
+String waNumber(String phone) {
+  final d = normalizePhone(phone);
+  return d.startsWith('0') ? '62${d.substring(1)}' : d;
 }

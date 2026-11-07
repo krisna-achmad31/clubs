@@ -26,6 +26,7 @@ import '../../features/session/domain/repositories/session_repository.dart';
 import '../../features/session/presentation/cubit/sessions_cubit.dart';
 import '../../features/tournament/presentation/cubit/tournament_cubit.dart';
 import '../../features/wearable/presentation/cubit/wearable_cubit.dart';
+import '../services/contacts_service.dart';
 import '../services/health_service.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
@@ -45,6 +46,7 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(NotificationService.new)
     ..registerLazySingleton(HealthService.new)
     ..registerLazySingleton(WatchBridge.new)
+    ..registerLazySingleton<ContactsService>(DeviceContactsService.new)
     // Data
     ..registerLazySingleton<ProfileRepository>(() => ProfileRepositoryImpl(sl()))
     ..registerLazySingleton<GearRepository>(() => GearRepositoryImpl(sl()))

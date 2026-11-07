@@ -1,3 +1,5 @@
+import '../entities/mascot.dart';
+
 /// Every route path in one place.
 abstract final class R {
   // Onboarding (A)
@@ -30,6 +32,10 @@ abstract final class R {
   static String club(String id) => '/club/$id';
   static String chat(String id) => '/club/$id/chat';
   static String kas(String id) => '/club/$id/kas';
+
+  /// B5 Undang anggota; [fresh] right after creating the club.
+  static String invite(String id, {bool fresh = false}) =>
+      '/club/$id/invite${fresh ? '?fresh=1' : ''}';
   static const pro = '/pro';
 
   // Session (C, D, F)
@@ -83,6 +89,10 @@ abstract final class R {
   static const account = '/settings/account';
   static const devices = '/settings/devices';
   static const geng = '/geng';
+
+  /// 9:16 evolution card for [animal] (the partner when omitted).
+  static String gengStory([Animal? animal]) =>
+      '/geng/story${animal == null ? '' : '?animal=${animal.name}'}';
   static const help = '/settings/help';
   static const notifPrefs = '/settings/notifications';
 

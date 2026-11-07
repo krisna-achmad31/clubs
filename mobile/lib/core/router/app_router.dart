@@ -90,6 +90,7 @@ GoRouter buildRouter() => GoRouter(
         _r('/club/:id', (s) => ClubPage(id: _id(s))),
         _r('/club/:id/chat', (s) => ClubChatPage(id: _id(s))),
         _r('/club/:id/kas', (s) => KasPage(id: _id(s))),
+        _r('/club/:id/invite', (s) => InviteMembersPage(id: _id(s), fresh: s.uri.queryParameters['fresh'] == '1')),
         _r(R.pro, (_) => const ProPage()),
 
         // C–F · sessions
@@ -146,6 +147,7 @@ GoRouter buildRouter() => GoRouter(
         _r(R.account, (_) => const AccountPage()),
         _r(R.devices, (_) => const DevicesPage()),
         _r(R.geng, (_) => const GengPage()),
+        _r('/geng/story', (s) => EvolutionStoryPage(animal: Animal.values.where((a) => a.name == s.uri.queryParameters['animal']).firstOrNull)),
         _r(R.help, (_) => const HelpPage()),
         _r(R.notifPrefs, (_) => const NotifPrefsPage()),
 

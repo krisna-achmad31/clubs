@@ -328,6 +328,19 @@ class FeedRepositoryImpl implements FeedRepository {
   }
 
   @override
+  Future<List<FeedPost>> club(String clubName) async {
+    await _syncActivities();
+    return _posts
+        .where(
+          (p) =>
+              (p.club == clubName || p.meta.contains(clubName)) &&
+              !_hidden.contains(p.id) &&
+              !_muted.contains(p.author),
+        )
+        .toList();
+  }
+
+  @override
   Future<FeedPost> byId(String id) async {
     await _syncActivities();
     return _posts.firstWhere((p) => p.id == id);

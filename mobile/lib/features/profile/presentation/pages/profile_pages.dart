@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/utils/card_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../activity/domain/entities/activity.dart' show Activity;
 import '../../../activity/domain/repositories/activity_repository.dart';
@@ -23,6 +24,7 @@ import '../cubit/gear_cubit.dart';
 import '../cubit/me_cubit.dart';
 import 'streak_calendar_pages.dart' show StampsPage;
 
+part 'geng_evolution.dart';
 part 'profile_helpers.dart';
 
 const _avatarBg = {
@@ -985,31 +987,14 @@ class _AddGearSheetState extends State<_AddGearSheet> {
             color: AppColors.faint,
             size: 18,
           ),
-          onTap: () => showKSheet<void>(
-            context,
-            (ctx) => KSheet(
-              children: [
-                Text('Olahraga', style: AppText.title()),
-                SizedBox(
-                  height: 320,
-                  child: ListView(
-                    children: [
-                      for (final s in Sports.all)
-                        KRow(
-                          title: s.name,
-                          emoji: s.emoji.isEmpty ? null : s.emoji,
-                          icon: s.icon,
-                          onTap: () {
-                            setState(() => _sport = s);
-                            Navigator.pop(ctx);
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          onTap: () async {
+            final s = await showSportPicker(
+              context,
+              selectedId: _sport.id,
+              title: 'Dipakai untuk',
+            );
+            if (s != null && mounted) setState(() => _sport = s);
+          },
         ),
         if (_kind != GearKind.raket)
           KSplit([

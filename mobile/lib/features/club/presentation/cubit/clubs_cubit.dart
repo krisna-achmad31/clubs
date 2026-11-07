@@ -82,6 +82,15 @@ class ClubsCubit extends Cubit<ClubsState> {
     await load();
   }
 
+  /// Admin adds a Klubby user straight into the club.
+  Future<void> addMember(String clubId, KlubbyUser user) async {
+    await _repo.addMember(clubId, user);
+    await load();
+  }
+
+  Future<List<KlubbyUser>> findUsers(Iterable<String> keys) =>
+      _repo.findUsers(keys);
+
   Future<void> setPayout(String clubId, PayoutAccount payout) async {
     await _repo.setPayout(clubId, payout);
     await load();

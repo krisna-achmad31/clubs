@@ -572,34 +572,8 @@ class _StoryPageState extends State<StoryPage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary =
-          _card.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw StateError('Card unavailable');
-      final img = await boundary.toImage(pixelRatio: 4);
-      final data = await img.toByteData(format: ui.ImageByteFormat.png);
-      img.dispose();
-      if (data == null) throw StateError('Image unavailable');
-      final bytes = data.buffer.asUint8List();
-      if (save) {
-        await Gal.putImageBytes(
-          bytes,
-          name: 'klubby_story_${DateTime.now().millisecondsSinceEpoch}',
-        );
-        if (mounted) toast(context, 'Gambar tersimpan di galeri');
-      } else {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [
-              XFile.fromData(
-                bytes,
-                mimeType: 'image/png',
-                name: 'klubby_story.png',
-              ),
-            ],
-          ),
-        );
-      }
+      await exportCardImage(_card, save: save);
+      if (save && mounted) toast(context, 'Gambar tersimpan di galeri');
     } catch (_) {
       if (mounted) {
         toast(

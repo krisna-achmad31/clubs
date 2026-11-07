@@ -70,6 +70,9 @@ class FeedCubit extends Cubit<FeedState> {
     emit(state.copyWith(posts: posts));
   }
 
+  /// A club's own feed: independent of the KOMUNITAS/PUBLIK toggle.
+  Future<List<FeedPost>> clubPosts(String clubName) => _repo.club(clubName);
+
   /// Fetches a post for J2 and keeps it in [FeedState.details] so later changes render.
   Future<FeedPost> post(String id) async {
     final p = await _repo.byId(id);

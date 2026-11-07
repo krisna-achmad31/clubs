@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -870,8 +872,55 @@ Future<T?> showKSheet<T>(BuildContext context, WidgetBuilder builder) {
   );
 }
 
+OverlayEntry? _toastEntry;
+Timer? _toastTimer;
+
+/// Short message on the app's top-most overlay, near the top of the screen:
+/// visible above bottom sheets and dialogs, and never covering the primary
+/// button at the bottom of a page.
 void toast(BuildContext context, String text) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(text), duration: const Duration(milliseconds: 1800)));
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+  _toastTimer?.cancel();
+  if (_toastEntry?.mounted ?? false) _toastEntry!.remove();
+  final entry = OverlayEntry(builder: (_) => _Toast(text));
+  _toastEntry = entry;
+  overlay.insert(entry);
+  _toastTimer = Timer(const Duration(milliseconds: 2200), () {
+    if (entry.mounted) entry.remove();
+    if (_toastEntry == entry) _toastEntry = null;
+  });
+}
+
+class _Toast extends StatelessWidget {
+  const _Toast(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+        top: MediaQuery.paddingOf(context).top + 8,
+        left: 16,
+        right: 16,
+        child: IgnorePointer(
+          child: Semantics(
+            liveRegion: true,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: Motion.fast,
+              curve: Curves.easeOutCubic,
+              builder: (_, t, child) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, -12 * (1 - t)), child: child)),
+              child: Material(
+                color: AppColors.ink,
+                elevation: 6,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(text, style: AppText.custom(14, w: FontWeight.w800, c: AppColors.white)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 }

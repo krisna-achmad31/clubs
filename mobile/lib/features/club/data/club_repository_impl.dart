@@ -135,6 +135,56 @@ class ClubRepositoryImpl implements ClubRepository {
     }
   }
 
+  /// Demo directory standing in for the server's contact match.
+  static const directory = [
+    KlubbyUser(name: 'Raka Pratama', username: 'rakap', phone: '081234560001'),
+    KlubbyUser(
+      name: 'Dinda Putri',
+      username: 'dindap',
+      phone: '081234560002',
+      sportId: 'renang',
+    ),
+    KlubbyUser(
+      name: 'Sisca Lestari',
+      username: 'sisca',
+      phone: '081234560003',
+      sportId: 'padel',
+    ),
+    KlubbyUser(
+      name: 'Rian Saputra',
+      username: 'rianlari',
+      phone: '081234560004',
+      sportId: 'lari',
+    ),
+    KlubbyUser(name: 'Budi Santoso', username: 'budis', phone: '081234560005'),
+  ];
+
+  @override
+  Future<List<KlubbyUser>> findUsers(Iterable<String> phonesOrUsernames) async {
+    final keys = {
+      for (final k in phonesOrUsernames) ...[
+        normalizePhone(k),
+        k.trim().toLowerCase().replaceFirst('@', ''),
+      ],
+    }..remove('');
+    return directory
+        .where((u) => keys.contains(u.phone) || keys.contains(u.username))
+        .toList();
+  }
+
+  @override
+  Future<void> addMember(String clubId, KlubbyUser user) async {
+    final club = _every.firstWhere((c) => c.id == clubId);
+    if (club.addedMembers.contains(user.name)) return;
+    _update(
+      clubId,
+      (c) => c.copyWith(
+        members: c.members + 1,
+        addedMembers: [user.name, ...c.addedMembers],
+      ),
+    );
+  }
+
   @override
   Future<void> markRead(String clubId) async =>
       _update(clubId, (c) => c.copyWith(unread: 0));

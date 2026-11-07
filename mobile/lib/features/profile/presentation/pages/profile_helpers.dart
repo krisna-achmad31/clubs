@@ -580,12 +580,33 @@ class GengPage extends StatelessWidget {
             ),
           ),
           Text('${animal.label} · ${sport.name}', style: AppText.title()),
-          Text(
-            sessions == null
-                ? 'Main ${sport.name} 1x terverifikasi untuk adopsi.'
-                : '$sessions sesi · ${p.stage.label}',
-            style: AppText.body(),
-          ),
+          if (sessions == null)
+            Text(
+              'Main ${sport.name} 1x terverifikasi untuk adopsi.',
+              style: AppText.body(),
+            )
+          else ...[
+            Text(
+              '$sessions sesi · Tahap ${p.stage.label} · 🔥 ${p.streak} hari',
+              style: AppText.body(),
+            ),
+            KProgress(
+              value: EvolutionProgress(p.streak).fraction,
+              height: 10,
+              color: p.stage.next?.color ?? p.stage.color,
+              gloss: false,
+            ),
+            Text(EvolutionProgress(p.streak).nextLine, style: AppText.bodySm()),
+          ],
+          if (sessions != null)
+            KButton.secondary(
+              'BAGIKAN EVOLUSI ${animal.label.toUpperCase()}',
+              icon: LucideIcons.share2,
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push(R.gengStory(animal));
+              },
+            ),
           if (sessions != null && p.sports.any((u) => u.sport.animal == animal))
             KButton(
               'JADIKAN PARTNER',
@@ -667,23 +688,12 @@ class GengPage extends StatelessWidget {
         ],
       ),
       children: [
-        KCard(
-          color: AppColors.purpleL,
-          child: Column(
-            children: [
-              MascotBody(animal: p.partner, stage: p.stage, size: 100),
-              Text(
-                'Partner: ${p.partner.label} · ${p.stage.label}',
-                style: AppText.cardTitle(),
-              ),
-              Text(
-                'Streak ${p.streak} hari bikin semua hewanmu tampil versi ${p.stage.label}.'
-                '${p.stage.next == null ? '' : ' ${p.stage.next!.minStreak - p.streak} hari lagi jadi ${p.stage.next!.label}!'}',
-                textAlign: TextAlign.center,
-                style: AppText.bodySm(),
-              ),
-            ],
-          ),
+        const FieldLabel('PERKEMBANGAN'),
+        _EvolutionCard(p: p, animal: p.partner),
+        KButton(
+          'BAGIKAN EVOLUSI',
+          icon: LucideIcons.share2,
+          onTap: () => context.push(R.gengStory(p.partner)),
         ),
         FieldLabel('SUDAH DIADOPSI · ${adopted.length}'),
         tiles(adopted),

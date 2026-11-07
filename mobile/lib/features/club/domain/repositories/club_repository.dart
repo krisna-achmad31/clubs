@@ -19,6 +19,13 @@ abstract interface class ClubRepository {
     PayoutAccount? payout,
   });
   Future<void> markRead(String clubId);
+
+  /// Klubby accounts whose number or username matches; the server-side
+  /// contact match in production, a demo directory for now.
+  Future<List<KlubbyUser>> findUsers(Iterable<String> phonesOrUsernames);
+
+  /// Adds a Klubby user to the club right away (admin invite).
+  Future<void> addMember(String clubId, KlubbyUser user);
   Future<void> setPayout(String clubId, PayoutAccount payout);
   Future<void> activatePro(String clubId);
   Future<List<ChatMessage>> chat(String clubId);

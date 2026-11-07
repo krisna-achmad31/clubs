@@ -4,6 +4,9 @@ abstract interface class FeedRepository {
   Future<List<FeedPost>> feed({required bool publik});
   Future<FeedPost> byId(String id);
 
+  /// Every post shared in [clubName], whatever its privacy (members only).
+  Future<List<FeedPost>> club(String clubName);
+
   /// Toggles my [emoji] on the post, adding it as a new reaction if nobody used it yet.
   Future<void> react(String postId, String emoji);
   Future<void> hide(String postId);

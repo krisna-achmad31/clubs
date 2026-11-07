@@ -1,12 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -15,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
+import '../../../../core/utils/card_export.dart';
 import '../../../../core/services/health_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/widgets/widgets.dart';

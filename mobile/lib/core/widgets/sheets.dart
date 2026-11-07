@@ -109,7 +109,9 @@ class _SportSheetState extends State<_SportSheet> {
   @override
   Widget build(BuildContext context) {
     final q = _q.trim().toLowerCase();
-    final list = Sports.all.where((s) => !widget.exclude.contains(s.id) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.category.label.toLowerCase().contains(q))).toList();
+    final list = Sports.all.where((s) => !widget.exclude.contains(s.id) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.category.label.toLowerCase().contains(q))).toList()
+      // Alphabetical so a long list is easy to scan.
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return KSheet(gap: 10, children: [
       Text(widget.title, style: AppText.title()),
       KInput(hint: 'Cari dari ${Sports.all.length} olahraga…', icon: LucideIcons.search, onChanged: (v) => setState(() => _q = v)),

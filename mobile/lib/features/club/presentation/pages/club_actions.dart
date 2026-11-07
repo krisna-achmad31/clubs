@@ -12,11 +12,17 @@ List<String> _memberNames(BuildContext context, Club club) {
     'Ayu',
     'Fajar',
   ];
+  final added = club.addedMembers;
+  // Sample names fill the rest; skip anyone already added for real.
+  final pool = [
+    for (final n in names)
+      if (!added.contains(n)) n,
+  ];
   return [
-    for (var i = 0; i < club.members; i++)
-      i == 0 && club.admin
-          ? me
-          : '${names[(i + club.id.length) % names.length]}${i >= names.length ? ' ${i + 1}' : ''}',
+    if (club.admin) me,
+    ...added,
+    for (var i = (club.admin ? 1 : 0) + added.length; i < club.members; i++)
+      '${pool[(i + club.id.length) % pool.length]}${i >= pool.length ? ' ${i + 1}' : ''}',
   ];
 }
 
@@ -75,6 +81,15 @@ void _clubMenu(BuildContext context, Club club) {
     (ctx) => KSheet(
       children: [
         Text(club.name, style: AppText.title()),
+        if (cubit.state.isMember(club.id))
+          KRow(
+            title: 'Undang anggota',
+            icon: LucideIcons.userPlus,
+            onTap: () {
+              Navigator.pop(ctx);
+              router.push(R.invite(club.id));
+            },
+          ),
         KRow(
           title: 'Salin kode',
           icon: LucideIcons.copy,
@@ -392,8 +407,11 @@ class _ExplorePageState extends State<ExplorePage> {
 }
 
 class KasPage extends StatefulWidget {
-  const KasPage({super.key, required this.id});
+  const KasPage({super.key, required this.id, this.embedded = false});
   final String id;
+
+  /// Shown as the Kas tab inside the club page instead of its own screen.
+  final bool embedded;
   @override
   State<KasPage> createState() => _KasPageState();
 }
@@ -510,38 +528,34 @@ class _KasPageState extends State<KasPage> {
         future: _kas,
         builder: (context, snapshot) {
           final kas = snapshot.data;
+          final export = KIconButton(
+            LucideIcons.download,
+            onTap: kas == null
+                ? null
+                : () {
+                    if (!club.pro) {
+                      context.push('${R.pro}?club=${club.id}');
+                      return;
+                    }
+                    String cell(String v) => '"${v.replaceAll('"', '""')}"';
+                    final csv =
+                        'Judul,Catatan,Jumlah\r\n${kas.entries.map((e) => '${cell(e.title)},${cell(e.sub)},${e.amount}').join('\r\n')}';
+                    SharePlus.instance.share(
+                      ShareParams(
+                        files: [
+                          XFile.fromData(
+                            Uint8List.fromList(utf8.encode(csv)),
+                            mimeType: 'text/csv',
+                            name: 'kas_${club.id}.csv',
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+          );
           return KPage(
-            header: KHeader(
-              'Kas ${club.name}',
-              actions: [
-                KIconButton(
-                  LucideIcons.download,
-                  onTap: kas == null
-                      ? null
-                      : () {
-                          if (!club.pro) {
-                            context.push('${R.pro}?club=${club.id}');
-                            return;
-                          }
-                          String cell(String v) =>
-                              '"${v.replaceAll('"', '""')}"';
-                          final csv =
-                              'Judul,Catatan,Jumlah\r\n${kas.entries.map((e) => '${cell(e.title)},${cell(e.sub)},${e.amount}').join('\r\n')}';
-                          SharePlus.instance.share(
-                            ShareParams(
-                              files: [
-                                XFile.fromData(
-                                  Uint8List.fromList(utf8.encode(csv)),
-                                  mimeType: 'text/csv',
-                                  name: 'kas_${club.id}.csv',
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                ),
-              ],
-            ),
+            embedded: widget.embedded,
+            header: KHeader('Kas ${club.name}', actions: [export]),
             bottom: kas == null || !club.admin
                 ? null
                 : KActions([
@@ -557,6 +571,14 @@ class _KasPageState extends State<KasPage> {
                     ),
                   ]),
             children: [
+              // No header inside the club tab: keep the CSV export reachable.
+              if (widget.embedded)
+                Row(
+                  children: [
+                    Expanded(child: Text('Kas klub', style: AppText.title())),
+                    export,
+                  ],
+                ),
               KBanner.info(
                 'Kas demo. Mutasi tersimpan selama sesi aplikasi ini, tanpa transaksi uang.',
               ),
