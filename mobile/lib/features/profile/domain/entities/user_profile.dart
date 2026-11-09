@@ -12,7 +12,11 @@ class UserSport extends Equatable {
   final SkillLevel? level;
   final List<String> positions;
 
-  UserSport copyWith({SkillLevel? level, List<String>? positions}) => UserSport(sport, level: level ?? this.level, positions: positions ?? this.positions);
+  UserSport copyWith({SkillLevel? level, List<String>? positions}) => UserSport(
+    sport,
+    level: level ?? this.level,
+    positions: positions ?? this.positions,
+  );
 
   @override
   List<Object?> get props => [sport, level, positions];
@@ -44,6 +48,7 @@ class UserProfile extends Equatable {
     this.followers = 0,
     this.joined,
     this.adopted = const {},
+    this.verifiedSportSessions = const {},
     this.lastActive,
     this.owned = const {},
     this.photoPath,
@@ -77,6 +82,13 @@ class UserProfile extends Equatable {
 
   /// Geng Gemoy: animals unlocked, with their verified session count.
   final Map<Animal, int> adopted;
+
+  /// Known sessions per sport; legacy animal totals are never split by guess.
+  final Map<String, int> verifiedSportSessions;
+
+  int knownSessionsForAnimal(Animal animal) => verifiedSportSessions.entries
+      .where((e) => Sports.byId(e.key).animal == animal)
+      .fold(0, (total, e) => total + e.value);
   final DateTime? lastActive;
 
   /// Shop item ids the user owns.
@@ -98,30 +110,64 @@ class UserProfile extends Equatable {
   /// Older demo profiles persisted counters but omitted their calendar marks.
   /// Recover the original dates once; never infer workout details from a total.
   List<StampEntry> get calendarHistory {
-    final isLegacyDemo = joined?.year == 2026 && joined?.month == 3 &&
-        joined?.day == 2 && stamps >= 23;
-    final history = [...(stampHistory.isNotEmpty ? stampHistory : isLegacyDemo ? LegacyStampHistory.october2026 : const <StampEntry>[])];
+    final isLegacyDemo =
+        joined?.year == 2026 &&
+        joined?.month == 3 &&
+        joined?.day == 2 &&
+        stamps >= 23;
+    final history = [
+      ...(stampHistory.isNotEmpty
+          ? stampHistory
+          : isLegacyDemo
+          ? LegacyStampHistory.october2026
+          : const <StampEntry>[]),
+    ];
     if (streak > 0 && lastActive != null) {
-      final lastDay = DateTime(lastActive!.year, lastActive!.month, lastActive!.day);
+      final lastDay = DateTime(
+        lastActive!.year,
+        lastActive!.month,
+        lastActive!.day,
+      );
+      // Older recovery inferred this day's sport from the current selector.
+      // Keep the day, but do not treat that guess as historical evidence.
+      if (isLegacyDemo &&
+          !LegacyStampHistory.october2026.any((e) => e.day == lastDay)) {
+        final index = history.indexWhere((e) => e.day == lastDay && e.legacy);
+        if (index >= 0) {
+          history[index] = StampEntry(
+            lastDay,
+            frozen: history[index].frozen,
+            legacy: true,
+          );
+        }
+      }
       if (!history.any((entry) => entry.day == lastDay)) {
-        history.add(StampEntry(lastDay, sportIds: [activeSportId], legacy: true));
+        history.add(StampEntry(lastDay, legacy: true));
       }
     }
     return history;
   }
 
-  bool flag(String key, {bool fallback = false}) => settings[key] as bool? ?? fallback;
-  int number(String key, {int fallback = 0}) => settings[key] as int? ?? fallback;
-  String text(String key, {String fallback = ''}) => settings[key] as String? ?? fallback;
+  bool flag(String key, {bool fallback = false}) =>
+      settings[key] as bool? ?? fallback;
+  int number(String key, {int fallback = 0}) =>
+      settings[key] as int? ?? fallback;
+  String text(String key, {String fallback = ''}) =>
+      settings[key] as String? ?? fallback;
 
   Sport get activeSport => Sports.byId(activeSportId);
-  Stage get stage => Stage.forStreak(streak);
+  Stage get stage => Stage.forStreak(adopted[partner] ?? 0);
   Animal get partner => activeSport.animal;
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return '?';
-    return (parts.first[0] + (parts.length > 1 ? parts[1][0] : '')).toUpperCase();
+    return (parts.first[0] + (parts.length > 1 ? parts[1][0] : ''))
+        .toUpperCase();
   }
 
   String get firstName => name.split(' ').first;
@@ -145,6 +191,7 @@ class UserProfile extends Equatable {
     int? stamps,
     int? saldo,
     Map<Animal, int>? adopted,
+    Map<String, int>? verifiedSportSessions,
     DateTime? lastActive,
     Set<String>? owned,
     int? following,
@@ -155,79 +202,110 @@ class UserProfile extends Equatable {
     String? accessory,
     Map<String, Object>? settings,
     List<StampEntry>? stampHistory,
-  }) =>
-      UserProfile(
-        name: name ?? this.name,
-        username: username ?? this.username,
-        phone: phone ?? this.phone,
-        email: email ?? this.email,
-        gender: gender ?? this.gender,
-        avatar: avatar ?? this.avatar,
-        area: area ?? this.area,
-        radiusKm: radiusKm ?? this.radiusKm,
-        sports: sports ?? this.sports,
-        activeSportId: activeSportId ?? this.activeSportId,
-        streak: streak ?? this.streak,
-        bestStreak: bestStreak ?? this.bestStreak,
-        xp: xp ?? this.xp,
-        freezes: freezes ?? this.freezes,
-        maxFreezes: maxFreezes,
-        gems: gems ?? this.gems,
-        stamps: stamps ?? this.stamps,
-        saldo: saldo ?? this.saldo,
-        following: following ?? this.following,
-        followers: followers ?? this.followers,
-        joined: joined,
-        adopted: adopted ?? this.adopted,
-        lastActive: lastActive ?? this.lastActive,
-        owned: owned ?? this.owned,
-        photoPath: clearPhoto ? null : photoPath ?? this.photoPath,
-        avatarBg: avatarBg ?? this.avatarBg,
-        accessory: accessory ?? this.accessory,
-        settings: settings ?? this.settings,
-        stampHistory: stampHistory ?? this.stampHistory,
-      );
+  }) => UserProfile(
+    name: name ?? this.name,
+    username: username ?? this.username,
+    phone: phone ?? this.phone,
+    email: email ?? this.email,
+    gender: gender ?? this.gender,
+    avatar: avatar ?? this.avatar,
+    area: area ?? this.area,
+    radiusKm: radiusKm ?? this.radiusKm,
+    sports: sports ?? this.sports,
+    activeSportId: activeSportId ?? this.activeSportId,
+    streak: streak ?? this.streak,
+    bestStreak: bestStreak ?? this.bestStreak,
+    xp: xp ?? this.xp,
+    freezes: freezes ?? this.freezes,
+    maxFreezes: maxFreezes,
+    gems: gems ?? this.gems,
+    stamps: stamps ?? this.stamps,
+    saldo: saldo ?? this.saldo,
+    following: following ?? this.following,
+    followers: followers ?? this.followers,
+    joined: joined,
+    adopted: adopted ?? this.adopted,
+    verifiedSportSessions: verifiedSportSessions ?? this.verifiedSportSessions,
+    lastActive: lastActive ?? this.lastActive,
+    owned: owned ?? this.owned,
+    photoPath: clearPhoto ? null : photoPath ?? this.photoPath,
+    avatarBg: avatarBg ?? this.avatarBg,
+    accessory: accessory ?? this.accessory,
+    settings: settings ?? this.settings,
+    stampHistory: stampHistory ?? this.stampHistory,
+  );
 
   @override
-  List<Object?> get props =>
-      [name, username, phone, email, gender, avatar, area, radiusKm, sports, activeSportId, streak, bestStreak, xp, freezes, gems, stamps, saldo, following, followers, adopted, lastActive, owned, photoPath, avatarBg, accessory, settings, stampHistory];
+  List<Object?> get props => [
+    name,
+    username,
+    phone,
+    email,
+    gender,
+    avatar,
+    area,
+    radiusKm,
+    sports,
+    activeSportId,
+    streak,
+    bestStreak,
+    xp,
+    freezes,
+    gems,
+    stamps,
+    saldo,
+    following,
+    followers,
+    adopted,
+    verifiedSportSessions,
+    lastActive,
+    owned,
+    photoPath,
+    avatarBg,
+    accessory,
+    settings,
+    stampHistory,
+  ];
 
   Map<String, Object?> toJson() => {
-        'name': name,
-        'username': username,
-        'phone': phone,
-        'email': email,
-        'gender': gender.name,
-        'avatar': avatar.name,
-        'area': area,
-        'radiusKm': radiusKm,
-        'sports': [
-          for (final u in sports) {'id': u.sport.id, 'level': u.level?.name, 'positions': u.positions},
-        ],
-        'activeSportId': activeSportId,
-        'streak': streak,
-        'bestStreak': bestStreak,
-        'xp': xp,
-        'freezes': freezes,
-        'maxFreezes': maxFreezes,
-        'gems': gems,
-        'stamps': stamps,
-        'saldo': saldo,
-        'following': following,
-        'followers': followers,
-        'joined': joined?.toIso8601String(),
-        'adopted': {for (final e in adopted.entries) e.key.name: e.value},
-        'lastActive': lastActive?.toIso8601String(),
-        'owned': owned.toList(),
-        'photoPath': photoPath,
-        'avatarBg': avatarBg,
-        'accessory': accessory,
-        'settings': settings,
-        'stampHistory': [for (final entry in stampHistory) entry.toJson()],
-      };
+    'name': name,
+    'username': username,
+    'phone': phone,
+    'email': email,
+    'gender': gender.name,
+    'avatar': avatar.name,
+    'area': area,
+    'radiusKm': radiusKm,
+    'sports': [
+      for (final u in sports)
+        {'id': u.sport.id, 'level': u.level?.name, 'positions': u.positions},
+    ],
+    'activeSportId': activeSportId,
+    'streak': streak,
+    'bestStreak': bestStreak,
+    'xp': xp,
+    'freezes': freezes,
+    'maxFreezes': maxFreezes,
+    'gems': gems,
+    'stamps': stamps,
+    'saldo': saldo,
+    'following': following,
+    'followers': followers,
+    'joined': joined?.toIso8601String(),
+    'adopted': {for (final e in adopted.entries) e.key.name: e.value},
+    'verifiedSportSessions': verifiedSportSessions,
+    'lastActive': lastActive?.toIso8601String(),
+    'owned': owned.toList(),
+    'photoPath': photoPath,
+    'avatarBg': avatarBg,
+    'accessory': accessory,
+    'settings': settings,
+    'stampHistory': [for (final entry in stampHistory) entry.toJson()],
+  };
 
   factory UserProfile.fromJson(Map<String, Object?> j) {
-    T? byName<T extends Enum>(List<T> values, Object? name) => values.where((v) => v.name == name).firstOrNull;
+    T? byName<T extends Enum>(List<T> values, Object? name) =>
+        values.where((v) => v.name == name).firstOrNull;
     DateTime? date(Object? v) => v is String ? DateTime.tryParse(v) : null;
     return UserProfile(
       name: j['name'] as String? ?? '',
@@ -240,7 +318,11 @@ class UserProfile extends Equatable {
       radiusKm: j['radiusKm'] as int? ?? 10,
       sports: [
         for (final s in (j['sports'] as List? ?? const []).cast<Map>())
-          UserSport(Sports.byId(s['id'] as String), level: byName(SkillLevel.values, s['level']), positions: (s['positions'] as List? ?? const []).cast<String>()),
+          UserSport(
+            Sports.byId(s['id'] as String),
+            level: byName(SkillLevel.values, s['level']),
+            positions: (s['positions'] as List? ?? const []).cast<String>(),
+          ),
       ],
       activeSportId: j['activeSportId'] as String? ?? 'badminton',
       streak: j['streak'] as int? ?? 0,
@@ -259,6 +341,8 @@ class UserProfile extends Equatable {
           ?byName(Animal.values, e.key): e.value as int,
       },
       lastActive: date(j['lastActive']),
+      verifiedSportSessions: (j['verifiedSportSessions'] as Map? ?? const {})
+          .cast<String, int>(),
       owned: {...(j['owned'] as List? ?? const []).cast<String>()},
       photoPath: j['photoPath'] as String?,
       avatarBg: j['avatarBg'] as int?,

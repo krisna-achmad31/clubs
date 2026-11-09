@@ -71,9 +71,15 @@ class ClubsCubit extends Cubit<ClubsState> {
     await load();
   }
 
-  Future<void> leave(Club club) async {
-    await _repo.leave(club.id);
+  /// False when the user is the club's only admin and can't leave.
+  Future<bool> leave(Club club) async {
+    try {
+      await _repo.leave(club.id);
+    } on StateError {
+      return false;
+    }
     await load();
+    return true;
   }
 
   /// Chat opened: clear the unread badge.

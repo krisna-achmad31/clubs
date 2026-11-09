@@ -8,7 +8,15 @@ import '../theme/app_text.dart';
 
 /// Mascot head inside a tinted circle, gently bobbing.
 class MascotHead extends StatelessWidget {
-  const MascotHead({super.key, required this.animal, this.stage = Stage.gesit, this.size = 96, this.bg, this.float = true, this.ring});
+  const MascotHead({
+    super.key,
+    required this.animal,
+    this.stage = Stage.gesit,
+    this.size = 96,
+    this.bg,
+    this.float = true,
+    this.ring,
+  });
 
   final Animal animal;
   final Stage stage;
@@ -28,7 +36,12 @@ class MascotHead extends StatelessWidget {
         shape: BoxShape.circle,
         border: ring == null ? null : Border.all(color: ring!, width: 3),
       ),
-      child: Image.asset(animal.head(stage), fit: BoxFit.contain, cacheWidth: (size * 2.5).round(), gaplessPlayback: true),
+      child: Image.asset(
+        animal.head(stage),
+        fit: BoxFit.contain,
+        cacheWidth: (size * 2.5).round(),
+        gaplessPlayback: true,
+      ),
     );
     return float ? Floaty(amplitude: size * .04, child: head) : head;
   }
@@ -36,7 +49,14 @@ class MascotHead extends StatelessWidget {
 
 /// Full-body mascot. Plays the per-stage Lottie when [animated], webp otherwise.
 class MascotBody extends StatelessWidget {
-  const MascotBody({super.key, required this.animal, this.stage = Stage.gesit, this.size = 160, this.animated = true, this.float = true});
+  const MascotBody({
+    super.key,
+    required this.animal,
+    this.stage = Stage.gesit,
+    this.size = 160,
+    this.animated = true,
+    this.float = true,
+  });
 
   final Animal animal;
   final Stage stage;
@@ -46,7 +66,13 @@ class MascotBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final still = Image.asset(animal.body(stage), width: size, height: size, fit: BoxFit.contain, cacheWidth: (size * 2.5).round());
+    final still = Image.asset(
+      animal.body(stage),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      cacheWidth: (size * 2.5).round(),
+    );
     final Widget child = animated
         ? Lottie.asset(
             animal.lottie(stage),
@@ -56,7 +82,9 @@ class MascotBody extends StatelessWidget {
             errorBuilder: (_, _, _) => still,
           )
         : still;
-    return RepaintBoundary(child: float && !animated ? Floaty(child: child) : child);
+    return RepaintBoundary(
+      child: float && !animated ? Floaty(child: child) : child,
+    );
   }
 }
 
@@ -76,8 +104,16 @@ class SpeechBubble extends StatelessWidget {
       child: CustomPaint(
         painter: _BubblePainter(tailLeft),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(tailLeft ? 22 : 14, 12, tailLeft ? 14 : 22, 12),
-          child: Text(text, style: style ?? AppText.custom(15, w: FontWeight.w800, h: 1.3)),
+          padding: EdgeInsets.fromLTRB(
+            tailLeft ? 22 : 14,
+            12,
+            tailLeft ? 14 : 22,
+            12,
+          ),
+          child: Text(
+            text,
+            style: style ?? AppText.custom(15, w: FontWeight.w800, h: 1.3),
+          ),
         ),
       ),
     );
@@ -91,7 +127,16 @@ class _BubblePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const tail = 8.0;
-    final body = Path()..addRRect(RRect.fromLTRBR(left ? tail : 0, 0, size.width - (left ? 0 : tail), size.height, const Radius.circular(16)));
+    final body = Path()
+      ..addRRect(
+        RRect.fromLTRBR(
+          left ? tail : 0,
+          0,
+          size.width - (left ? 0 : tail),
+          size.height,
+          const Radius.circular(16),
+        ),
+      );
     final mid = size.height / 2;
     final x = left ? tail + 1 : size.width - tail - 1;
     final tip = Path()
@@ -116,7 +161,15 @@ class _BubblePainter extends CustomPainter {
 
 /// Mascot head + speech bubble row used across onboarding and empty states.
 class MascotSays extends StatelessWidget {
-  const MascotSays({super.key, required this.animal, required this.text, this.stage = Stage.gesit, this.size = 96, this.bg, this.textStyle});
+  const MascotSays({
+    super.key,
+    required this.animal,
+    required this.text,
+    this.stage = Stage.gesit,
+    this.size = 96,
+    this.bg,
+    this.textStyle,
+  });
 
   final Animal animal;
   final Stage stage;
@@ -127,10 +180,12 @@ class MascotSays extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      MascotHead(animal: animal, stage: stage, size: size, bg: bg),
-      const SizedBox(width: 10),
-      Expanded(child: SpeechBubble(text, style: textStyle)),
-    ]);
+    return Row(
+      children: [
+        MascotHead(animal: animal, stage: stage, size: size, bg: bg),
+        const SizedBox(width: 10),
+        Expanded(child: SpeechBubble(text, style: textStyle)),
+      ],
+    );
   }
 }

@@ -539,6 +539,11 @@ void main() {
       find.textContaining('Perkiraan area terdekat: Cilandak'),
       findsOneWidget,
     );
+    await Scrollable.ensureVisible(
+      tester.element(find.text('PAKAI AREA INI')),
+      alignment: .5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('PAKAI AREA INI'));
     await tester.pumpAndSettle();
     expect(find.text('Pilih area'), findsNothing);

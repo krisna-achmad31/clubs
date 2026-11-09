@@ -32,6 +32,40 @@ class _ProfileRepository implements ProfileRepository {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'legacy last-active stamp does not infer sport from current selector',
+    () {
+      final date = DateTime(2026, 10, 25);
+      final profile = ProfileRepositoryImpl.seed.copyWith(
+        lastActive: date,
+        activeSportId: 'badminton',
+        stampHistory: [
+          StampEntry(date, sportIds: ['badminton'], legacy: true),
+        ],
+      );
+      const source = ActivitySource.gps;
+      final days = StampCalendar.days(profile, [
+        Activity(
+          id: 'run',
+          sportId: 'lari',
+          title: 'Lari',
+          start: date,
+          duration: const Duration(minutes: 32),
+          source: source,
+        ),
+      ]);
+      expect(days[date]!.sportIds, ['lari']);
+      expect(
+        profile
+            .copyWith(activeSportId: 'padel')
+            .calendarHistory
+            .single
+            .sportIds,
+        isEmpty,
+      );
+    },
+  );
+
   test('existing 14-day profile recovers its calendar and survives restart without changing balances', () async {
     final legacy = ProfileRepositoryImpl.seed.copyWith(
       streak: 14,
@@ -61,9 +95,11 @@ void main() {
           .frozen,
       isTrue,
     );
+    // Balances stay; the streak itself is settled against today, and
+    // 25 Oct is far more missed days than the 2 Es Batu cover.
     expect(
       (me.state.streak, me.state.xp, me.state.gems, me.state.freezes),
-      (14, 2160, 1254, 2),
+      (0, 2160, 1254, 2),
     );
     final restarted = MeCubit(ProfileRepositoryImpl(prefs), legacy);
     await restarted.load();

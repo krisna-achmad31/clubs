@@ -10,6 +10,7 @@ export 'bars.dart';
 export 'basics.dart';
 export 'chunky.dart';
 export 'flat_map.dart';
+export 'osm_route_map.dart';
 export 'mascot_view.dart';
 export 'page.dart';
 export 'sheets.dart';

@@ -49,7 +49,7 @@ Future<void> showSportSwitcher(BuildContext context) {
                 children: [
                   MascotHead(
                     animal: u.sport.animal,
-                    stage: me.stage,
+                    stage: Stage.forStreak(me.adopted[u.sport.animal] ?? 0),
                     size: 44,
                     bg: AppColors.yellowL,
                     float: false,

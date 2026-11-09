@@ -69,6 +69,7 @@ class RecorderCubit extends Cubit<RecorderState> {
           if (action == 'resume') resume();
           if (action == 'stop') finish();
         case WatchWorkout():
+        case WatchWhoAmI():
           break;
       }
     });
@@ -120,7 +121,10 @@ class RecorderCubit extends Cubit<RecorderState> {
       _watch.tick(
         elapsedSec: elapsed.inSeconds,
         distanceKm: state.km,
-        pace: Fmt.pace(elapsed, state.km),
+        pace: () {
+          final sp = Fmt.speed(state.sportId, elapsed, state.km);
+          return '${sp.value}${sp.unit == 'km/j' ? ' km/j' : sp.unit}';
+        }(),
       );
     }
   }

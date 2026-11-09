@@ -16,18 +16,77 @@ import '../../../../core/utils/card_export.dart';
 import '../../../../core/services/health_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../club/presentation/cubit/clubs_cubit.dart';
 import '../../../profile/domain/usecases/streak_rules.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../../profile/presentation/cubit/gear_cubit.dart';
 import '../../../profile/domain/entities/stamp_calendar.dart';
+import '../../../session/domain/entities/mabar_session.dart';
 import '../../../session/presentation/cubit/sessions_cubit.dart';
 import '../../../wearable/presentation/cubit/wearable_cubit.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_analysis.dart';
 import '../../domain/repositories/activity_repository.dart';
 import '../cubit/recorder_cubit.dart';
+import '../widgets/activity_data_sections.dart';
 
 part 'activity_result_pages.dart';
+
+/// Private saved workouts have the same detail access as published workouts.
+class SavedActivityDetailPage extends StatefulWidget {
+  const SavedActivityDetailPage({super.key, required this.id});
+  final String id;
+  @override
+  State<SavedActivityDetailPage> createState() =>
+      _SavedActivityDetailPageState();
+}
+
+class _SavedActivityDetailPageState extends State<SavedActivityDetailPage> {
+  late final _activity = sl<ActivityRepository>().recent().then(
+    (all) => all.where((a) => a.id == widget.id).firstOrNull,
+  );
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Activity?>(
+    future: _activity,
+    builder: (context, snapshot) {
+      final activity = snapshot.data;
+      return KPage(
+        header: const KHeader('Detail Aktivitas'),
+        children: [
+          if (snapshot.connectionState != ConnectionState.done)
+            const Center(child: CircularProgressIndicator())
+          else if (snapshot.hasError)
+            KBanner.info(
+              'Aktivitas belum dapat dimuat. Buka kembali untuk mencoba lagi.',
+            )
+          else if (activity == null)
+            KBanner.info('Aktivitas ini sudah tidak tersimpan.')
+          else ...[
+            Text(activity.title, style: AppText.title()),
+            Text(
+              '${activity.sport.emoji} ${activity.sport.name} · ${activity.start.day} ${Fmt.monthsLong[activity.start.month - 1]} ${activity.start.year}',
+              style: AppText.body(),
+            ),
+            KPill(
+              activity.published ? 'DIPUBLIKASIKAN' : 'TERSIMPAN PRIBADI',
+              bg: AppColors.primaryL,
+              fg: AppColors.primaryD,
+            ),
+            if (activity.duration == Duration.zero)
+              KBanner.info('Durasi tidak dicatat untuk aktivitas ini.'),
+            if (activity.sport.tracksDistance)
+              OsmRouteMap(
+                samples: activity.samples,
+                height: 180,
+                interactive: true,
+              ),
+            ActivityDataSections(activity: activity, owner: true),
+          ],
+        ],
+      );
+    },
+  );
+}
 
 /// Shared "Xiaomi Band 8 terhubung" card, driven by [WearableCubit].
 class _WatchCard extends StatelessWidget {
@@ -130,6 +189,19 @@ class _ScanPageState extends State<ScanPage>
       final sessions = context.read<SessionsCubit>();
       final s = sessions.state[sessionId];
       if (s == null) throw const CheckInException(CheckInError.unknownCode);
+      final now = DateTime.now();
+      if (s.cancelled ||
+          now.isAfter(s.scheduledEnd.add(const Duration(hours: 1)))) {
+        throw const CheckInException(CheckInError.closed);
+      }
+      if (now.isBefore(
+        s.scheduledStart.subtract(const Duration(minutes: 30)),
+      )) {
+        throw const CheckInException(CheckInError.notOpenYet);
+      }
+      if (sessions.state.rsvp(sessionId).status != RsvpStatus.joined) {
+        throw const CheckInException(CheckInError.notRegistered);
+      }
       final me = context.read<MeCubit>();
       if (me.state.flag('checkin_$sessionId')) {
         _busy = false;
@@ -141,13 +213,24 @@ class _ScanPageState extends State<ScanPage>
           sportId: s.sportId,
           title: s.title,
           start: DateTime.now(),
-          duration: Duration.zero,
+          duration: s.scheduledEnd.difference(s.scheduledStart),
           source: ActivitySource.qr,
           clubName: s.clubName,
         ),
       );
       me.setSetting('checkin_$sessionId', true);
-      me.recordActivity(source: ActivitySource.qr, sportId: s.sportId);
+      final gear = sl<GearCubit>();
+      gear.addUsage(
+        gear.defaultFor(s.sportId)?.id,
+        time: s.scheduledEnd.difference(s.scheduledStart),
+      );
+      me.recordActivity(
+        source: ActivitySource.qr,
+        sportId: s.sportId,
+        duration: s.scheduledEnd.difference(s.scheduledStart),
+      );
+      // The host's check-in list shows me as present.
+      sessions.markParticipant(sessionId, me.state.name, present: true);
       if (!mounted) return;
       context.pushReplacement(R.done);
     } on CheckInException catch (e) {
@@ -158,6 +241,11 @@ class _ScanPageState extends State<ScanPage>
           'QR tidak dikenali — minta host tampilkan ulang',
         CheckInError.tooFar => 'Kamu di luar 200 m dari lokasi',
         CheckInError.notOpenYet => 'Check-in dibuka 30 menit sebelum mulai',
+        CheckInError.expired =>
+          'QR sudah kedaluwarsa — scan langsung dari HP host',
+        CheckInError.notRegistered =>
+          'Kamu belum punya tiket lunas untuk mabar ini',
+        CheckInError.closed => 'Mabar ini sudah selesai atau dibatalkan',
       });
       await Future<void>.delayed(const Duration(seconds: 2));
       _busy = false;
@@ -167,7 +255,7 @@ class _ScanPageState extends State<ScanPage>
   @override
   Widget build(BuildContext context) {
     return KPage(
-      header: const KHeader('Rekam Aktivitas', leading: LucideIcons.x),
+      header: const KHeader('Check-in QR', leading: LucideIcons.x),
       bottom: KButton.secondary(
         'REKAM TANPA QR (CASUAL)',
         onTap: () => context.pushReplacement(R.manual),
@@ -302,10 +390,9 @@ class _ScanPageState extends State<ScanPage>
   }
 }
 
-const _gpsSports = [
-  ('lari', 'Lari'),
-  ('sepeda', 'Sepeda'),
-  ('renang', 'Renang air terbuka'),
+final _gpsSports = [
+  for (final s in Sports.all.where((s) => s.tracksDistance))
+    (s.id, '${s.emoji} ${s.name}'),
 ];
 
 /// I2 Siap rekam (GPS warm-up).
@@ -321,9 +408,12 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
   void initState() {
     super.initState();
     final sport = context.read<MeCubit>().state.activeSportId;
-    context.read<RecorderCubit>().prepare(
-      _gpsSports.any((s) => s.$1 == sport) ? sport : 'lari',
-    );
+    context.read<RecorderCubit>()
+      // Off unless the user opted in under Privasi.
+      ..toggleBeacon(
+        context.read<MeCubit>().state.flag('beacon', fallback: false),
+      )
+      ..prepare(_gpsSports.any((s) => s.$1 == sport) ? sport : 'lari');
   }
 
   @override
@@ -431,7 +521,10 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
                     ],
                   ),
                 ),
-                KLink('CATAT TANPA GPS', onTap: () => context.push(R.manual)),
+                KLink(
+                  'CATAT TANPA GPS',
+                  onTap: () => context.push('${R.manual}?sport=${st.sportId}'),
+                ),
                 if (!st.gpsStrong) ...[
                   const SizedBox(height: 12),
                   Row(
@@ -444,7 +537,7 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Sinyal lemah? Tunggu sebentar atau MULAI TANPA GPS',
+                          'Sinyal lemah? Tunggu sebentar atau CATAT TANPA GPS',
                           style: AppText.caption(),
                         ),
                       ),
@@ -465,7 +558,7 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
                 label: 'MULAI',
                 onTap: () async {
                   if (st.gpsDenied) {
-                    context.push(R.manual);
+                    context.push('${R.manual}?sport=${st.sportId}');
                     return;
                   }
                   final point = st.beacon
@@ -476,10 +569,17 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
                   cubit.start();
                   context.pushReplacement(R.recording);
                   if (point != null) {
+                    // Emergency contacts from Profil → Privasi go first.
+                    final contacts = sl<MeCubit>().state
+                        .text('beaconContacts')
+                        .split('|')
+                        .where((v) => v.isNotEmpty)
+                        .map((v) => v.split(' · ').first)
+                        .join(', ');
                     await SharePlus.instance.share(
                       ShareParams(
                         text:
-                            'Lokasi awal olahragaku: https://maps.google.com/?q=${point.lat},${point.lng} (titik awal, bukan pelacakan live)',
+                            '${contacts.isEmpty ? '' : 'Untuk $contacts: '}Lokasi awal olahragaku: https://maps.google.com/?q=${point.lat},${point.lng} (titik awal, bukan pelacakan live)',
                       ),
                     );
                   }
@@ -551,22 +651,23 @@ class RecordingPage extends StatelessWidget {
             context.pushReplacement(R.saveActivity);
           } else if (value.voice && value.splits.isNotEmpty) {
             HapticFeedback.mediumImpact();
-            toast(
-              context,
-              '${value.splits.length} km · ${Fmt.pace(Duration(seconds: value.splits.last), 1)}/km',
-            );
+            toast(context, () {
+              final sp = Fmt.speed(
+                value.sportId,
+                Duration(seconds: value.splits.last),
+                1,
+              );
+              return '${value.splits.length} km · ${sp.value} ${sp.unit}';
+            }());
           }
         },
         child: Scaffold(
           body: Column(
             children: [
-              FlatMap(
+              OsmRouteMap(
                 height: 300 + top,
                 radius: 0,
-                route: st.route.length >= 2 ? st.route : null,
-                layers: st.route.length >= 2
-                    ? const {MapLayer.route, MapLayer.me}
-                    : const {MapLayer.me},
+                samples: st.samples,
                 children: [
                   if (paused)
                     Positioned(
@@ -608,12 +709,26 @@ class RecordingPage extends StatelessWidget {
                     Row(
                       children: [
                         _Metric(Fmt.dec(st.km), 'KM'),
-                        _Metric(Fmt.pace(st.elapsed, st.km), 'PACE /KM'),
-                        _Metric(
-                          st.bpm?.toString() ?? '—',
-                          'BPM',
-                          color: AppColors.red,
+                        Builder(
+                          builder: (_) {
+                            final sp = Fmt.speed(st.sportId, st.elapsed, st.km);
+                            return _Metric(
+                              sp.value,
+                              sp.unit == 'km/j'
+                                  ? 'KM/J'
+                                  : 'PACE ${sp.unit.toUpperCase()}',
+                            );
+                          },
                         ),
+                        // Profil → Perangkat → "Detak jantung live".
+                        if (context.select<MeCubit, bool>(
+                          (m) => m.state.flag('liveHr', fallback: true),
+                        ))
+                          _Metric(
+                            st.bpm?.toString() ?? '—',
+                            'BPM',
+                            color: AppColors.red,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -849,6 +964,7 @@ class _SaveActivityPageState extends State<SaveActivityPage> {
           .whereType<double>()
           .where((bpm) => bpm >= 25 && bpm <= 250)
           .toList();
+      final gearId = _gearId ?? sl<GearCubit>().defaultFor(st.sportId)?.id;
       await sl<ActivityRepository>().save(
         Activity(
           id: 'act_${savedAt.millisecondsSinceEpoch}',
@@ -858,9 +974,7 @@ class _SaveActivityPageState extends State<SaveActivityPage> {
               : _title.text.trim(),
           start: start,
           duration: st.elapsed,
-          source: st.gpsDenied || st.route.length < 2
-              ? ActivitySource.manual
-              : ActivitySource.gps,
+          source: st.source,
           distanceKm: st.km,
           avgHr: heartRates.isEmpty
               ? null
@@ -879,9 +993,11 @@ class _SaveActivityPageState extends State<SaveActivityPage> {
           note: _note.text.trim(),
           hideHr: _hideHr,
           photos: _photos.map((f) => f.path).toList(),
-          gearId: _gearId ?? sl<GearCubit>().defaultFor(st.sportId)?.id,
+          gearId: gearId,
         ),
       );
+      // Shoe km and racket hours grow with every saved session.
+      sl<GearCubit>().addUsage(gearId, km: st.km, time: st.elapsed);
       // Mirror the workout into Health Connect / Apple Health when the user allowed it.
       if (mirrorHealth) {
         unawaited(
@@ -896,11 +1012,11 @@ class _SaveActivityPageState extends State<SaveActivityPage> {
         );
       }
       me.recordActivity(
-        source: st.gpsDenied || st.route.length < 2
-            ? ActivitySource.manual
-            : ActivitySource.gps,
+        source: st.source,
         sportId: st.sportId,
         stampAt: start,
+        // Moving time, like the saved activity: pauses don't earn minutes.
+        duration: st.elapsed,
       );
       if (mounted) context.go(R.done);
     } catch (_) {
@@ -940,138 +1056,146 @@ class _SaveActivityPageState extends State<SaveActivityPage> {
   @override
   Widget build(BuildContext context) {
     final st = context.watch<RecorderCubit>().state;
-    return KPage(
-      header: KHeader(
-        'Simpan Aktivitas',
-        leading: LucideIcons.x,
-        onLeading: _discard,
-        actions: [KLink('SIMPAN', onTap: _busy ? null : _save)],
-      ),
-      bottom: KActions([
-        KButton(
-          'SIMPAN AKTIVITAS',
-          loading: _busy,
-          onTap: _busy ? null : _save,
+    return PopScope(
+      // A finished recording only leaves through SIMPAN or a confirmed BUANG.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) _discard();
+      },
+      child: KPage(
+        header: KHeader(
+          'Simpan Aktivitas',
+          leading: LucideIcons.x,
+          onLeading: _discard,
+          actions: [KLink('SIMPAN', onTap: _busy ? null : _save)],
         ),
-        KLink('Buang aktivitas', color: AppColors.red, onTap: _discard),
-      ]),
-      gap: 14,
-      children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 120,
-              height: 96,
-              child: FlatMap(
+        bottom: KActions([
+          KButton(
+            'SIMPAN AKTIVITAS',
+            loading: _busy,
+            onTap: _busy ? null : _save,
+          ),
+          KLink('Buang aktivitas', color: AppColors.red, onTap: _discard),
+        ]),
+        gap: 14,
+        children: [
+          if (!st.verifiable)
+            KBanner.info(
+              'Rekaman di bawah 200 m atau 2 menit disimpan sebagai aktivitas '
+              'kasual: streak tetap aman, tapi tidak dihitung untuk evolusi '
+              'dan liga.',
+            ),
+          Row(
+            children: [
+              SizedBox(
+                width: 120,
                 height: 96,
-                radius: 16,
-                route: st.route.length >= 2 ? st.route : null,
-                animate: false,
+                child: OsmRouteMap(height: 96, radius: 16, samples: st.samples),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    KInput(controller: _title),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${Fmt.dec(st.km)} km · ${Fmt.clock(st.elapsed)} · ${Fmt.speed(st.sportId, st.elapsed, st.km).value} ${Fmt.speed(st.sportId, st.elapsed, st.km).unit}',
+                      style: AppText.bodySm(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          KField(
+            text: 'Tambah foto',
+            icon: LucideIcons.camera,
+            placeholder: true,
+            onTap: _pickPhotos,
+          ),
+          if (!st.gpsDenied && st.route.length >= 2)
+            KBanner.ok('Terverifikasi GPS · masuk poin klubmu'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final photo in _photos)
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(photo.path),
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: KIconButton(
+                        LucideIcons.x,
+                        onTap: () => setState(() => _photos.remove(photo)),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const FieldLabel('PRIVASI'),
+          _privacyChips(_privacy, (p) => setState(() => _privacy = p)),
+          if (sl<GearCubit>().active.any((g) => g.sportId == st.sportId))
+            KRow(
+              title: 'Gear',
+              subtitle:
+                  sl<GearCubit>().state
+                      .where((g) => g.id == _gearId)
+                      .firstOrNull
+                      ?.name ??
+                  sl<GearCubit>().defaultFor(st.sportId)?.name ??
+                  'Pilih gear',
+              icon: LucideIcons.backpack,
+              trailing: const Icon(LucideIcons.chevronRight),
+              onTap: () => showKSheet<void>(
+                context,
+                (ctx) => KSheet(
+                  children: [
+                    for (final gear in sl<GearCubit>().active.where(
+                      (g) => g.sportId == st.sportId,
+                    ))
+                      KRow(
+                        title: gear.name,
+                        onTap: () {
+                          setState(() => _gearId = gear.id);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  KInput(controller: _title),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${Fmt.dec(st.km)} km · ${Fmt.clock(st.elapsed)} · ${Fmt.pace(st.elapsed, st.km)}/km',
-                    style: AppText.bodySm(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        KField(
-          text: 'Tambah foto',
-          icon: LucideIcons.camera,
-          placeholder: true,
-          onTap: _pickPhotos,
-        ),
-        if (!st.gpsDenied && st.route.length >= 2)
-          KBanner.ok('Terverifikasi GPS · masuk poin klubmu'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final photo in _photos)
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(photo.path),
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: KIconButton(
-                      LucideIcons.x,
-                      onTap: () => setState(() => _photos.remove(photo)),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-        const FieldLabel('PRIVASI'),
-        _privacyChips(_privacy, (p) => setState(() => _privacy = p)),
-        if (sl<GearCubit>().active.any((g) => g.sportId == st.sportId))
-          KRow(
-            title: 'Gear',
-            subtitle:
-                sl<GearCubit>().state
-                    .where((g) => g.id == _gearId)
-                    .firstOrNull
-                    ?.name ??
-                sl<GearCubit>().defaultFor(st.sportId)?.name ??
-                'Pilih gear',
-            icon: LucideIcons.backpack,
-            trailing: const Icon(LucideIcons.chevronRight),
-            onTap: () => showKSheet<void>(
-              context,
-              (ctx) => KSheet(
-                children: [
-                  for (final gear in sl<GearCubit>().active.where(
-                    (g) => g.sportId == st.sportId,
-                  ))
-                    KRow(
-                      title: gear.name,
-                      onTap: () {
-                        setState(() => _gearId = gear.id);
-                        Navigator.pop(ctx);
-                      },
-                    ),
-                ],
+          KCard(
+            child: KRow(
+              icon: LucideIcons.eyeOff,
+              iconBg: AppColors.soft,
+              iconFg: AppColors.muted,
+              title: 'Sembunyikan detak jantung',
+              padding: EdgeInsets.zero,
+              trailing: KToggle(
+                value: _hideHr,
+                onChanged: (v) => setState(() => _hideHr = v),
               ),
             ),
           ),
-        KCard(
-          child: KRow(
-            icon: LucideIcons.eyeOff,
-            iconBg: AppColors.soft,
-            iconFg: AppColors.muted,
-            title: 'Sembunyikan detak jantung',
-            padding: EdgeInsets.zero,
-            trailing: KToggle(
-              value: _hideHr,
-              onChanged: (v) => setState(() => _hideHr = v),
-            ),
+          KInput(
+            controller: _note,
+            hint: 'Tulis catatan… (napas aman, kaki pegal 😅)',
+            maxLines: 3,
           ),
-        ),
-        KInput(
-          controller: _note,
-          hint: 'Tulis catatan… (napas aman, kaki pegal 😅)',
-          maxLines: 3,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

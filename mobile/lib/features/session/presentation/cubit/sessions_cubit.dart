@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format.dart';
 
 import '../../domain/entities/mabar_session.dart';
@@ -17,10 +19,11 @@ class SessionsState extends Equatable {
   Rsvp rsvp(String id) => rsvps[id] ?? const Rsvp();
   MabarSession? operator [](String id) => sessions[id];
 
-  /// B1 "Mabar kamu minggu ini".
+  /// B1 "Mabar kamu minggu ini": upcoming tickets and queues only.
   List<(MabarSession, Rsvp)> get mine => [
     for (final e in rsvps.entries)
       if (sessions[e.key] != null &&
+          sessions[e.key]!.joinable &&
           (e.value.status == RsvpStatus.joined ||
               e.value.status == RsvpStatus.waiting))
         (sessions[e.key]!, e.value),
@@ -51,21 +54,32 @@ class SessionsCubit extends Cubit<SessionsState> {
         sessions: {for (final s in list) s.id: s},
         rsvps: state.rsvps.isNotEmpty
             ? state.rsvps
-            : const {
-                'rabu-malam': Rsvp(
-                  status: RsvpStatus.joined,
-                  guests: ['Andi'],
-                  ticketNo: 9,
-                  amount: 72000,
-                ),
-                'padel-pagi': Rsvp(status: RsvpStatus.waiting, queue: 4),
-              },
+            : _repo.storedRsvps() ??
+                  const {
+                    'rabu-malam': Rsvp(
+                      status: RsvpStatus.joined,
+                      guests: ['Andi'],
+                      ticketNo: 9,
+                      amount: 72000,
+                    ),
+                    'padel-pagi': Rsvp(status: RsvpStatus.waiting, queue: 4),
+                  },
       ),
     );
   }
 
-  void _rsvp(String id, Rsvp r) =>
-      emit(state.copyWith(rsvps: {...state.rsvps, id: r}));
+  void _rsvp(String id, Rsvp r) {
+    emit(state.copyWith(rsvps: {...state.rsvps, id: r}));
+    _repo.saveRsvps(state.rsvps);
+  }
+
+  /// New account on this device: seed sessions, no tickets.
+  Future<void> resetForNewAccount() async {
+    await _repo.resetForNewAccount();
+    emit(const SessionsState());
+    final list = await _repo.all();
+    emit(SessionsState(sessions: {for (final s in list) s.id: s}));
+  }
 
   void _session(MabarSession s) {
     _repo.update(s);
@@ -76,7 +90,7 @@ class SessionsCubit extends Cubit<SessionsState> {
   bool startPayment(String id, List<String> guests) {
     final s = state[id]!;
     final old = state.rsvp(id);
-    if (s.cancelled ||
+    if (!s.joinable ||
         old.status == RsvpStatus.joined ||
         guests.length > s.guestMax) {
       return false;
@@ -98,8 +112,8 @@ class SessionsCubit extends Cubit<SessionsState> {
     return true;
   }
 
-  /// QRIS confirmed → C4 ticket.
-  void paid(String id) {
+  /// QRIS confirmed → C4 ticket. [name] is the payer as the host sees them.
+  void paid(String id, {String name = 'Kamu'}) {
     final s = state[id]!;
     final r = state.rsvp(id);
     if (r.status != RsvpStatus.pendingPayment ||
@@ -109,34 +123,64 @@ class SessionsCubit extends Cubit<SessionsState> {
     }
     final people = 1 + r.guests.length;
     final wasHolding = s.full && r.queue != null;
+    final filled = wasHolding
+        ? s.filled
+        : (s.filled + people).clamp(0, s.slots);
     _session(
       s.copyWith(
-        filled: wasHolding ? s.filled : (s.filled + people).clamp(0, s.slots),
-        waiting: wasHolding ? (s.waiting - 1).clamp(0, 99) : s.waiting,
+        filled: filled,
+        waiting: r.queue != null ? (s.waiting - 1).clamp(0, 99) : s.waiting,
+        participants: _withAttendees(s, name, r.guests),
       ),
     );
     _rsvp(
       id,
       r.copyWith(
         status: RsvpStatus.joined,
-        ticketNo: (wasHolding ? s.filled : s.filled + 1).clamp(1, s.slots),
+        ticketNo:
+            r.ticketNo ??
+            (wasHolding ? s.filled : s.filled + 1).clamp(1, s.slots),
       ),
     );
+  }
+
+  /// The payer and their guests on the host's roster (Kelola, check-in).
+  static List<Participant> _withAttendees(
+    MabarSession s,
+    String name,
+    List<String> guests,
+  ) {
+    final known = {for (final p in s.participants) p.name};
+    Participant person(String n, {String? guestOf}) => Participant(
+      name: n,
+      initials: n.trim().isEmpty ? '?' : n.trim()[0].toUpperCase(),
+      color: guestOf == null ? AppColors.primary : AppColors.purple,
+      via: 'APP',
+      guestOf: guestOf,
+    );
+    return [
+      ...s.participants,
+      if (!known.contains(name)) person(name),
+      for (final g in guests)
+        if (!known.contains(g)) person(g, guestOf: name),
+    ];
   }
 
   /// Timer ran out (C5): the slot is released, nothing was charged.
   void expire(String id) {
     if (state.rsvp(id).status != RsvpStatus.pendingPayment) return;
-    if (state.rsvp(id).queue != null) {
+    final r = state.rsvp(id);
+    if (r.queue != null) {
       leaveWaitlist(id);
     } else {
-      _rsvp(id, const Rsvp());
+      // Keep the guest names so COBA LAGI pays for the same group.
+      _rsvp(id, Rsvp(guests: r.guests));
     }
   }
 
   void joinWaitlist(String id, {List<String> guests = const []}) {
     final s = state[id]!;
-    if (s.cancelled ||
+    if (!s.joinable ||
         [
           RsvpStatus.joined,
           RsvpStatus.waiting,
@@ -182,10 +226,25 @@ class SessionsCubit extends Cubit<SessionsState> {
   void setWaitlistNotify(String id, bool value) =>
       _rsvp(id, state.rsvp(id).copyWith(notifyWhatsApp: value));
 
-  void claimTicket(String id) {
-    if (state[id] == null || state[id]!.cancelled) return;
+  /// Web RSVP claim: takes a free seat like a normal join. Returns false
+  /// when the session is over, cancelled or full.
+  bool claimTicket(String id, {String name = 'Tamu'}) {
+    final s = state[id];
+    if (s == null) return false;
     final r = state.rsvp(id);
-    _rsvp(id, r.copyWith(status: RsvpStatus.joined, ticketNo: r.ticketNo ?? 1));
+    if (r.status == RsvpStatus.joined) return true;
+    if (!s.joinable || s.open < 1) return false;
+    _session(
+      s.copyWith(
+        filled: s.filled + 1,
+        participants: _withAttendees(s, name, const []),
+      ),
+    );
+    _rsvp(
+      id,
+      Rsvp(status: RsvpStatus.joined, ticketNo: s.filled + 1, amount: s.fee),
+    );
+    return true;
   }
 
   /// Pass the offered slot to the next person in the queue.
@@ -202,8 +261,15 @@ class SessionsCubit extends Cubit<SessionsState> {
     final s = state[id]!;
     final r = state.rsvp(id);
     if (r.status != RsvpStatus.joined) return 0;
+    // Only dues actually paid can come back; the service fee never does and
+    // a claimed (unpaid) ticket refunds nothing.
+    final paidDues = math.max(0, r.amount - Fees.serviceFor(s.fee));
     if (guestOnly) {
       if (r.guests.isEmpty) return 0;
+      // After the deadline nothing comes back, so the paid total stays.
+      final guestDues = beforeDeadline
+          ? math.min(s.fee * r.guests.length, paidDues)
+          : 0;
       _session(
         s.copyWith(filled: (s.filled - r.guests.length).clamp(0, s.slots)),
       );
@@ -211,23 +277,25 @@ class SessionsCubit extends Cubit<SessionsState> {
         id,
         r.copyWith(
           guests: const [],
-          amount: r.amount - s.fee * r.guests.length,
+          amount: r.amount - guestDues,
           cancelReason: reason,
         ),
       );
-      return beforeDeadline ? s.fee * r.guests.length : 0;
+      return guestDues;
     }
     final people = 1 + r.guests.length;
-    final refill = s.waiting > 0 && s.autoWaitlist;
+    // Each freed seat goes to the next in the queue; seats nobody takes
+    // are released.
+    final moved = s.autoWaitlist ? math.min(people, s.waiting) : 0;
     _session(
       s.copyWith(
-        filled: refill ? s.filled : (s.filled - people).clamp(0, s.slots),
-        waiting: refill ? (s.waiting - 1).clamp(0, 99) : s.waiting,
+        filled: (s.filled - (people - moved)).clamp(0, s.slots),
+        waiting: (s.waiting - moved).clamp(0, 99),
       ),
     );
     _rsvp(id, Rsvp(status: RsvpStatus.cancelled, cancelReason: reason));
-    if (beforeDeadline) return s.fee * people;
-    return offerToWaitlist && refill ? s.fee : 0;
+    if (beforeDeadline) return math.min(s.fee * people, paidDues);
+    return offerToWaitlist ? math.min(s.fee * moved, paidDues) : 0;
   }
 
   Future<MabarSession> create(SessionDraft d) async {
@@ -248,18 +316,7 @@ class SessionsCubit extends Cubit<SessionsState> {
       s.copyWith(
         participants: [
           for (final p in s.participants)
-            p.name == name
-                ? Participant(
-                    name: p.name,
-                    initials: p.initials,
-                    color: p.color,
-                    status: status ?? p.status,
-                    host: p.host,
-                    via: p.via,
-                    guestOf: p.guestOf,
-                    present: present ?? p.present,
-                  )
-                : p,
+            p.name == name ? p.copyWith(status: status, present: present) : p,
         ],
       ),
     );
@@ -288,7 +345,8 @@ class SessionsCubit extends Cubit<SessionsState> {
     if (target == null || (refund && target.refunded)) return;
     _session(
       s.copyWith(
-        filled: (s.filled - 1).clamp(0, s.slots),
+        // A refunded seat was already released; HAPUS only drops the row.
+        filled: target.refunded ? s.filled : (s.filled - 1).clamp(0, s.slots),
         participants: [
           for (final p in s.participants)
             if (p.name != name || refund)
@@ -310,8 +368,12 @@ class SessionsCubit extends Cubit<SessionsState> {
     );
   }
 
-  void cancelSession(String id, {String reason = ''}) {
+  /// Host cancels the whole session. Returns what the signed-in user paid,
+  /// refunded in full (service fee included) because it's the host's call.
+  int cancelSession(String id, {String reason = ''}) {
     final s = state[id]!;
+    final r = state.rsvp(id);
+    final refund = r.status == RsvpStatus.joined ? r.amount : 0;
     _session(
       s.copyWith(
         filled: 0,
@@ -326,6 +388,7 @@ class SessionsCubit extends Cubit<SessionsState> {
       ),
     );
     _rsvp(id, Rsvp(status: RsvpStatus.cancelled, cancelReason: reason));
+    return refund;
   }
 }
 

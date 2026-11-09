@@ -39,11 +39,19 @@ Watch → phone:
 - **Android**: izin `android.permission.health.*` (read/write exercise, distance, calories; read heart rate, steps) ada di `AndroidManifest.xml`. Ada juga intent rationale Health Connect (`ACTION_SHOW_PERMISSIONS_RATIONALE` dan alias `VIEW_PERMISSION_USAGE`). `MainActivity` memakai `FlutterFragmentActivity`. minSdk 26.
 - **iOS**: `NSHealthShareUsageDescription` dan `NSHealthUpdateUsageDescription` ada di Info.plist. Capability HealthKit ada di `Runner.entitlements` dan sudah terpasang lewat `CODE_SIGN_ENTITLEMENTS`. Aktifkan juga HealthKit pada App ID di Apple Developer.
 
-## Belum ada di repo ini
+Konfirmasi & sinkron ulang:
 
-App companion native belum dibuat:
+```jsonc
+// phone → watch
+{ "type": "workout_ack", "start": 1761300000000 } // workout diterima, jam berhenti mengirim ulang
+{ "type": "hello" }                               // HP dibuka, jam kirim workout tertunda
+```
 
-- target watchOS (SwiftUI + `WCSession`)
-- modul Wear OS (Compose for Wear + `MessageClient` pada path `/klubby`)
+Di Android, plugin `watch_connectivity` memakai path `watch_connectivity` dan isi pesan berupa `HashMap` yang di-serialize Java.
 
-Selama companion belum ada, jalur Health store tetap jalan, jadi XP terverifikasi dari jam sudah bisa dipakai. Live link otomatis nonaktif karena `isPaired`/`isReachable` bernilai `false`.
+## Companion
+
+- **Wear OS**: modul `android/wear` (Compose for Wear + Health Services). Lihat `WEAR_OS_APP.md`.
+- **watchOS**: belum dibuat (SwiftUI + `WCSession`).
+
+Tanpa companion, jalur Health store tetap jalan, jadi XP terverifikasi dari jam sudah bisa dipakai. Live link otomatis nonaktif karena `isPaired`/`isReachable` bernilai `false`.

@@ -6,14 +6,16 @@ import '../theme/app_text.dart';
 
 /// Border used by chunky cards/tiles/chips: 2px sides, thicker bottom lip.
 Border chunkyBorder(Color c, {double bottom = 5, double side = 2}) => Border(
-      top: BorderSide(color: c, width: side),
-      left: BorderSide(color: c, width: side),
-      right: BorderSide(color: c, width: side),
-      bottom: BorderSide(color: c, width: bottom),
-    );
+  top: BorderSide(color: c, width: side),
+  left: BorderSide(color: c, width: side),
+  right: BorderSide(color: c, width: side),
+  bottom: BorderSide(color: c, width: bottom),
+);
 
 /// Solid offset shadow (the design's `fx …@4`).
-List<BoxShadow> lip(Color c, [double y = 4]) => [BoxShadow(color: c, offset: Offset(0, y))];
+List<BoxShadow> lip(Color c, [double y = 4]) => [
+  BoxShadow(color: c, offset: Offset(0, y)),
+];
 
 /// Card with the chunky bottom lip. Tappable cards sink when pressed.
 class KCard extends StatelessWidget {
@@ -74,10 +76,17 @@ class KButton extends StatelessWidget {
     this.loading = false,
   });
 
-  const KButton.secondary(this.label, {super.key, this.onTap, this.icon, this.expand = true, this.textColor, this.small = false})
-      : kind = BtnKind.secondary,
-        hue = Hue.primary,
-        loading = false;
+  const KButton.secondary(
+    this.label, {
+    super.key,
+    this.onTap,
+    this.icon,
+    this.expand = true,
+    this.textColor,
+    this.small = false,
+  }) : kind = BtnKind.secondary,
+       hue = Hue.primary,
+       loading = false;
 
   final String label;
   final VoidCallback? onTap;
@@ -93,20 +102,40 @@ class KButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final disabled = onTap == null;
     final primary = kind == BtnKind.primary;
-    final fill = primary ? (disabled ? AppColors.line : hue.base) : AppColors.bg;
-    final shadow = primary ? (disabled ? AppColors.faint.withValues(alpha: .4) : hue.dark) : AppColors.line;
-    final fg = textColor ?? (primary ? (disabled ? AppColors.faint : AppColors.white) : (disabled ? AppColors.faint : AppColors.primary));
+    final fill = primary
+        ? (disabled ? AppColors.line : hue.base)
+        : AppColors.bg;
+    final shadow = primary
+        ? (disabled ? AppColors.faint.withValues(alpha: .4) : hue.dark)
+        : AppColors.line;
+    final fg =
+        textColor ??
+        (primary
+            ? (disabled ? AppColors.faint : AppColors.white)
+            : (disabled ? AppColors.faint : AppColors.primary));
     final size = small ? 14.0 : 17.0;
     final content = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (loading)
-          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 3, color: fg))
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 3, color: fg),
+          )
         else ...[
-          if (icon != null) ...[Icon(icon, color: fg, size: size + 3), const SizedBox(width: 8)],
+          if (icon != null) ...[
+            Icon(icon, color: fg, size: size + 3),
+            const SizedBox(width: 8),
+          ],
           Flexible(
-            child: Text(label.toUpperCase(), style: AppText.button(fg, size), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+            child: Text(
+              label.toUpperCase(),
+              style: AppText.button(fg, size),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ],
@@ -114,7 +143,10 @@ class KButton extends StatelessWidget {
     return Pressable(
       onTap: loading ? null : onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: small ? 10 : (primary ? 15 : 13), horizontal: small ? 14 : 20),
+        padding: EdgeInsets.symmetric(
+          vertical: small ? 10 : (primary ? 15 : 13),
+          horizontal: small ? 14 : 20,
+        ),
         decoration: BoxDecoration(
           color: fill,
           borderRadius: BorderRadius.circular(16),
@@ -129,7 +161,14 @@ class KButton extends StatelessWidget {
 
 /// Small chunky action button used inside cards ("TERIMA", "GABUNG", "UBAH").
 class KMiniButton extends StatelessWidget {
-  const KMiniButton(this.label, {super.key, this.onTap, this.hue, this.icon, this.textColor});
+  const KMiniButton(
+    this.label, {
+    super.key,
+    this.onTap,
+    this.hue,
+    this.icon,
+    this.textColor,
+  });
 
   final String label;
   final VoidCallback? onTap;
@@ -142,8 +181,12 @@ class KMiniButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
-    final h = disabled && hue != null ? const Hue(AppColors.line, AppColors.faint, AppColors.soft) : hue;
-    final fg = disabled ? AppColors.faint : textColor ?? (h == null ? AppColors.muted : AppColors.white);
+    final h = disabled && hue != null
+        ? const Hue(AppColors.line, AppColors.faint, AppColors.soft)
+        : hue;
+    final fg = disabled
+        ? AppColors.faint
+        : textColor ?? (h == null ? AppColors.muted : AppColors.white);
     return Pressable(
       onTap: onTap,
       child: Container(
@@ -151,12 +194,27 @@ class KMiniButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: h?.base ?? AppColors.bg,
           borderRadius: BorderRadius.circular(12),
-          border: h == null ? chunkyBorder(AppColors.line, bottom: 4) : Border(bottom: BorderSide(color: h.dark, width: 4)),
+          border: h == null
+              ? chunkyBorder(AppColors.line, bottom: 4)
+              : Border(bottom: BorderSide(color: h.dark, width: 4)),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-          Flexible(child: Text(label, style: AppText.label(fg), maxLines: 1, overflow: TextOverflow.ellipsis)),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                style: AppText.label(fg),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -185,11 +243,18 @@ class KChoice extends StatelessWidget {
   final bool expand;
   final double? height;
 
-  static Color fg(bool selected, [Hue hue = Hue.primary]) => selected ? hue.dark : AppColors.muted;
+  static Color fg(bool selected, [Hue hue = Hue.primary]) =>
+      selected ? hue.dark : AppColors.muted;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? (hue == Hue.primary ? AppColors.primaryM : hue == Hue.blue ? AppColors.blueM : hue.base.withValues(alpha: .5)) : AppColors.line;
+    final borderColor = selected
+        ? (hue == Hue.primary
+              ? AppColors.primaryM
+              : hue == Hue.blue
+              ? AppColors.blueM
+              : hue.base.withValues(alpha: .5))
+        : AppColors.line;
     return Pressable(
       onTap: onTap,
       child: AnimatedContainer(
@@ -212,7 +277,15 @@ class KChoice extends StatelessWidget {
 
 /// Text chip shortcut over [KChoice].
 class KChip extends StatelessWidget {
-  const KChip(this.label, {super.key, required this.selected, this.onTap, this.expand = false, this.hue = Hue.primary, this.leading});
+  const KChip(
+    this.label, {
+    super.key,
+    required this.selected,
+    this.onTap,
+    this.expand = false,
+    this.hue = Hue.primary,
+    this.leading,
+  });
 
   final String label;
   final bool selected;
@@ -228,17 +301,35 @@ class KChip extends StatelessWidget {
       onTap: onTap,
       expand: expand,
       hue: hue,
-      child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-        if (leading != null) ...[leading!, const SizedBox(width: 6)],
-        Flexible(child: Text(label, style: AppText.custom(14, c: KChoice.fg(selected, hue)), overflow: TextOverflow.ellipsis)),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 6)],
+          Flexible(
+            child: Text(
+              label,
+              style: AppText.custom(14, c: KChoice.fg(selected, hue)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 /// Rounded pill tag ("LUNAS ✓", "ANTREAN #4").
 class KPill extends StatelessWidget {
-  const KPill(this.label, {super.key, this.bg = AppColors.primaryL, this.fg = AppColors.primaryD, this.icon, this.size = 12, this.padding});
+  const KPill(
+    this.label, {
+    super.key,
+    this.bg = AppColors.primaryL,
+    this.fg = AppColors.primaryD,
+    this.icon,
+    this.size = 12,
+    this.padding,
+  });
 
   final String label;
   final Color bg;
@@ -250,19 +341,42 @@ class KPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (icon != null) ...[Icon(icon, size: size + 2, color: fg), const SizedBox(width: 4)],
-        Flexible(child: Text(label, style: AppText.custom(size, c: fg, ls: .4), maxLines: 1, overflow: TextOverflow.ellipsis)),
-      ]),
+      padding:
+          padding ?? const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: size + 2, color: fg),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              style: AppText.custom(size, c: fg, ls: .4),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 /// Square coloured tag with small radius ("#4 DIVISI 1", "PUBLIK").
 class KTag extends StatelessWidget {
-  const KTag(this.label, {super.key, this.bg = AppColors.yellow, this.fg = AppColors.white, this.border});
+  const KTag(
+    this.label, {
+    super.key,
+    this.bg = AppColors.yellow,
+    this.fg = AppColors.white,
+    this.border,
+  });
 
   final String label;
   final Color bg;

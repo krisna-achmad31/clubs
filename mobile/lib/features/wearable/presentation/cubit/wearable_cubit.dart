@@ -84,10 +84,27 @@ class WearableState extends Equatable {
 /// Watch data arrives either live over [WatchBridge] (Apple Watch / Wear OS
 /// companion) or after the fact through Health Connect / HealthKit.
 class WearableCubit extends Cubit<WearableState> {
-  WearableCubit(this._health, this._watch) : super(const WearableState());
+  WearableCubit(this._health, this._watch, {this.onWorkout})
+    : super(const WearableState());
 
   final HealthService _health;
   final WatchBridge _watch;
+
+  /// Turns a synced workout into an app activity (deduplicated there).
+  final Future<bool> Function(WorkoutRecord workout)? onWorkout;
+
+  Future<void> _import(Iterable<WorkoutRecord> list) async {
+    final f = onWorkout;
+    if (f == null) return;
+    for (final w in list) {
+      try {
+        await f(w);
+      } on Exception {
+        // One bad record must not stop the rest of the sync.
+      }
+    }
+  }
+
   StreamSubscription<WatchEvent>? _sub;
 
   Future<void> refresh() async {
@@ -104,7 +121,10 @@ class WearableCubit extends Cubit<WearableState> {
           watchReachable: reachable,
         ),
       );
-      if (paired) _listen();
+      if (paired) {
+        _listen();
+        if (reachable) await _watch.hello();
+      }
       if (connected) await sync();
     } on Exception {
       // Platform plugins can be missing on emulators; keep the UI usable.
@@ -116,24 +136,28 @@ class WearableCubit extends Cubit<WearableState> {
       switch (e) {
         case WatchHeartRate(:final bpm):
           emit(state.copyWith(bpm: bpm));
+        case WatchWhoAmI():
+          unawaited(_watch.hello());
+        case WatchWorkout(:final otherAccount) when otherAccount:
+          // Linked to someone else: no import and no ack, the watch keeps it.
+          break;
         case WatchWorkout(
           :final sportId,
           :final start,
           :final end,
           :final distanceMeters,
         ):
-          emit(
-            state.copyWith(
-              lastWorkout: WorkoutRecord(
-                start: start,
-                end: end,
-                activity: sportId,
-                distanceMeters: distanceMeters,
-                source: 'watch',
-              ),
-              lastSync: DateTime.now(),
-            ),
+          final w = WorkoutRecord(
+            start: start,
+            end: end,
+            activity: sportId,
+            distanceMeters: distanceMeters,
+            source: 'watch',
+            device: 'Jam Klubby',
           );
+          emit(state.copyWith(lastWorkout: w, lastSync: DateTime.now()));
+          // Ack after the import (deduplicated there) so a resend is harmless.
+          _import([w]).whenComplete(() => _watch.ackWorkout(start));
         case WatchControl():
         case WatchCadence():
           break;
@@ -189,6 +213,7 @@ class WearableCubit extends Cubit<WearableState> {
           bpm: hr,
         ),
       );
+      await _import(list);
       return true;
     } on Exception {
       return false;

@@ -6,18 +6,27 @@ import 'package:permission_handler/permission_handler.dart';
 ///
 /// Each one is requested only right before the feature that needs it, with a
 /// friendly in-app explainer first (A4 location, A8 notification/motion, I3 camera…).
-enum AppPermission { location, locationAlways, camera, notification, motion, photos }
+enum AppPermission {
+  location,
+  locationAlways,
+  camera,
+  notification,
+  motion,
+  photos,
+}
 
 class PermissionService {
   Permission _map(AppPermission p) => switch (p) {
-        AppPermission.location => Permission.locationWhenInUse,
-        AppPermission.locationAlways => Permission.locationAlways,
-        AppPermission.camera => Permission.camera,
-        AppPermission.notification => Permission.notification,
-        // iOS: Core Motion (NSMotionUsageDescription). Android: ACTIVITY_RECOGNITION for step/activity detection.
-        AppPermission.motion => Platform.isIOS ? Permission.sensors : Permission.activityRecognition,
-        AppPermission.photos => Platform.isIOS ? Permission.photosAddOnly : Permission.storage,
-      };
+    AppPermission.location => Permission.locationWhenInUse,
+    AppPermission.locationAlways => Permission.locationAlways,
+    AppPermission.camera => Permission.camera,
+    AppPermission.notification => Permission.notification,
+    // iOS: Core Motion (NSMotionUsageDescription). Android: ACTIVITY_RECOGNITION for step/activity detection.
+    AppPermission.motion =>
+      Platform.isIOS ? Permission.sensors : Permission.activityRecognition,
+    AppPermission.photos =>
+      Platform.isIOS ? Permission.photosAddOnly : Permission.storage,
+  };
 
   Future<bool> isGranted(AppPermission p) async {
     final s = await _map(p).status;
@@ -34,7 +43,8 @@ class PermissionService {
     return s.isGranted || s.isLimited;
   }
 
-  Future<bool> isPermanentlyDenied(AppPermission p) => _map(p).isPermanentlyDenied;
+  Future<bool> isPermanentlyDenied(AppPermission p) =>
+      _map(p).isPermanentlyDenied;
 
   Future<bool> openSettings() => openAppSettings();
 }

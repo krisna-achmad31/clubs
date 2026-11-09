@@ -76,8 +76,23 @@ class GearCubit extends Cubit<List<Gear>> {
       _update(id, (g) => g.copyWith(name: name));
 
   /// Rackets: fresh strings today, play hours start over.
-  void restrung(String id) =>
-      _update(id, (g) => g.copyWith(restrungAt: DateTime.now(), hours: 0));
+  void restrung(String id) => _update(
+    id,
+    (g) => g.copyWith(restrungAt: DateTime.now(), hours: 0, minutes: 0),
+  );
+
+  /// A saved activity used [id]: adds its distance and play time.
+  void addUsage(String? id, {double km = 0, Duration time = Duration.zero}) {
+    if (id == null || !state.any((g) => g.id == id)) return;
+    _update(id, (g) {
+      final total = g.hours * 60 + g.minutes + time.inMinutes;
+      return g.copyWith(
+        km: g.km + (km > 0 ? km : 0),
+        hours: total ~/ 60,
+        minutes: total % 60,
+      );
+    });
+  }
 
   /// Shoes/bikes: odometer back to zero (e.g. after a resole).
   void resetKm(String id) => _update(id, (g) => g.copyWith(km: 0));

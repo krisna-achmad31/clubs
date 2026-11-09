@@ -42,6 +42,38 @@ class Activity extends Equatable {
     this.published = true,
   });
 
+  /// Same activity with a different [route] (privacy zones trim its ends),
+  /// or edited [title], [note] and [privacy] (Edit post).
+  Activity copyWith({
+    List<Offset>? route,
+    String? title,
+    String? note,
+    Privacy? privacy,
+  }) => Activity(
+    id: id,
+    sportId: sportId,
+    title: title ?? this.title,
+    start: start,
+    duration: duration,
+    source: source,
+    distanceKm: distanceKm,
+    avgHr: avgHr,
+    route: route ?? this.route,
+    splits: splits,
+    privacy: privacy ?? this.privacy,
+    note: note ?? this.note,
+    feel: feel,
+    score: score,
+    hideHr: hideHr,
+    clubName: clubName,
+    photos: photos,
+    gearId: gearId,
+    samples: samples,
+    elapsedTime: elapsedTime,
+    device: device,
+    published: published,
+  );
+
   final String id;
   final String sportId;
   final String title;
@@ -177,7 +209,7 @@ class RecorderState extends Equatable {
     this.gpsDenied = false,
     this.route = const [],
     this.autoPaused = false,
-    this.beacon = true,
+    this.beacon = false,
     this.voice = false,
     this.splits = const [],
     this.samples = const [],
@@ -204,6 +236,21 @@ class RecorderState extends Equatable {
   final double? cadence;
 
   double get km => meters / 1000;
+
+  /// Minimum effort for a GPS recording to count as verified (adoption,
+  /// evolution, league hours). Below this a standing-still phone's drift
+  /// would earn full credit, so the recording is kept as a casual entry.
+  static const minVerifiedKm = .2;
+  static const minVerifiedTime = Duration(minutes: 2);
+
+  bool get verifiable =>
+      !gpsDenied &&
+      route.length >= 2 &&
+      km >= minVerifiedKm &&
+      elapsed >= minVerifiedTime;
+
+  ActivitySource get source =>
+      verifiable ? ActivitySource.gps : ActivitySource.manual;
 
   RecorderState copyWith({
     RecordPhase? phase,

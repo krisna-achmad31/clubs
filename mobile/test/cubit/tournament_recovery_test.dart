@@ -131,4 +131,33 @@ void main() {
       expect(cubit.state.conflicts, isEmpty);
     },
   );
+
+  test('Gugur crowns the final winner, not the top point scorer', () {
+    cubit
+      ..setFormat(TournamentFormat.gugur)
+      ..setPlayers(6)
+      ..setCourts(1)
+      ..setPoints(21);
+    expect(cubit.start(), isTrue);
+    while (!cubit.state.finished) {
+      final last = cubit.state.round == cubit.state.rounds;
+      for (final m in [...cubit.state.matches]) {
+        // Early rounds: team A cruises 21-0. Final: team A loses 20-21.
+        expect(
+          last
+              ? cubit.submitScore(m.court, 20, 21)
+              : cubit.submitScore(m.court, 21, 0),
+          isTrue,
+        );
+      }
+      cubit.nextRound();
+    }
+    final finalMatch = cubit.state.matches.single;
+    final ranked = cubit.state.ranked;
+    expect(ranked.first.name, finalMatch.teamB);
+    expect(ranked[1].name, finalMatch.teamA);
+    expect(cubit.state.eliminated.containsKey(ranked.first.name), isFalse);
+    // 6 players → 3 knockout stages, each one eliminating someone.
+    expect(cubit.state.eliminated.values.toSet(), {1, 2, 3});
+  });
 }

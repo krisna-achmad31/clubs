@@ -1,3 +1,8 @@
+import 'dart:convert';
+
+import 'package:flutter/painting.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/router/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/format.dart';
@@ -9,9 +14,20 @@ import '../domain/entities/feed_post.dart';
 import '../domain/repositories/feed_repository.dart';
 
 class FeedRepositoryImpl implements FeedRepository {
-  FeedRepositoryImpl({this._activities, this._profiles});
+  FeedRepositoryImpl({this._activities, this._profiles, this._prefs}) {
+    _restore();
+  }
   final ActivityRepository? _activities;
   final ProfileRepository? _profiles;
+
+  /// Keeps reactions, comments, hidden posts, mutes and read notifications
+  /// across restarts. Null in tests: everything stays in memory.
+  final SharedPreferences? _prefs;
+  static const _key = 'feed_v1';
+
+  /// Saved reactions/comments per post id, applied to seed and own posts.
+  final _engagement = <String, (List<Reaction>, List<Comment>)>{};
+  final _readNotifs = <String>{};
   final _hidden = <String>{};
   final _muted = <String>{};
 
@@ -68,7 +84,6 @@ class FeedRepositoryImpl implements FeedRepository {
     ),
     const FeedPost(
       id: 'rian-lari',
-      activityId: 'gbk',
       author: 'Rian Saputra',
       initials: 'RS',
       color: AppColors.primary,
@@ -86,7 +101,7 @@ class FeedRepositoryImpl implements FeedRepository {
         PostStat('WAKTU', '32:10', AppColors.ink),
       ],
       splits: [382, 365, 358, 374],
-      segment: 'Tanjakan Senayan · 4:12 · PR',
+      segment: 'Tanjakan Senayan · 3:55',
       segmentId: 'tanjakan-senayan',
       reactions: [
         Reaction('🏃', 6, AppColors.purple),
@@ -96,8 +111,8 @@ class FeedRepositoryImpl implements FeedRepository {
       ],
       comments: [
         Comment(
-          author: 'Budi',
-          emoji: '🐥',
+          author: 'Raka',
+          emoji: '🐰',
           avatarBg: AppColors.orangeL,
           text: 'Gila pace-nya naik terus 🔥',
         ),
@@ -180,6 +195,7 @@ class FeedRepositoryImpl implements FeedRepository {
         final index = _posts.indexWhere((post) => post.id == id);
         final previous = index < 0 ? null : _posts[index];
         final analysis = ActivityAnalysis(activity);
+        final shown = _outsideZones(activity, profile.text('zones'));
         final post = FeedPost(
           id: id,
           author: profile.name,
@@ -191,15 +207,15 @@ class FeedRepositoryImpl implements FeedRepository {
           club: activity.clubName,
           mine: true,
           publik: activity.privacy == Privacy.publik,
-          activity: activity,
+          activity: shown,
           activityId: activity.id,
           hasRoute: analysis.route.length >= 2,
           splits: analysis.splits
               .where((split) => split.km >= .999)
               .map((split) => split.seconds.round())
               .toList(),
-          reactions: previous?.reactions ?? const [],
-          comments: previous?.comments ?? const [],
+          reactions: previous?.reactions ?? _engagement[id]?.$1 ?? const [],
+          comments: previous?.comments ?? _engagement[id]?.$2 ?? const [],
           stats: [
             if (activity.distanceKm > 0)
               PostStat(
@@ -209,8 +225,12 @@ class FeedRepositoryImpl implements FeedRepository {
               ),
             if (analysis.averagePace != null)
               PostStat(
-                'PACE',
-                Fmt.pace(activity.duration, activity.distanceKm),
+                activity.sportId == 'sepeda' ? 'KM/J' : 'PACE',
+                Fmt.speed(
+                  activity.sportId,
+                  activity.duration,
+                  activity.distanceKm,
+                ).value,
                 AppColors.primary,
               ),
             PostStat('WAKTU', Fmt.clock(activity.duration), AppColors.ink),
@@ -229,9 +249,14 @@ class FeedRepositoryImpl implements FeedRepository {
         }
       }
     }
+    // Only the user's own posts carry their activities; another author's
+    // post never shows the user's private workout.
     for (var index = 0; index < _posts.length; index++) {
       final post = _posts[index];
       if (post.mine || post.activityId == null) continue;
+      if (!activities.any((a) => a.id == post.activityId && a.published)) {
+        continue;
+      }
       final activity = activities
           .where((a) => a.id == post.activityId)
           .firstOrNull;
@@ -244,7 +269,7 @@ class FeedRepositoryImpl implements FeedRepository {
       id: 'n1',
       kind: NotifKind.goyang,
       emoji: '📳',
-      title: 'Budi ngajak main! (Goyang)',
+      title: 'Raka ngajak main! (Goyang)',
       body: 'Badminton sore ini dekat GOR Mahakam',
       ago: '2m',
       route: R.goyangInvite,
@@ -295,7 +320,8 @@ class FeedRepositoryImpl implements FeedRepository {
       kind: NotifKind.league,
       emoji: '🏆',
       title: 'Klubmu dekat zona promosi',
-      body: 'PB Smash Ceria #4 Divisi 1 · kurang 240 poin',
+      // The exact gap lives on the Liga page; no fixed number to go stale.
+      body: 'PB Smash Ceria #4 Divisi 1 · tinggal sedikit lagi ke #3',
       ago: '1h',
       route: R.league,
       today: false,
@@ -311,6 +337,21 @@ class FeedRepositoryImpl implements FeedRepository {
       today: false,
     ),
   ];
+
+  /// Privacy zones (Profil → Privasi): hides the start and end of a
+  /// published route, as far as the largest zone radius reaches.
+  static Activity _outsideZones(Activity a, String zones) {
+    if (zones.isEmpty || a.route.length < 4 || a.distanceKm <= 0) return a;
+    final radius = [
+      for (final z in zones.split('|'))
+        int.tryParse(RegExp(r'(\d+)\s*m$').firstMatch(z)?.group(1) ?? '') ?? 0,
+    ].fold<int>(0, (m, v) => v > m ? v : m);
+    if (radius == 0) return a;
+    final share = (radius / 1000 / a.distanceKm).clamp(0.0, .4);
+    final cut = (a.route.length * share).ceil();
+    if (a.route.length - 2 * cut < 2) return a.copyWith(route: const []);
+    return a.copyWith(route: a.route.sublist(cut, a.route.length - cut));
+  }
 
   @override
   Future<List<FeedPost>> feed({required bool publik}) async {
@@ -361,39 +402,274 @@ class FeedRepositoryImpl implements FeedRepository {
             Reaction(emoji, 1, Reaction.hueOf(emoji), mine: true),
           ];
     _posts[i] = p.copyWith(reactions: next.where((r) => r.count > 0).toList());
+    _remember(_posts[i]);
   }
 
   @override
-  Future<void> hide(String postId) async => _hidden.add(postId);
+  Future<void> hide(String postId) async {
+    _hidden.add(postId);
+    await _persist();
+  }
 
   @override
-  Future<void> mute(String author) async => _muted.add(author);
+  Future<Activity?> myActivity(String activityId) async {
+    final all = await _activities?.recent() ?? const <Activity>[];
+    return all.where((a) => a.id == activityId).firstOrNull;
+  }
 
   @override
-  Future<void> report(String postId, String reason) async =>
-      _hidden.add(postId);
+  Future<void> editMine(
+    String activityId, {
+    required String title,
+    required String note,
+    required Privacy privacy,
+  }) async {
+    final a = await myActivity(activityId);
+    if (a == null) return;
+    await _activities!.update(
+      a.copyWith(title: title, note: note, privacy: privacy),
+    );
+  }
+
+  @override
+  Future<void> mute(String author) async {
+    _muted.add(author);
+    await _persist();
+  }
+
+  @override
+  Future<void> unmute(String author) async {
+    _muted.remove(author);
+    await _persist();
+  }
+
+  @override
+  Future<List<String>> muted() async => _muted.toList()..sort();
+
+  @override
+  Future<void> report(String postId, String reason) => hide(postId);
 
   @override
   Future<void> comment(String postId, Comment c) async {
     final i = _index(postId);
     if (i >= 0) {
       _posts[i] = _posts[i].copyWith(comments: [..._posts[i].comments, c]);
+      _remember(_posts[i]);
     }
   }
 
+  void _remember(FeedPost p) {
+    _engagement[p.id] = (p.reactions, p.comments);
+    _persist();
+  }
+
   @override
-  Future<List<AppNotification>> notifications() async => List.of(_notifs);
+  Future<List<AppNotification>> notifications() async {
+    final p = await _profiles?.load();
+    if (p == null) return List.of(_notifs);
+    final today = DateTime.now();
+    final last = p.lastActive;
+    final activeToday =
+        last != null &&
+        last.year == today.year &&
+        last.month == today.month &&
+        last.day == today.day;
+    final frozenDays = [
+      for (final e in p.calendarHistory)
+        if (e.frozen) e.day,
+    ]..sort();
+    // Only a recent Es Batu is news; an old one is just calendar history.
+    final froze =
+        frozenDays.isNotEmpty &&
+        DateTime(
+              today.year,
+              today.month,
+              today.day,
+            ).difference(frozenDays.last).inDays <=
+            2;
+    // Days since the last Es Batu, so the tile sits in the right group.
+    final frozeAgo = froze
+        ? DateTime(
+            today.year,
+            today.month,
+            today.day,
+          ).difference(frozenDays.last).inDays
+        : 0;
+    // Notification preferences (Profil → Notifikasi) hide whole groups.
+    bool allowed(NotifKind k) => p.flag(switch (k) {
+      NotifKind.goyang || NotifKind.slot || NotifKind.payment => 'notif_mabar',
+      NotifKind.kudoz => 'notif_kudoz',
+      NotifKind.league => 'notif_liga',
+      NotifKind.streak || NotifKind.freeze => 'notif_streak',
+    }, fallback: true);
+    return [
+      for (final n in _notifs)
+        if (allowed(n.kind))
+          switch (n.kind) {
+            // Live streak copy instead of a fixed "14 hari".
+            NotifKind.streak when activeToday || p.streak == 0 => null,
+            NotifKind.streak => AppNotification(
+              id: n.id,
+              kind: n.kind,
+              emoji: n.emoji,
+              title: n.title,
+              body:
+                  'Streak ${p.streak} hari belum aman. Rekam aktivitas sebelum tengah malam.',
+              ago: n.ago,
+              route: n.route,
+              today: n.today,
+              unread: n.unread,
+              action: n.action,
+            ),
+            NotifKind.freeze when !froze => null,
+            NotifKind.freeze => AppNotification(
+              id: n.id,
+              kind: n.kind,
+              emoji: n.emoji,
+              title: n.title,
+              body: 'Streak ${p.streak} hari tetap aman',
+              ago: frozeAgo == 0 ? 'baru' : '${frozeAgo}h',
+              route: n.route,
+              today: frozeAgo == 0,
+              unread: n.unread,
+              action: n.action,
+            ),
+            _ => n,
+          },
+    ].nonNulls.toList();
+  }
 
   @override
   Future<void> markRead(String id) async {
     final i = _notifs.indexWhere((n) => n.id == id);
-    if (i >= 0) _notifs[i] = _notifs[i].read();
+    if (i >= 0) {
+      _notifs[i] = _notifs[i].read();
+      _readNotifs.add(id);
+      await _persist();
+    }
   }
 
   @override
   Future<void> markAllRead() async {
     for (var i = 0; i < _notifs.length; i++) {
       _notifs[i] = _notifs[i].read();
+      _readNotifs.add(_notifs[i].id);
+    }
+    await _persist();
+  }
+
+  /// New account on this device: no reactions, comments, mutes or hides.
+  @override
+  Future<void> resetForNewAccount() async {
+    _hidden.clear();
+    _muted.clear();
+    _readNotifs.clear();
+    for (var i = 0; i < _posts.length; i++) {
+      if (_engagement.containsKey(_posts[i].id)) {
+        _posts[i] = _posts[i].copyWith(
+          reactions: [
+            for (final r in _posts[i].reactions)
+              if (!r.mine) r else if (r.count > 1) r.toggled(),
+          ],
+          comments: [
+            for (final c in _posts[i].comments)
+              if (!c.mine) c,
+          ],
+        );
+      }
+    }
+    _engagement.clear();
+    await _prefs?.remove(_key);
+  }
+
+  // Persistence --------------------------------------------------------------
+
+  void _restore() {
+    final raw = _prefs?.getString(_key);
+    if (raw == null) return;
+    try {
+      final j = (jsonDecode(raw) as Map).cast<String, Object?>();
+      _hidden.addAll((j['hidden'] as List? ?? const []).cast<String>());
+      _muted.addAll((j['muted'] as List? ?? const []).cast<String>());
+      _readNotifs.addAll((j['read'] as List? ?? const []).cast<String>());
+      for (final e in ((j['posts'] as Map?) ?? const {}).entries) {
+        final v = (e.value as Map).cast<String, Object?>();
+        _engagement[e.key as String] = (
+          [
+            for (final r in v['reactions'] as List? ?? const [])
+              _reactionFromJson((r as Map).cast()),
+          ],
+          [
+            for (final c in v['comments'] as List? ?? const [])
+              _commentFromJson((c as Map).cast()),
+          ],
+        );
+      }
+    } on Object {
+      return;
+    }
+    for (var i = 0; i < _posts.length; i++) {
+      final saved = _engagement[_posts[i].id];
+      if (saved != null) {
+        _posts[i] = _posts[i].copyWith(reactions: saved.$1, comments: saved.$2);
+      }
+    }
+    for (var i = 0; i < _notifs.length; i++) {
+      if (_readNotifs.contains(_notifs[i].id)) _notifs[i] = _notifs[i].read();
     }
   }
+
+  Future<void> _persist() async {
+    await _prefs?.setString(
+      _key,
+      jsonEncode({
+        'hidden': _hidden.toList(),
+        'muted': _muted.toList(),
+        'read': _readNotifs.toList(),
+        'posts': {
+          for (final e in _engagement.entries)
+            e.key: {
+              'reactions': [for (final r in e.value.$1) _reactionToJson(r)],
+              'comments': [for (final c in e.value.$2) _commentToJson(c)],
+            },
+        },
+      }),
+    );
+  }
 }
+
+Map<String, Object?> _reactionToJson(Reaction r) => {
+  'emoji': r.emoji,
+  'count': r.count,
+  'color': r.color.toARGB32(),
+  'mine': r.mine,
+};
+
+Reaction _reactionFromJson(Map<String, Object?> j) => Reaction(
+  j['emoji'] as String,
+  j['count'] as int,
+  Color(j['color'] as int),
+  mine: j['mine'] as bool? ?? false,
+);
+
+Map<String, Object?> _commentToJson(Comment c) => {
+  'author': c.author,
+  'emoji': c.emoji,
+  'avatarBg': c.avatarBg.toARGB32(),
+  'text': c.text,
+  'sticker': c.sticker,
+  'stickerBg': c.stickerBg?.toARGB32(),
+  'stickerFg': c.stickerFg?.toARGB32(),
+  'mine': c.mine,
+};
+
+Comment _commentFromJson(Map<String, Object?> j) => Comment(
+  author: j['author'] as String,
+  emoji: j['emoji'] as String,
+  avatarBg: Color(j['avatarBg'] as int),
+  text: j['text'] as String,
+  sticker: j['sticker'] as bool? ?? false,
+  stickerBg: j['stickerBg'] == null ? null : Color(j['stickerBg'] as int),
+  stickerFg: j['stickerFg'] == null ? null : Color(j['stickerFg'] as int),
+  mine: j['mine'] as bool? ?? false,
+);

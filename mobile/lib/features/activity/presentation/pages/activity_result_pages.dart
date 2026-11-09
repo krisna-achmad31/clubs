@@ -1,13 +1,17 @@
 part of 'activity_pages.dart';
 
 class ManualPage extends StatefulWidget {
-  const ManualPage({super.key});
+  const ManualPage({super.key, this.sportId});
+
+  /// Sport picked on the GPS screen ("CATAT TANPA GPS"), kept on fallback.
+  final String? sportId;
   @override
   State<ManualPage> createState() => _ManualPageState();
 }
 
 class _ManualPageState extends State<ManualPage> {
-  late var _sport = context.read<MeCubit>().state.activeSportId;
+  late var _sport =
+      widget.sportId ?? context.read<MeCubit>().state.activeSportId;
   late var _privacy = Privacy.values.firstWhere(
     (v) =>
         v.label ==
@@ -21,6 +25,46 @@ class _ManualPageState extends State<ManualPage> {
   var _duration = const Duration(hours: 1);
   int _feel = 2;
   bool _busy = false;
+
+  /// What the form held when it opened, to tell whether Back loses input.
+  late final ({String sport, DateTime at, Duration duration, Privacy privacy})
+  _initial;
+
+  @override
+  void initState() {
+    super.initState();
+    _initial = (sport: _sport, at: _at, duration: _duration, privacy: _privacy);
+    for (final c in [_title, _note, _score]) {
+      c.addListener(_onText);
+    }
+  }
+
+  bool _wasDirty = false;
+  void _onText() {
+    if (_dirty != _wasDirty) setState(() {});
+  }
+
+  bool get _dirty =>
+      [_title, _note, _score].any((c) => c.text.trim().isNotEmpty) ||
+      _sport != _initial.sport ||
+      _at != _initial.at ||
+      _duration != _initial.duration ||
+      _privacy != _initial.privacy ||
+      _feel != 2;
+
+  Future<void> _leave() async {
+    if (await showConfirmSheet(
+          context,
+          title: 'Buang catatan ini?',
+          body: 'Isian Catat Manual belum disimpan dan akan hilang.',
+          confirm: 'BUANG',
+          cancel: 'Lanjut isi',
+        ) &&
+        mounted) {
+      context.pop();
+    }
+  }
+
   @override
   void dispose() {
     _title.dispose();
@@ -63,11 +107,20 @@ class _ManualPageState extends State<ManualPage> {
         ),
       );
       final previous = me.state.lastActive;
+      final gear = sl<GearCubit>();
+      gear.addUsage(
+        gear.defaultFor(_sport)?.id,
+        km: distance == null
+            ? 0
+            : double.parse(distance.group(1)!.replaceAll(',', '.')),
+        time: _duration,
+      );
       me.recordActivity(
         source: ActivitySource.manual,
         sportId: _sport,
         at: previous != null && previous.isAfter(_at) ? previous : _at,
         stampAt: _at,
+        duration: _duration,
       );
       if (mounted) context.go(R.done);
     } on Exception {
@@ -84,8 +137,32 @@ class _ManualPageState extends State<ManualPage> {
       _sport,
       ...context.watch<MeCubit>().state.sports.map((u) => u.sport.id),
     }.take(4);
+    final dirty = _wasDirty = _dirty;
+    return PopScope(
+      // Back with unsaved input asks first instead of dropping it silently.
+      canPop: !dirty || _busy,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: _form(context, sports),
+    );
+  }
+
+  Widget _form(BuildContext context, Iterable<String> sports) {
     return KPage(
-      header: const KHeader('Catat Manual'),
+      header: KHeader(
+        'Catat Manual',
+        // The header's own back pops directly, past PopScope.
+        onLeading: () {
+          if (_wasDirty && !_busy) {
+            _leave();
+          } else if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(R.feed);
+          }
+        },
+      ),
       bottom: KButton(
         'SIMPAN AKTIVITAS',
         loading: _busy,
@@ -226,9 +303,15 @@ class DonePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final me = context.watch<MeCubit>();
     final p = me.state;
+    final animal = me.lastActivityAnimal ?? p.partner;
+    final stage = Stage.forStreak(p.adopted[animal] ?? 0);
     final r = me.lastReward;
-    final verified = (r?.clubPoints ?? 0) > 0;
-    final next = r?.evolvedTo ?? p.stage.next;
+    final verified = r?.verified ?? false;
+    // Points only land in a league when the user has a club in this sport.
+    final inLeague = context.select<ClubsCubit, bool>(
+      (c) => c.state.mine.any((club) => club.sportId == r?.sportId),
+    );
+    final next = r?.evolvedTo ?? stage.next;
     return Stack(
       children: [
         KPage(
@@ -262,10 +345,10 @@ class DonePage extends StatelessWidget {
                       child: PopIn(
                         from: .3,
                         child: MascotHead(
-                          animal: p.partner,
-                          stage: p.stage,
+                          animal: animal,
+                          stage: stage,
                           size: 150,
-                          bg: p.stage.tint,
+                          bg: stage.tint,
                         ),
                       ),
                     ),
@@ -315,10 +398,10 @@ class DonePage extends StatelessWidget {
                   r == null
                       ? 'Aktivitasmu sudah masuk riwayat.'
                       : r.evolvedTo != null
-                      ? 'Streak kamu sekarang ${r.streak} hari! ${p.partner.label} siap berevolusi jadi ${r.evolvedTo!.label} 🎉'
+                      ? '${animal.label} sudah mencapai ${p.adopted[animal] ?? 0} sesi dan berevolusi jadi ${r.evolvedTo!.label} 🎉'
                       : next == null
-                      ? 'Streak kamu ${r.streak} hari. ${p.partner.label} sudah Legend!'
-                      : 'Streak kamu ${r.streak} hari. ${next.minStreak - r.streak} hari lagi ke ${next.label}!',
+                      ? 'Streak kamu ${r.streak} hari. ${animal.label} sudah Legend!'
+                      : 'Streak kamu ${r.streak} hari. ${next.minStreak - (p.adopted[animal] ?? 0)} sesi lagi ${animal.label} jadi ${next.label}!',
                   textAlign: TextAlign.center,
                   style: AppText.body(AppColors.muted),
                 ),
@@ -349,7 +432,7 @@ class DonePage extends StatelessWidget {
                   Expanded(
                     child: StatChip(
                       label: 'POIN KLUB',
-                      value: '+${r.clubPoints}',
+                      value: inLeague ? '+${r.clubPoints}' : '—',
                       emoji: '✓',
                       hue: verified ? Hue.primary : Hue.grey,
                     ),
@@ -413,7 +496,9 @@ class _EvolvePageState extends State<EvolvePage> {
   Widget build(BuildContext context) {
     final me = context.watch<MeCubit>();
     final p = me.state;
-    final stage = me.lastReward?.evolvedTo ?? p.stage;
+    final animal = me.lastActivityAnimal ?? p.partner;
+    final stage =
+        me.lastReward?.evolvedTo ?? Stage.forStreak(p.adopted[animal] ?? 0);
     final items = _items[stage]!;
     final pad = MediaQuery.paddingOf(context);
     return Scaffold(
@@ -455,7 +540,7 @@ class _EvolvePageState extends State<EvolvePage> {
                         shape: BoxShape.circle,
                       ),
                       child: MascotHead(
-                        animal: p.partner,
+                        animal: animal,
                         stage: stage,
                         size: 160,
                       ),
@@ -629,9 +714,19 @@ class _StoryPageState extends State<StoryPage> {
               .firstOrNull
               ?.score ??
           '—';
-      final clubPoints =
-          records.where((a) => a.verified).length *
-          StreakRules.clubPointsCheckIn;
+      // Same formula as the league: verified minutes ×10/60 per activity,
+      // +25 for each QR attendance.
+      final clubPoints = records
+          .where((a) => a.verified)
+          .fold<int>(
+            0,
+            (sum, a) =>
+                sum +
+                StreakRules.hourPoints(0, a.duration.inMinutes) +
+                (a.source == ActivitySource.qr
+                    ? StreakRules.clubPointsCheckIn
+                    : 0),
+          );
       final monday = DateTime(now.year, now.month, now.day - now.weekday + 1);
       String number(String value) => _hide ? '••' : value;
       final title = tournament
@@ -778,6 +873,8 @@ class _StoryPageState extends State<StoryPage> {
                                         : Emo(
                                             entry.frozen
                                                 ? '🧊'
+                                                : entry.sportIds.isEmpty
+                                                ? '✓'
                                                 : Sports.byId(
                                                     entry.sportIds.first,
                                                   ).emoji,

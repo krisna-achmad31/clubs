@@ -190,7 +190,15 @@ class FeedPost extends Equatable {
   );
 
   @override
-  List<Object?> get props => [id, reactions, comments, activity, mine];
+  List<Object?> get props => [
+    id,
+    author,
+    initials,
+    reactions,
+    comments,
+    activity,
+    mine,
+  ];
 }
 
 enum NotifKind { goyang, streak, slot, payment, kudoz, league, freeze }

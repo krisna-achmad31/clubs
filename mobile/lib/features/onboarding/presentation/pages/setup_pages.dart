@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +9,13 @@ import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/services/permission_service.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../activity/domain/repositories/activity_repository.dart';
 import '../../../club/domain/entities/club.dart';
 import '../../../club/presentation/cubit/clubs_cubit.dart';
+import '../../../feed/presentation/cubit/feed_cubit.dart';
 import '../../../goyang/presentation/cubit/goyang_cubit.dart';
 import '../../../profile/domain/entities/user_profile.dart';
+import '../../../profile/presentation/cubit/gear_cubit.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../../wearable/presentation/cubit/wearable_cubit.dart';
 import '../cubit/onboarding_cubit.dart';
@@ -846,13 +851,18 @@ class ReadyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.watch<OnboardingCubit>().state;
     final first = d.sports.firstOrNull?.sport;
-    void go() {
+    Future<void> go() async {
       if (!d.aboutValid || d.sports.isEmpty || d.area.isEmpty) {
         context.go(R.signup);
         return;
       }
+      // New account: no demo or previous-account activities and gear.
+      await sl<ActivityRepository>().clearAll();
+      sl<GearCubit>().reset();
+      if (!context.mounted) return;
       final me = sl<MeCubit>();
       me.completeOnboarding(
+        newAccount: true,
         name: d.name.trim(),
         username: d.username,
         phone: d.phone,
@@ -867,6 +877,7 @@ class ReadyPage extends StatelessWidget {
       me.setSetting('goyangEnabled', d.goyang);
       final goyang = sl<GoyangCubit>();
       goyang.updateSettings(goyang.state.settings.copyWith(enabled: d.goyang));
+      unawaited(sl<FeedCubit>().load());
       context.go(R.feed);
     }
 

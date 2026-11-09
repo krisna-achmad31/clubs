@@ -3,8 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../activity/domain/entities/activity.dart';
+import '../../../activity/domain/repositories/activity_repository.dart';
+import '../../../profile/domain/usecases/streak_rules.dart';
+import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../domain/entities/tournament.dart';
 import '../cubit/tournament_cubit.dart';
 
@@ -22,6 +27,33 @@ class TournamentNewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<TournamentCubit>();
     final state = context.watch<TournamentCubit>().state;
+    if (cubit.running) {
+      return KPage(
+        header: const KHeader('Buat Turnamen'),
+        children: [
+          KBanner.info(
+            '${state.title} masih berjalan (babak ${state.latestRound}/${state.rounds}). Pengaturannya terkunci sampai selesai.',
+          ),
+          KButton(
+            'LANJUTKAN TURNAMEN',
+            onTap: () => context.pushReplacement(R.tournamentLive),
+          ),
+          KButton.secondary(
+            'AKHIRI & BUAT BARU',
+            onTap: () async {
+              if (await showConfirmSheet(
+                context,
+                title: 'Akhiri turnamen?',
+                body: 'Skor ${state.title} yang sedang berjalan akan dibuang.',
+                confirm: 'AKHIRI',
+              )) {
+                cubit.abandon();
+              }
+            },
+          ),
+        ],
+      );
+    }
     return KPage(
       header: const KHeader('Buat Turnamen'),
       bottom: KButton(
@@ -538,13 +570,66 @@ class TournamentPodiumPage extends StatelessWidget {
                 title: '${i + 1}. ${player.name}',
                 subtitle: '${player.points} poin',
               ),
-            KBanner.info(
-              'Hasil tersimpan selama sesi aplikasi ini. Rating, XP dan hadiah otomatis belum terhubung.',
-            ),
+            _SaveResult(state: state, rank: mine < 0 ? null : mine + 1),
           ],
         ),
         const Positioned.fill(child: IgnorePointer(child: Confetti())),
       ],
+    );
+  }
+}
+
+/// Keeps the result: a casual activity on the profile and in the feed, and
+/// a stamp for the streak, and one league attendance (+25) for the user's
+/// club in this sport. Play time stays unverified, so no hour points.
+class _SaveResult extends StatelessWidget {
+  const _SaveResult({required this.state, required this.rank});
+
+  final TournamentState state;
+  final int? rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final started = context.read<TournamentCubit>().startedAt ?? DateTime.now();
+    final key = 'tournament_${started.millisecondsSinceEpoch}';
+    final saved = context.select<MeCubit, bool>((m) => m.state.flag(key));
+    if (saved) {
+      return KBanner.info(
+        'Hasil tersimpan di profil dan feed · dihitung 1 kehadiran liga (+${StreakRules.clubPointsCheckIn} poin).',
+      );
+    }
+    return KButton.secondary(
+      'SIMPAN HASIL KE PROFIL',
+      onTap: () async {
+        final me = context.read<MeCubit>();
+        final end = DateTime.now();
+        await sl<ActivityRepository>().save(
+          Activity(
+            id: key,
+            sportId: me.state.activeSportId,
+            title: state.title,
+            start: started,
+            duration: end.difference(started),
+            source: ActivitySource.manual,
+            score:
+                'Juara ${state.ranked.first.name}'
+                '${rank == null ? '' : ' · kamu #$rank'}',
+          ),
+        );
+        me.setSetting(key, true);
+        me.recordActivity(
+          source: ActivitySource.manual,
+          stampAt: started,
+          duration: end.difference(started),
+          tournament: true,
+        );
+        if (context.mounted) {
+          toast(
+            context,
+            'Hasil turnamen tersimpan · +${StreakRules.clubPointsCheckIn} poin liga',
+          );
+        }
+      },
     );
   }
 }

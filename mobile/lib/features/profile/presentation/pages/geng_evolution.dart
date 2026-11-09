@@ -1,7 +1,7 @@
 part of 'profile_pages.dart';
 
-/// Where a mascot stands on the streak ladder. Stages are global (driven by
-/// the daily streak), so every adopted animal shares the same stage.
+/// Evolution follows the completed sessions for each animal.
+
 class EvolutionProgress {
   EvolutionProgress(this.streak) : stage = Stage.forStreak(streak);
 
@@ -24,7 +24,7 @@ class EvolutionProgress {
 
   String get nextLine => next == null
       ? 'Tahap tertinggi tercapai! 👑'
-      : '$daysToNext hari lagi jadi ${next!.label} (hari ke-${next!.minStreak})';
+      : '$daysToNext sesi lagi jadi ${next!.label} (sesi ke-${next!.minStreak})';
 }
 
 /// K-series "Perkembangan" card on Geng Gemoy: streak, stage, next unlock and
@@ -37,7 +37,33 @@ class _EvolutionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final e = EvolutionProgress(p.streak);
+    final e = EvolutionProgress(p.adopted[animal] ?? 0);
+    final family = Sports.all.where((s) => s.animal == animal).toList();
+    if (!p.adopted.containsKey(animal)) {
+      return KCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: MascotBody(animal: animal, stage: Stage.pemula, size: 96),
+            ),
+            Text(animal.title, style: AppText.title()),
+            Text(
+              'Belum diadopsi · 0 sesi terverifikasi',
+              style: AppText.body(),
+            ),
+            Text(
+              'Olahraga: ${family.map((s) => s.name).join(', ')}',
+              style: AppText.bodySm(),
+            ),
+            Text(
+              'Selesaikan satu sesi terverifikasi dari olahraga di atas untuk mengadopsi ${animal.label}. Menambahkan olahraga belum membuka hewannya.',
+              style: AppText.bodySm(),
+            ),
+          ],
+        ),
+      );
+    }
     final now = DateTime.now();
     final safeToday =
         p.lastActive != null && DateUtils.isSameDay(p.lastActive, now);
@@ -63,12 +89,12 @@ class _EvolutionCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '🔥 ${p.streak} hari streak',
+                      '${p.adopted[animal] ?? 0} sesi terverifikasi',
                       key: const ValueKey('geng-streak'),
                       style: AppText.custom(22),
                     ),
                     Text(
-                      '${animal.title} · partner',
+                      '${animal.title}${animal == p.partner ? ' · partner' : ''}',
                       style: AppText.bodySm(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -91,6 +117,39 @@ class _EvolutionCard extends StatelessWidget {
             key: const ValueKey('geng-next'),
             style: AppText.custom(14, c: AppColors.ink),
           ),
+          const SizedBox(height: 12),
+          const FieldLabel('RINCIAN SESI'),
+          for (final sport in family)
+            if ((p.verifiedSportSessions[sport.id] ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  key: ValueKey('geng-sport-${sport.id}'),
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${sport.emoji} ${sport.name}',
+                        style: AppText.body(),
+                      ),
+                    ),
+                    Text(
+                      '${p.verifiedSportSessions[sport.id]} sesi',
+                      style: AppText.body(),
+                    ),
+                  ],
+                ),
+              ),
+          if ((p.adopted[animal] ?? 0) > p.knownSessionsForAnimal(animal))
+            Row(
+              children: [
+                Expanded(child: Text('Belum dirinci', style: AppText.bodySm())),
+                Text(
+                  '${(p.adopted[animal] ?? 0) - p.knownSessionsForAnimal(animal)} sesi',
+                  style: AppText.bodySm(),
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
           const SizedBox(height: 14),
           _StageLadder(animal: animal, current: e.stage),
           const SizedBox(height: 12),
@@ -98,6 +157,12 @@ class _EvolutionCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 6,
             children: [
+              KPill(
+                '🔥 Streak akun ${p.streak} hari',
+                bg: AppColors.white,
+                fg: AppColors.orangeD,
+                size: 11,
+              ),
               KPill(
                 'Rekor ${p.bestStreak} hari',
                 bg: AppColors.white,
@@ -120,8 +185,8 @@ class _EvolutionCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Bolong sehari tanpa Es Batu = streak mulai lagi dari hari 1 dan '
-            'geng kembali ke Pemula.',
+            'Streak akun mencakup semua olahraga. Bolong sehari tanpa Es Batu = streak mulai lagi dari hari 1 dan '
+            'evolusi hewan tetap mengikuti jumlah sesinya.',
             style: AppText.caption(AppColors.muted),
           ),
         ],
@@ -160,13 +225,44 @@ class _StageLadder extends StatelessWidget {
                 children: [
                   Opacity(
                     opacity: s.index <= current.index ? 1 : .3,
-                    child: MascotHead(
-                      animal: animal,
-                      stage: s,
-                      size: size,
-                      float: false,
-                      bg: s == current ? AppColors.white : null,
-                      ring: s == current ? s.color : null,
+                    child: GestureDetector(
+                      key: ValueKey('preview-${s.name}'),
+                      onTap: s.index <= current.index && !onDark
+                          ? () => showKSheet<void>(
+                              context,
+                              (_) => KSheet(
+                                children: [
+                                  Center(
+                                    child: MascotBody(
+                                      animal: animal,
+                                      stage: s,
+                                      size: 160,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${animal.label} · ${s.label}',
+                                    style: AppText.title(),
+                                  ),
+                                  Text(
+                                    'Terbuka mulai ${s.minStreak} sesi',
+                                    style: AppText.bodySm(),
+                                  ),
+                                  Text(
+                                    evolutionStageDescription(animal, s),
+                                    style: AppText.body(),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : null,
+                      child: MascotHead(
+                        animal: animal,
+                        stage: s,
+                        size: size,
+                        float: false,
+                        bg: s == current ? AppColors.white : null,
+                        ring: s == current ? s.color : null,
+                      ),
                     ),
                   ),
                   if (s.index > current.index)
@@ -192,7 +288,7 @@ class _StageLadder extends StatelessWidget {
                 ),
               ),
               Text(
-                'hari ${s.minStreak}',
+                'sesi ${s.minStreak}',
                 style: AppText.custom(
                   9,
                   w: FontWeight.w700,
@@ -246,7 +342,17 @@ class _EvolutionStoryPageState extends State<EvolutionStoryPage> {
   Widget build(BuildContext context) {
     final p = context.watch<MeCubit>().state;
     final animal = widget.animal ?? p.partner;
-    final e = EvolutionProgress(p.streak);
+    if (!p.adopted.containsKey(animal)) {
+      return KPage(
+        header: const KHeader('Bagikan Evolusi'),
+        children: [
+          KBanner.tip(
+            '${animal.label} belum diadopsi. Selesaikan satu sesi terverifikasi untuk membuka evolusinya.',
+          ),
+        ],
+      );
+    }
+    final e = EvolutionProgress(p.adopted[animal] ?? 0);
     final sessions = p.adopted[animal] ?? 0;
     final templates = [
       (e.stage.color, e.stage.tint),

@@ -168,8 +168,14 @@ void _clubMenu(BuildContext context, Club club) {
                 body: club.name,
                 confirm: 'KELUAR KLUB',
               )) {
-                await cubit.leave(club);
-                router.go(R.clubs);
+                if (await cubit.leave(club)) {
+                  router.go(R.clubs);
+                } else if (context.mounted) {
+                  toast(
+                    context,
+                    'Kamu satu-satunya admin. Tambahkan admin lain dulu sebelum keluar.',
+                  );
+                }
               }
             },
           ),
@@ -223,7 +229,7 @@ class _ExplorePageState extends State<ExplorePage> {
             .values
             .where(
               (s) =>
-                  !s.cancelled &&
+                  s.joinable &&
                   (_sport == null || s.sportId == _sport) &&
                   match('${s.title} ${s.venue} ${s.clubName} ${s.sport.name}'),
             )

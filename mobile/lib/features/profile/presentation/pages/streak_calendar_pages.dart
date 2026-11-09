@@ -186,7 +186,9 @@ class StreakSavedPage extends StatelessWidget {
 }
 
 class StampsPage extends StatefulWidget {
-  const StampsPage({super.key, this.embedded = false});
+  const StampsPage({super.key, this.embedded = false, this.initialMonth});
+
+  final DateTime? initialMonth;
 
   /// Shown as a tab inside Profil instead of its own screen.
   final bool embedded;
@@ -195,7 +197,18 @@ class StampsPage extends StatefulWidget {
 }
 
 class _StampsPageState extends State<StampsPage> {
-  var _month = DateTime(DateTime.now().year, DateTime.now().month);
+  late DateTime _month;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final requested = widget.initialMonth ?? now;
+    final current = DateTime(now.year, now.month);
+    final initial = DateTime(requested.year, requested.month);
+    _month = initial.isAfter(current) ? current : initial;
+  }
+
   Future<List<Activity>>? _activities;
   int? _activityKey;
   Future<List<Activity>> _activityLog(UserProfile p) {
@@ -207,43 +220,63 @@ class _StampsPageState extends State<StampsPage> {
     return _activities!;
   }
 
-  void _day(
-    int day,
-    List<Activity> items,
-    StampEntry? stamp,
-  ) => showKSheet<void>(
-    context,
-    (ctx) => KSheet(
-      children: [
-        Text(
-          '$day ${Fmt.monthsLong[_month.month - 1]} ${_month.year}',
-          style: AppText.title(),
-        ),
-        if (stamp?.frozen == true)
-          KBanner.info('Es Batu melindungi streak pada hari ini.')
-        else if (items.isEmpty && stamp != null)
-          KRow(
-            title: 'Stempel tersimpan',
-            subtitle: stamp.sportIds
-                .map((id) => Sports.byId(id).name)
-                .join(', '),
-            icon: LucideIcons.stamp,
-          )
-        else if (items.isEmpty)
+  Future<void> _day(int day, List<Activity> items, StampEntry? stamp) async {
+    final all = await _activityLog(context.read<MeCubit>().state);
+    if (!mounted) return;
+    final date = DateTime(_month.year, _month.month, day);
+    items = all.where((a) => DateUtils.isSameDay(a.start, date)).toList();
+    stamp = StampCalendar.days(context.read<MeCubit>().state, all)[date];
+    await showKSheet<void>(
+      context,
+      (ctx) => KSheet(
+        children: [
           Text(
-            'Belum ada aktivitas tercatat pada hari ini.',
-            style: AppText.body(),
+            '$day ${Fmt.monthsLong[_month.month - 1]} ${_month.year}',
+            style: AppText.title(),
           ),
-        for (final a in items)
-          KRow(
-            title: '${a.sport.emoji} ${a.title}',
-            subtitle:
-                '${Fmt.hm(a.duration)} · ${a.verified ? 'Terverifikasi' : 'Kasual'}',
-          ),
-        KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
-      ],
-    ),
-  );
+          if (stamp?.frozen == true)
+            KBanner.info('Es Batu melindungi streak pada hari ini.')
+          else if (items.isEmpty && stamp != null)
+            KRow(
+              title: 'Stempel tersimpan',
+              subtitle: stamp.sportIds.isEmpty
+                  ? 'Jenis olahraga tidak tercatat'
+                  : stamp.sportIds.map((id) => Sports.byId(id).name).join(', '),
+              icon: LucideIcons.stamp,
+            )
+          else if (items.isEmpty)
+            Text(
+              'Belum ada aktivitas tercatat pada hari ini.',
+              style: AppText.body(),
+            ),
+          if (items.isNotEmpty)
+            Text(
+              'Aktivitas tersimpan · ${items.map((a) => a.sport.name).toSet().join(', ')}',
+              style: AppText.bodySm(),
+            ),
+          if (items.isNotEmpty &&
+              stamp != null &&
+              stamp.sportIds.any((id) => !items.any((a) => a.sportId == id)))
+            Text(
+              'Riwayat stempel · ${stamp.sportIds.where((id) => !items.any((a) => a.sportId == id)).map((id) => Sports.byId(id).name).join(', ')} (detail aktivitas tidak tersedia)',
+              style: AppText.bodySm(),
+            ),
+          for (final a in items)
+            KRow(
+              title: '${a.sport.emoji} ${a.title}',
+              subtitle:
+                  '${a.duration == Duration.zero ? 'Durasi tidak dicatat' : Fmt.hm(a.duration)} · ${a.verified ? 'Terverifikasi' : 'Kasual'}',
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push(R.savedActivity(a.id));
+              },
+            ),
+          KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
+        ],
+      ),
+    );
+  }
+
   void _badge(
     String e,
     String name,
@@ -420,18 +453,38 @@ class _StampsPageState extends State<StampsPage> {
                                       decoration: BoxDecoration(
                                         color: byDay[day]!.frozen
                                             ? AppColors.blueL
+                                            : byDay[day]!.sportIds.isEmpty
+                                            ? AppColors.primaryL
                                             : Sports.byId(
                                                 byDay[day]!.sportIds.first,
                                               ).hue.light,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Emo(
-                                        byDay[day]!.frozen
-                                            ? '🧊'
-                                            : Sports.byId(
-                                                byDay[day]!.sportIds.first,
-                                              ).emoji,
-                                        size: 18,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '$day',
+                                              style: AppText.micro(
+                                                AppColors.ink,
+                                              ),
+                                            ),
+                                            Emo(
+                                              byDay[day]!.frozen
+                                                  ? '🧊'
+                                                  : byDay[day]!.sportIds.isEmpty
+                                                  ? '✓'
+                                                  : Sports.byId(
+                                                      byDay[day]!
+                                                          .sportIds
+                                                          .first,
+                                                    ).emoji,
+                                              size: 16,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -466,7 +519,8 @@ class _StampsPageState extends State<StampsPage> {
             bg: AppColors.primaryL,
             fg: AppColors.primaryD,
             iconColor: AppColors.primary,
-            text: '$count stempel bulan ini',
+            text:
+                '$count hari aktif · ${Fmt.monthsLong[_month.month - 1]} ${_month.year}',
             trailing: prevCount > 0 || count > 0
                 ? CountUp(
                     value: count - prevCount,
@@ -509,7 +563,8 @@ class _StampsPageState extends State<StampsPage> {
                   '💯',
                   '100 sesi',
                   'Catat 100 sesi olahraga.',
-                  activities.length.clamp(0, 100),
+                  // Same count as "sesi tercatat" on Profil.
+                  p.stamps.clamp(0, 100),
                   100,
                 ),
               ].indexed)

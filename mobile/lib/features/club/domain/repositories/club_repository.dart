@@ -37,6 +37,9 @@ abstract interface class ClubRepository {
     Color? stickerBg,
   });
   Future<KasSummary> kas(String clubId);
+
+  /// New account on this device: memberships and club state start over.
+  Future<void> resetForNewAccount();
   Future<KasSummary> addKas(
     String clubId,
     KasEntry entry, {

@@ -339,7 +339,7 @@ void main() {
     await AppHarness.tapText(tester, 'BUAT KLUB');
     expect(find.text('Tambahkan rekening pencairan kas dulu'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
-    await AppHarness.tapText(tester, 'TAMBAH REKENING');
+    // The payout sheet opens by itself.
     AppHarness.sheetWithinHalf(tester, 'payout sheet');
     await AppHarness.tapText(tester, 'Lainnya');
     final fields = find.descendant(

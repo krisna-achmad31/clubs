@@ -97,6 +97,9 @@ class GoyangCubit extends Cubit<GoyangState> {
           ),
         ),
       );
+      // The tab shell may have started the sensor before the saved OFF was
+      // read; honour it now so Goyang stays off after a restart.
+      if (!state.settings.enabled) stopListening();
     } on Object {
       /* Platform preferences may be unavailable in tests. */
     }

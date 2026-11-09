@@ -58,7 +58,11 @@ class _PressableState extends State<Pressable> {
       child: AnimatedContainer(
         duration: Motion.fast,
         curve: Curves.easeOut,
-        transform: Matrix4.translationValues(0, _down ? widget.depth * .75 : 0, 0),
+        transform: Matrix4.translationValues(
+          0,
+          _down ? widget.depth * .75 : 0,
+          0,
+        ),
         child: AnimatedScale(
           duration: Motion.fast,
           scale: _down ? .98 : 1,
@@ -71,7 +75,13 @@ class _PressableState extends State<Pressable> {
 
 /// Pops in with a springy scale + fade. Use `delay` to stagger lists.
 class PopIn extends StatefulWidget {
-  const PopIn({super.key, required this.child, this.delay = Duration.zero, this.from = .6, this.offsetY = 0});
+  const PopIn({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.from = .6,
+    this.offsetY = 0,
+  });
 
   final Widget child;
   final Duration delay;
@@ -83,7 +93,10 @@ class PopIn extends StatefulWidget {
 }
 
 class _PopInState extends State<PopIn> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: Motion.slow);
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: Motion.slow,
+  );
 
   @override
   void initState() {
@@ -111,7 +124,10 @@ class _PopInState extends State<PopIn> with SingleTickerProviderStateMixin {
           opacity: fade,
           child: Transform.translate(
             offset: Offset(0, widget.offsetY * (1 - t)),
-            child: Transform.scale(scale: widget.from + (1 - widget.from) * t, child: child),
+            child: Transform.scale(
+              scale: widget.from + (1 - widget.from) * t,
+              child: child,
+            ),
           ),
         );
       },
@@ -121,7 +137,12 @@ class _PopInState extends State<PopIn> with SingleTickerProviderStateMixin {
 
 /// Slide-up + fade entrance for list items; index drives the stagger.
 class StaggerIn extends StatelessWidget {
-  const StaggerIn({super.key, required this.index, required this.child, this.step = 55});
+  const StaggerIn({
+    super.key,
+    required this.index,
+    required this.child,
+    this.step = 55,
+  });
 
   final int index;
   final Widget child;
@@ -140,7 +161,13 @@ class StaggerIn extends StatelessWidget {
 
 /// Gentle idle bob used by mascots so the screen always feels alive.
 class Floaty extends StatefulWidget {
-  const Floaty({super.key, required this.child, this.amplitude = 6, this.period = const Duration(milliseconds: 2400), this.tilt = 0.02});
+  const Floaty({
+    super.key,
+    required this.child,
+    this.amplitude = 6,
+    this.period = const Duration(milliseconds: 2400),
+    this.tilt = 0.02,
+  });
 
   final Widget child;
   final double amplitude;
@@ -152,7 +179,10 @@ class Floaty extends StatefulWidget {
 }
 
 class _FloatyState extends State<Floaty> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: widget.period)..repeat();
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: widget.period,
+  )..repeat();
 
   @override
   void dispose() {
@@ -180,7 +210,12 @@ class _FloatyState extends State<Floaty> with SingleTickerProviderStateMixin {
 
 /// Wobbles once whenever [trigger] changes (e.g. shake detected, wrong OTP).
 class Wobble extends StatefulWidget {
-  const Wobble({super.key, required this.child, required this.trigger, this.angle = .08});
+  const Wobble({
+    super.key,
+    required this.child,
+    required this.trigger,
+    this.angle = .08,
+  });
 
   final Widget child;
   final Object? trigger;
@@ -191,7 +226,10 @@ class Wobble extends StatefulWidget {
 }
 
 class _WobbleState extends State<Wobble> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 620),
+  );
 
   @override
   void didUpdateWidget(covariant Wobble oldWidget) {
@@ -213,7 +251,10 @@ class _WobbleState extends State<Wobble> with SingleTickerProviderStateMixin {
       builder: (context, child) {
         final v = _c.value;
         final damp = 1 - v;
-        return Transform.rotate(angle: math.sin(v * math.pi * 6) * widget.angle * damp, child: child);
+        return Transform.rotate(
+          angle: math.sin(v * math.pi * 6) * widget.angle * damp,
+          child: child,
+        );
       },
     );
   }
@@ -221,7 +262,12 @@ class _WobbleState extends State<Wobble> with SingleTickerProviderStateMixin {
 
 /// Repeating soft pulse (scale) for live/active indicators and big CTAs.
 class Pulse extends StatefulWidget {
-  const Pulse({super.key, required this.child, this.scale = 1.06, this.period = const Duration(milliseconds: 1400)});
+  const Pulse({
+    super.key,
+    required this.child,
+    this.scale = 1.06,
+    this.period = const Duration(milliseconds: 1400),
+  });
 
   final Widget child;
   final double scale;
@@ -232,7 +278,10 @@ class Pulse extends StatefulWidget {
 }
 
 class _PulseState extends State<Pulse> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: widget.period)..repeat(reverse: true);
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: widget.period,
+  )..repeat(reverse: true);
 
   @override
   void dispose() {
@@ -243,7 +292,10 @@ class _PulseState extends State<Pulse> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return ScaleTransition(
-      scale: Tween(begin: 1.0, end: widget.scale).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      scale: Tween(
+        begin: 1.0,
+        end: widget.scale,
+      ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
       child: widget.child,
     );
   }
@@ -251,7 +303,15 @@ class _PulseState extends State<Pulse> with SingleTickerProviderStateMixin {
 
 /// Number that counts up to [value] — XP, points, km.
 class CountUp extends StatelessWidget {
-  const CountUp({super.key, required this.value, required this.style, this.format, this.duration = const Duration(milliseconds: 900), this.prefix = '', this.suffix = ''});
+  const CountUp({
+    super.key,
+    required this.value,
+    required this.style,
+    this.format,
+    this.duration = const Duration(milliseconds: 900),
+    this.prefix = '',
+    this.suffix = '',
+  });
 
   final num value;
   final TextStyle style;

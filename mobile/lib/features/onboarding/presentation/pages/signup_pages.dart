@@ -12,7 +12,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/di/injector.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../club/domain/repositories/club_repository.dart';
+import '../../../club/presentation/cubit/clubs_cubit.dart';
+import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../../profile/domain/entities/user_profile.dart';
+import '../../../session/presentation/cubit/sessions_cubit.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../cubit/onboarding_cubit.dart';
 
@@ -93,6 +97,7 @@ class _SignupPageState extends State<SignupPage> {
       );
       context.go(R.feed);
     } else {
+      unawaited(_startFreshAccount());
       context.push(R.about);
     }
   }
@@ -328,6 +333,7 @@ class _OtpPageState extends State<OtpPage> {
         );
         if (mounted) context.go(R.feed);
       } else {
+        unawaited(_startFreshAccount());
         context.push(R.about);
       }
     } else {
@@ -797,4 +803,15 @@ class LocationPage extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A new account on this device starts clean: no clubs, tickets, sessions
+/// or feed reactions left over from the previous (or demo) account.
+Future<void> _startFreshAccount() async {
+  await Future.wait([
+    sl<ClubRepository>().resetForNewAccount(),
+    sl<FeedRepository>().resetForNewAccount(),
+    sl<SessionsCubit>().resetForNewAccount(),
+  ]);
+  await sl<ClubsCubit>().load();
 }

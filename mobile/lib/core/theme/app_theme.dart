@@ -19,10 +19,12 @@ abstract final class AppTheme {
       ),
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
-      pageTransitionsTheme: const PageTransitionsTheme(builders: {
-        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-      }),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
     return base.copyWith(
       textTheme: base.textTheme.apply(
@@ -39,15 +41,22 @@ abstract final class AppTheme {
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.bg,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.ink,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentTextStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: AppColors.white),
+        contentTextStyle: GoogleFonts.nunito(
+          fontWeight: FontWeight.w800,
+          color: AppColors.white,
+        ),
       ),
-      textSelectionTheme: const TextSelectionThemeData(cursorColor: AppColors.primary),
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: AppColors.primary,
+      ),
     );
   }
 }

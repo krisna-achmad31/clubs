@@ -150,7 +150,9 @@ class LocationService {
     accuracy: p.accuracy,
     speed: p.speed,
     time: p.timestamp,
-    altitude: p.altitudeAccuracy > 0 && p.altitudeAccuracy <= 30 ? p.altitude : null,
+    altitude: p.altitudeAccuracy > 0 && p.altitudeAccuracy <= 30
+        ? p.altitude
+        : null,
     altitudeAccuracy: p.altitudeAccuracy > 0 ? p.altitudeAccuracy : null,
   );
 }

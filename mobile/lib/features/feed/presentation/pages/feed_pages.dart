@@ -7,8 +7,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/router/routes.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../activity/domain/entities/activity.dart';
 import '../../../activity/presentation/pages/record_sheet.dart';
-import '../../../activity/domain/entities/activity_analysis.dart';
 import '../../../activity/presentation/widgets/activity_data_sections.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
@@ -17,6 +17,8 @@ import '../../../profile/presentation/pages/profile_pages.dart'
 import '../../../profile/presentation/widgets/me_top_stats.dart';
 import '../../domain/entities/feed_post.dart';
 import '../cubit/feed_cubit.dart';
+import '../../../session/domain/entities/mabar_session.dart';
+import '../../../session/presentation/cubit/sessions_cubit.dart';
 
 /// J1 Feed tab.
 class FeedPage extends StatefulWidget {
@@ -358,12 +360,9 @@ class _PostCard extends StatelessWidget {
           Text(post.title, style: AppText.cardTitle()),
           if (post.hasRoute) ...[
             const SizedBox(height: 10),
-            FlatMap(
+            OsmRouteMap(
               height: 120,
-              animate: false,
-              route: post.activity == null
-                  ? null
-                  : ActivityAnalysis(post.activity!).route,
+              samples: post.activity?.samples ?? const [],
             ),
           ],
           const SizedBox(height: 12),
@@ -529,6 +528,93 @@ class _AddReaction extends StatelessWidget {
   }
 }
 
+/// Edit post: changes the activity behind one of my posts in place.
+Future<void> _editPost(BuildContext context, FeedPost post) async {
+  final cubit = context.read<FeedCubit>();
+  final activity = await cubit.myActivity(post.activityId!);
+  if (activity == null || !context.mounted) return;
+  final saved = await showKSheet<bool>(
+    context,
+    (ctx) => _EditPostSheet(post: post, activity: activity),
+  );
+  if (saved == true && context.mounted) toast(context, 'Post diperbarui');
+}
+
+class _EditPostSheet extends StatefulWidget {
+  const _EditPostSheet({required this.post, required this.activity});
+
+  final FeedPost post;
+  final Activity activity;
+
+  @override
+  State<_EditPostSheet> createState() => _EditPostSheetState();
+}
+
+class _EditPostSheetState extends State<_EditPostSheet> {
+  late final _title = TextEditingController(text: widget.activity.title);
+  late final _note = TextEditingController(text: widget.activity.note);
+  late var _privacy = widget.activity.privacy;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _title.text.trim();
+    return KSheet(
+      children: [
+        Text('Edit post', style: AppText.title()),
+        const FieldLabel('JUDUL'),
+        KInput(
+          key: const ValueKey('edit-post-title'),
+          controller: _title,
+          hint: 'Judul aktivitas',
+          onChanged: (_) => setState(() {}),
+        ),
+        const FieldLabel('CATATAN'),
+        KInput(
+          key: const ValueKey('edit-post-note'),
+          controller: _note,
+          hint: 'Ceritakan sesimu (opsional)',
+          maxLines: 3,
+        ),
+        const FieldLabel('SIAPA YANG BISA MELIHAT'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in Privacy.values)
+              KChip(
+                p.label,
+                selected: _privacy == p,
+                onTap: () => setState(() => _privacy = p),
+              ),
+          ],
+        ),
+        KButton(
+          'SIMPAN',
+          onTap: title.isEmpty
+              ? null
+              : () async {
+                  await context.read<FeedCubit>().editMine(
+                    widget.post.id,
+                    widget.activity.id,
+                    title: title,
+                    note: _note.text.trim(),
+                    privacy: _privacy,
+                  );
+                  if (context.mounted) Navigator.pop(context, true);
+                },
+        ),
+      ],
+    );
+  }
+}
+
 /// "•••" menu on a feed card and J2. [onGone] runs after the post is hidden, muted or reported.
 Future<void> _showPostMenu(
   BuildContext context,
@@ -561,33 +647,59 @@ Future<void> _showPostMenu(
             toast(context, 'Tautan disalin');
           }),
         ),
-        KRow(
-          title: 'Sembunyikan post ini',
-          icon: LucideIcons.eyeOff,
-          onTap: () => run(() {
-            cubit.hide(post.id);
-            toast(context, 'Post disembunyikan');
-            onGone?.call();
-          }),
-        ),
-        KRow(
-          title: 'Bisukan $first',
-          subtitle: 'Post-nya tidak muncul lagi di feed-mu',
-          icon: LucideIcons.volumeX,
-          onTap: () => run(() {
-            cubit.mute(post.author);
-            toast(context, '$first dibisukan');
-            onGone?.call();
-          }),
-        ),
-        KRow(
-          title: 'Laporkan',
-          icon: LucideIcons.flag,
-          iconFg: AppColors.red,
-          iconBg: AppColors.redL,
-          onTap: () =>
-              run(() => _showReport(context, cubit, post, onGone: onGone)),
-        ),
+        // My own post: no mute/report on myself, edit or remove it instead.
+        if (post.mine && post.activityId != null)
+          KRow(
+            title: 'Edit post',
+            subtitle: 'Judul, catatan, dan siapa yang bisa melihat',
+            icon: LucideIcons.pencil,
+            onTap: () => run(() => _editPost(context, post)),
+          ),
+        if (post.mine)
+          KRow(
+            title: 'Hapus dari feed',
+            subtitle: 'Aktivitasnya tetap ada di profilmu',
+            icon: LucideIcons.trash2,
+            iconFg: AppColors.red,
+            iconBg: AppColors.redL,
+            onTap: () => run(() {
+              cubit.hide(post.id);
+              toast(context, 'Post dihapus dari feed');
+              onGone?.call();
+            }),
+          ),
+        if (!post.mine) ...[
+          KRow(
+            title: 'Sembunyikan post ini',
+            icon: LucideIcons.eyeOff,
+            onTap: () => run(() {
+              cubit.hide(post.id);
+              toast(context, 'Post disembunyikan');
+              onGone?.call();
+            }),
+          ),
+          KRow(
+            title: 'Bisukan $first',
+            subtitle: 'Post-nya tidak muncul lagi di feed-mu',
+            icon: LucideIcons.volumeX,
+            onTap: () => run(() {
+              cubit.mute(post.author);
+              toast(
+                context,
+                '$first dibisukan · batalkan di Pengaturan → Akun dibisukan',
+              );
+              onGone?.call();
+            }),
+          ),
+          KRow(
+            title: 'Laporkan',
+            icon: LucideIcons.flag,
+            iconFg: AppColors.red,
+            iconBg: AppColors.redL,
+            onTap: () =>
+                run(() => _showReport(context, cubit, post, onGone: onGone)),
+          ),
+        ],
       ],
     );
   });
@@ -825,10 +937,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
           ],
         ),
         if (post.hasRoute)
-          FlatMap(
-            route: post.activity == null
-                ? null
-                : ActivityAnalysis(post.activity!).route,
+          OsmRouteMap(
+            samples: post.activity?.samples ?? const [],
+            interactive: true,
           ),
         Row(
           children: [
@@ -1030,13 +1141,42 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 }
 
+/// "Kamu naik dari waiting list" only while the seat is really offered;
+/// still queued shows the queue number, otherwise the tile is gone.
+AppNotification? _withLiveRsvp(AppNotification n, SessionsState sessions) {
+  if (n.kind != NotifKind.slot) return n;
+  final id = RegExp(r'^/session/([^/]+)/slot$').firstMatch(n.route)?.group(1);
+  final s = id == null ? null : sessions[id];
+  if (s == null) return n;
+  final r = sessions.rsvp(id!);
+  return switch (r.status) {
+    RsvpStatus.pendingPayment => n,
+    RsvpStatus.waiting => AppNotification(
+      id: n.id,
+      kind: n.kind,
+      emoji: '⏳',
+      title: 'Masih di waiting list',
+      body: 'Antrean #${r.queue ?? '-'} · ${s.title}',
+      ago: n.ago,
+      route: R.session(id),
+      today: n.today,
+      unread: n.unread,
+    ),
+    _ => null,
+  };
+}
+
 /// J3 Notifikasi.
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final list = context.watch<FeedCubit>().state.notifications;
+    final sessions = context.watch<SessionsCubit>().state;
+    final list = [
+      for (final n in context.watch<FeedCubit>().state.notifications)
+        ?_withLiveRsvp(n, sessions),
+    ];
     final today = list.where((n) => n.today).toList();
     final older = list.where((n) => !n.today).toList();
     return KPage(
@@ -1065,7 +1205,7 @@ class NotificationsPage extends StatelessWidget {
         if (older.isNotEmpty)
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: FieldLabel('KEMARIN'),
+            child: FieldLabel('SEBELUMNYA'),
           ),
         for (final n in older) _NotifTile(n),
       ],

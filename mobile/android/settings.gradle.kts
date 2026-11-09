@@ -21,6 +21,10 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.1.0" apply false
     id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // Compose compiler for the Wear OS companion (:wear).
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0" apply false
 }
 
 include(":app")
+// Klubby for Wear OS (Galaxy Watch, Pixel Watch). See ../docs/WEAR_OS_APP.md.
+include(":wear")

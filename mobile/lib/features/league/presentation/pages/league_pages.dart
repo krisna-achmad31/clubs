@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +7,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/router/routes.dart';
+import '../../../club/domain/entities/club.dart';
+import '../../../club/presentation/cubit/clubs_cubit.dart';
+import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
+import '../../../profile/presentation/pages/profile_pages.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/league.dart';
 import '../cubit/league_cubit.dart';
@@ -33,221 +39,462 @@ Widget _rank(int rank, {bool mine = false, double size = 26}) => Container(
   ),
 );
 
+/// The user's live season contribution on [d]: authored history plus what
+/// was recorded in the app, with the account streak as the streak bonus.
+MyContribution leagueContribution(UserProfile p, Division d) =>
+    d.myBase +
+    MyContribution(
+      verifiedMinutes: p.number(leagueMinutesKey(d.sportId)),
+      attendance: p.number(leagueAttendanceKey(d.sportId)),
+      manualIgnored: p.number(leagueManualKey(d.sportId)),
+      streakDays: p.streak,
+    );
+
+/// Live area-league rank for [club], falling back to its stored rank.
+int? liveLeagueRank(BuildContext context, Club club) {
+  final d = context.watch<LeagueCubit>().state.area;
+  if (d == null || d.club.clubId != club.id) return club.rank;
+  final p = context.watch<MeCubit>().state;
+  return d.table(leagueContribution(p, d)).mine.rank;
+}
+
 /// L1 Liga Komunitas (tab).
-class LeaguePage extends StatelessWidget {
+class LeaguePage extends StatefulWidget {
   const LeaguePage({super.key});
+
+  @override
+  State<LeaguePage> createState() => _LeaguePageState();
+}
+
+class _LeaguePageState extends State<LeaguePage> {
+  var _expanded = false;
+
+  void _info(BuildContext context, Division? d) => showKSheet<void>(
+    context,
+    (ctx) => KSheet(
+      children: [
+        Text('Cara kerja liga', style: AppText.title()),
+        Text(
+          'Poin klub = jam terverifikasi ×10 + kehadiran mabar ×25 + hari streak ×5 dari semua anggota. Aktivitas manual tetap dapat stempel, tapi 0 poin klub. Klub teratas promosi, zona terbawah degradasi setelah musim berakhir.',
+          style: AppText.body(),
+        ),
+        Text(
+          d == null
+              ? 'Liga mengikuti olahraga aktifmu dan klub yang kamu ikuti.'
+              : 'Liga area mengikuti lokasi klubmu (${d.clubArea}${d.city != null && d.city != d.clubArea ? ', ${d.city}' : ''}), bukan GPS atau area profilmu. Kalau klubmu pindah lokasi, liganya ikut pindah. Pilih olahraga di atas untuk melihat liga olahraga lain. 🏆 = kamu punya klub yang ikut liga.',
+          style: AppText.bodySm(),
+        ),
+        KBanner.info('Klub lain dan hadiah di versi ini adalah contoh.'),
+        if (d != null)
+          KButton(
+            'LIHAT SKOR',
+            onTap: () {
+              Navigator.pop(ctx);
+              context.push(R.leagueScore);
+            },
+          ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<LeagueCubit>();
     final st = context.watch<LeagueCubit>().state;
-    final d = st.division;
-    const top = 0.0;
+    final p = context.watch<MeCubit>().state;
+    final clubs = context.watch<ClubsCubit>().state.mine;
+    final clubsKey = (clubs.map((c) => c.id).toList()..sort()).join(',');
+    // User's sports first, then sports of joined clubs they haven't added.
+    final sportIds = <String>{
+      for (final u in p.sports) u.sport.id,
+      for (final c in clubs) c.sportId,
+    };
+    final picked = cubit.picked;
+    final sportId = picked != null && sportIds.contains(picked)
+        ? picked
+        : p.activeSportId;
+    if (st.sportId != sportId || st.clubsKey != clubsKey) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          cubit.sync(sportId: sportId, clubsKey: clubsKey);
+        }
+      });
+    }
+    final d = st.sportId == sportId ? st.division : null;
+    final sport = Sports.byId(sportId);
     return KPage(
-      header: Padding(
-        padding: EdgeInsets.only(top: top),
-        child: Row(
-          children: [
-            Expanded(child: Text('Liga Komunitas', style: AppText.custom(26))),
-            KIconButton(
-              LucideIcons.info,
-              color: AppColors.faint,
-              onTap: () => showKSheet<void>(
-                context,
-                (ctx) => KSheet(
-                  children: [
-                    Text('Cara kerja liga', style: AppText.title()),
-                    Text(
-                      'Poin = jam terverifikasi ×10 + kehadiran ×25 + hari streak ×5. Klub teratas promosi, zona terbawah degradasi setelah musim berakhir. Peringkat dan hadiah di versi ini adalah contoh.',
-                      style: AppText.body(),
-                    ),
-                    KButton(
-                      'LIHAT SKOR',
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        context.push(R.leagueScore);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+      header: Row(
+        children: [
+          Expanded(child: Text('Liga Komunitas', style: AppText.custom(26))),
+          KIconButton(
+            LucideIcons.info,
+            color: AppColors.faint,
+            onTap: () => _info(context, d),
+          ),
+        ],
       ),
       children: [
+        if (sportIds.length > 1)
+          SingleChildScrollView(
+            key: const ValueKey('league-sports'),
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: [
+                for (final id in sportIds) ...[
+                  KChip(
+                    '${Sports.byId(id).emoji} ${Sports.byId(id).name}',
+                    key: ValueKey('league-sport-$id'),
+                    hue: Sports.byId(id).hue,
+                    selected: id == sportId,
+                    leading:
+                        clubs.any((c) => c.sportId == id && c.division != null)
+                        ? const Emo('🏆', size: 14)
+                        : null,
+                    onTap: id == sportId
+                        ? null
+                        : () {
+                            setState(() => _expanded = false);
+                            cubit.choose(id);
+                          },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
         KSegmented(
-          items: const ['AREA · JAKSEL', 'NASIONAL'],
+          items: ['AREA', 'NASIONAL'],
           index: st.national ? 1 : 0,
           onChanged: (i) => cubit.setNational(i == 1),
         ),
-        if (d == null)
+        if (d != null) _LeagueScope(d),
+        if ((st.loading || st.sportId != sportId) && d == null)
           const Padding(
             padding: EdgeInsets.all(40),
             child: Center(child: CircularProgressIndicator()),
           )
-        else ...[
-          KCard(
-            color: AppColors.yellowL,
-            border: AppColors.yellowM,
-            onTap: () =>
-                context.push(d.daysLeft == 0 ? R.season : R.leagueScore),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.yellow,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: lip(AppColors.yellowD),
-                  ),
-                  child: const Emo('🏆', size: 26),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${d.label} · ${Sports.byId(d.sportId).emoji} ${Sports.byId(d.sportId).name}',
-                        style: AppText.cardTitle(),
-                      ),
-                      Text(
-                        st.national
-                            ? 'Top ${d.promoteTop} peringkat nasional'
-                            : 'Top ${d.promoteTop} naik ke Divisi Utama',
-                        style: AppText.bodySm(AppColors.orangeD),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  children: [
-                    Text(
-                      '${d.daysLeft} HARI',
-                      style: AppText.custom(16, c: AppColors.orange),
-                    ),
-                    Text('lagi', style: AppText.caption()),
-                  ],
-                ),
-              ],
+        else if (d == null)
+          _NoLeague(
+            sport: sport,
+            club: clubs.where((c) => c.sportId == sport.id).firstOrNull,
+          )
+        else
+          ..._board(context, d, d.table(leagueContribution(p, d))),
+      ],
+    );
+  }
+
+  List<Widget> _board(BuildContext context, Division d, LeagueTable t) {
+    final sport = Sports.byId(d.sportId);
+    final rows = t.standings;
+    final List<Standing> shown;
+    if (_expanded || d.national) {
+      shown = rows;
+    } else {
+      final i = rows.indexOf(t.mine);
+      final keep = <int>{
+        for (var k = 0; k < math.min(d.promoteTop + 2, rows.length); k++) k,
+        i - 1,
+        i,
+        i + 1,
+      }..removeWhere((k) => k < 0 || k >= rows.length);
+      shown = [for (final k in keep.toList()..sort()) rows[k]];
+    }
+    final relegateFrom = d.relegateBottom > 0
+        ? d.clubCount - d.relegateBottom + 1
+        : null;
+    final gap = t.gapToNext;
+    return [
+      KCard(
+        color: AppColors.yellowL,
+        border: AppColors.yellowM,
+        onTap: () => context.push(R.season),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.yellow,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: lip(AppColors.yellowD),
+              ),
+              child: const Emo('🏆', size: 26),
             ),
-          ),
-          KBanner(
-            emoji: '🎁',
-            bg: AppColors.soft,
-            fg: AppColors.muted,
-            text: d.prize,
-          ),
-          KCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, bottom: 2),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      Text(
-                        'POIN',
-                        style: AppText.custom(10, c: AppColors.faint),
-                      ),
-                    ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${d.label} · ${sport.emoji} ${sport.name}',
+                    style: AppText.cardTitle(),
                   ),
-                ),
-                for (final s in d.standings) ...[
-                  if (s.rank == d.promoteTop + 1 ||
-                      (s.mine &&
-                          s.rank > d.promoteTop &&
-                          d.standings.indexOf(s) == d.promoteTop))
-                    const _PromoDivider(),
-                  _StandingRow(
-                    s,
-                    onTap: s.mine
-                        ? () => context.push(R.club('smash'))
-                        : () => showKSheet<void>(
-                            context,
-                            (ctx) => KSheet(
-                              children: [
-                                Text(s.name, style: AppText.title()),
-                                Text(
-                                  '${s.members} anggota · ${s.points} poin · peringkat ${s.rank}',
-                                  style: AppText.body(),
-                                ),
-                                KBanner.info(
-                                  'Profil klub ini belum tersedia di data demo.',
-                                ),
-                                KButton(
-                                  'TUTUP',
-                                  onTap: () => Navigator.pop(ctx),
-                                ),
-                              ],
-                            ),
-                          ),
+                  Text(
+                    d.national
+                        ? 'Top ${d.promoteTop} nasional dapat hadiah'
+                        : t.promoted
+                        ? 'Kamu di zona promosi! Pertahankan sampai akhir musim'
+                        : 'Top ${d.promoteTop} naik ke ${d.nextLabel}',
+                    style: AppText.bodySm(AppColors.orangeD),
                   ),
                 ],
+              ),
+            ),
+            Column(
+              children: [
+                Text(
+                  '${d.daysLeft} HARI',
+                  style: AppText.custom(16, c: AppColors.orange),
+                ),
+                Text('lagi', style: AppText.caption()),
+              ],
+            ),
+          ],
+        ),
+      ),
+      KBanner(
+        emoji: '🎁',
+        bg: AppColors.soft,
+        fg: AppColors.muted,
+        text: d.prize,
+      ),
+      KCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  Text('POIN', style: AppText.custom(10, c: AppColors.faint)),
+                ],
+              ),
+            ),
+            for (final (i, s) in shown.indexed) ...[
+              if (i > 0 &&
+                  shown[i - 1].rank <= d.promoteTop &&
+                  s.rank > d.promoteTop)
+                _ZoneDivider(
+                  d.national ? '🎁 ZONA HADIAH' : '⬆ ZONA PROMOSI',
+                  AppColors.primary,
+                ),
+              if (i > 0 && s.rank > shown[i - 1].rank + 1)
                 Padding(
-                  padding: const EdgeInsets.all(8),
+                  key: ValueKey('league-gap-${s.rank}'),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Text(
-                    '⬇ ZONA DEGRADASI · 3 peringkat terbawah dari ${d.clubCount} klub',
+                    '⋯ ${s.rank - shown[i - 1].rank - 1} klub ⋯',
+                    textAlign: TextAlign.center,
+                    style: AppText.caption(AppColors.faint),
+                  ),
+                ),
+              if (relegateFrom != null && s.rank == relegateFrom && i > 0)
+                const _ZoneDivider('⬇ ZONA DEGRADASI', AppColors.red),
+              _StandingRow(
+                s,
+                onTap: s.clubId != null
+                    ? () => context.push(R.club(s.clubId!))
+                    : () => showKSheet<void>(
+                        context,
+                        (ctx) => KSheet(
+                          children: [
+                            Text(s.name, style: AppText.title()),
+                            Text(
+                              '${s.members} anggota · ${Fmt.group(s.points)} poin · peringkat ${s.rank}',
+                              style: AppText.body(),
+                            ),
+                            KBanner.info(
+                              'Profil klub ini belum tersedia di data demo.',
+                            ),
+                            KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+            if (d.national)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  'Klubmu #${t.mine.rank} dari ${Fmt.group(d.clubCount)} klub ${sport.name} se-Indonesia',
+                  style: AppText.caption(AppColors.muted),
+                ),
+              )
+            else ...[
+              if (!_expanded && relegateFrom != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '⬇ ZONA DEGRADASI · ${d.relegateBottom} peringkat terbawah dari ${d.clubCount} klub',
                     style: AppText.caption(AppColors.redD),
                   ),
                 ),
-              ],
-            ),
-          ),
-          KCard(
-            color: AppColors.primaryL,
-            border: AppColors.primaryM,
-            child: Row(
-              children: [
-                const Emo('💪', size: 26),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kontribusimu minggu ini: +${d.myWeekPoints} poin',
-                        style: AppText.custom(14, c: AppColors.primaryD),
-                      ),
-                      Text(d.myWeekNote, style: AppText.bodySm()),
-                    ],
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: KLink(
+                  _expanded
+                      ? 'TAMPILKAN RINGKAS'
+                      : 'LIHAT SEMUA ${d.clubCount} KLUB',
+                  onTap: () => setState(() => _expanded = !_expanded),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      KCard(
+        color: AppColors.primaryL,
+        border: AppColors.primaryM,
+        child: Row(
+          children: [
+            const Emo('💪', size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Kontribusimu musim ini: +${Fmt.group(t.me.points)} poin',
+                    key: const ValueKey('league-my-points'),
+                    style: AppText.custom(14, c: AppColors.primaryD),
                   ),
-                ),
-                KMiniButton(
-                  'DETAIL',
-                  hue: Hue.primary,
-                  onTap: () => context.push(R.leagueScore),
+                  Text(
+                    '${t.me.attendance} mabar hadir · ${t.me.hours} jam terverifikasi · streak ${t.me.streakDays} hari',
+                    style: AppText.bodySm(),
+                  ),
+                  if (gap != null)
+                    Text(
+                      'Butuh ${Fmt.group(gap)} poin lagi untuk menyalip #${t.mine.rank - 1}',
+                      style: AppText.caption(AppColors.muted),
+                    ),
+                ],
+              ),
+            ),
+            KMiniButton(
+              'DETAIL',
+              hue: Hue.primary,
+              onTap: () => context.push(R.leagueScore),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+}
+
+/// Says where the board's area comes from: the club's location, not the
+/// user's GPS. Tapping opens the club the league follows.
+class _LeagueScope extends StatelessWidget {
+  const _LeagueScope(this.d);
+
+  final Division d;
+
+  @override
+  Widget build(BuildContext context) {
+    final place = d.national
+        ? 'Seluruh Indonesia'
+        : d.city ?? (d.clubArea.isEmpty ? 'Area klub' : d.clubArea);
+    final where = d.clubArea.isNotEmpty && d.clubArea != place
+        ? ' (${d.clubArea})'
+        : '';
+    return KCard(
+      key: const ValueKey('league-scope'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      onTap: d.club.clubId == null
+          ? null
+          : () => context.push(R.club(d.club.clubId!)),
+      child: Row(
+        children: [
+          Icon(
+            d.national ? LucideIcons.globe : LucideIcons.mapPin,
+            size: 20,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(place, style: AppText.cardTitle()),
+                Text(
+                  d.national
+                      ? 'Semua klub ${Sports.byId(d.sportId).name} se-Indonesia'
+                      : 'Ikut lokasi klubmu: ${d.club.name}$where',
+                  style: AppText.caption(AppColors.muted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
+          if (d.club.clubId != null)
+            const Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: AppColors.faint,
+            ),
         ],
-      ],
+      ),
     );
   }
 }
 
-class _PromoDivider extends StatelessWidget {
-  const _PromoDivider();
+/// Shown when the user has no club with a division in the active sport.
+class _NoLeague extends StatelessWidget {
+  const _NoLeague({required this.sport, this.club});
+
+  final Sport sport;
+  final Club? club;
+
+  @override
+  Widget build(BuildContext context) => KCard(
+    key: const ValueKey('league-empty'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: Emo(sport.emoji.isEmpty ? '🏆' : sport.emoji, size: 40)),
+        const SizedBox(height: 8),
+        Text(
+          club == null
+              ? 'Belum ada liga ${sport.name} untukmu'
+              : '${club!.name} belum ikut liga',
+          textAlign: TextAlign.center,
+          style: AppText.title(),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Liga memeringkat klub, bukan perorangan. Gabung klub ${sport.name} yang ikut liga supaya aktivitasmu menambah poin klub.',
+          textAlign: TextAlign.center,
+          style: AppText.body(AppColors.muted),
+        ),
+        const SizedBox(height: 12),
+        KButton('CARI KLUB LIGA', onTap: () => context.push(R.explore)),
+      ],
+    ),
+  );
+}
+
+class _ZoneDivider extends StatelessWidget {
+  const _ZoneDivider(this.label, this.color);
+
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: Row(
       children: [
-        const Expanded(child: Divider(color: AppColors.primary, thickness: 2)),
+        Expanded(child: Divider(color: color, thickness: 2)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            '⬆ ZONA PROMOSI',
-            style: AppText.custom(11, c: AppColors.primary),
-          ),
+          child: Text(label, style: AppText.custom(11, c: color)),
         ),
-        const Expanded(child: Divider(color: AppColors.primary, thickness: 2)),
+        Expanded(child: Divider(color: color, thickness: 2)),
       ],
     ),
   );
@@ -262,6 +509,7 @@ class _StandingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final row = Container(
+      key: ValueKey('league-row-${s.rank}'),
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: s.mine
@@ -320,12 +568,25 @@ class LeagueScorePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d = context.watch<LeagueCubit>().state.division;
+    final st = context.watch<LeagueCubit>().state;
+    final d = st.division;
+    final p = context.watch<MeCubit>().state;
     if (d == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return KPage(
+        header: const KHeader('Skor Aktivitas Klub'),
+        children: [
+          if (st.loading)
+            const Center(child: CircularProgressIndicator())
+          else
+            KBanner.info(
+              'Belum ada liga ${Sports.byId(st.sportId).name} untukmu. Gabung klub yang ikut liga dulu.',
+            ),
+        ],
+      );
     }
-    final mine = d.mine;
-    final sc = d.score;
+    final t = d.table(leagueContribution(p, d));
+    final mine = t.mine;
+    final sc = t.score;
     return KPage(
       header: const KHeader('Skor Aktivitas Klub'),
       children: [
@@ -344,15 +605,7 @@ class LeagueScorePage extends StatelessWidget {
                       color: AppColors.orange,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Text(
-                      mine.name
-                          .split(' ')
-                          .where((v) => v.isNotEmpty)
-                          .take(2)
-                          .map((v) => v[0])
-                          .join(),
-                      style: AppText.custom(18, c: AppColors.white),
-                    ),
+                    child: Emo(mine.emoji, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -361,7 +614,7 @@ class LeagueScorePage extends StatelessWidget {
                       children: [
                         Text(mine.name, style: AppText.cardTitle()),
                         Text(
-                          '${d.label} ${Sports.byId(d.sportId).name} · #${mine.rank} dari ${d.clubCount}',
+                          '${d.label} ${Sports.byId(d.sportId).name} · #${mine.rank} dari ${Fmt.group(d.clubCount)}',
                           style: AppText.bodySm(AppColors.orangeD),
                         ),
                       ],
@@ -382,7 +635,7 @@ class LeagueScorePage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Text(
-                      'poin minggu ini',
+                      'poin musim ini',
                       style: AppText.bodySm(AppColors.orangeD),
                     ),
                   ),
@@ -395,13 +648,13 @@ class LeagueScorePage extends StatelessWidget {
         KCard(
           child: Column(
             children: [
-              for (final (icon, bg, fg, t, sub, v) in [
+              for (final (icon, bg, fg, label, sub, v) in [
                 (
                   LucideIcons.watch,
                   AppColors.primaryL,
                   AppColors.primary,
                   'Jam aktif terverifikasi',
-                  '${sc.verifiedHours} jam × 10',
+                  '${sc.hours} jam × 10',
                   sc.hoursPoints,
                 ),
                 (
@@ -431,7 +684,7 @@ class LeagueScorePage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(t, style: AppText.custom(14)),
+                            Text(label, style: AppText.custom(14)),
                             Text(sub, style: AppText.caption(AppColors.muted)),
                           ],
                         ),
@@ -458,28 +711,39 @@ class LeagueScorePage extends StatelessWidget {
           bg: AppColors.primaryL,
           fg: AppColors.primaryD,
           iconColor: AppColors.primary,
-          text: 'Kontribusimu minggu ini: ${d.myWeekPoints} poin',
+          text:
+              'Kontribusimu musim ini: ${Fmt.group(t.me.points)} poin · ${t.me.hours} jam, ${t.me.attendance} hadir, streak ${t.me.streakDays} hari',
         ),
         const FieldLabel('TOP KONTRIBUTOR'),
         KCard(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Column(
             children: [
-              for (final c in d.contributors)
+              for (final (i, c) in t.contributors.indexed)
                 GestureDetector(
-                  onTap: () => showUserSheet(
-                    context,
-                    name: c.name,
-                    subtitle: 'Kontributor klub',
-                    stats: [('${c.points}', 'poin')],
-                  ),
+                  onTap: c.me
+                      ? () => context.go(R.profile)
+                      : () => showUserSheet(
+                          context,
+                          name: c.name,
+                          subtitle: 'Kontributor ${mine.name}',
+                          stats: [('${c.points}', 'poin')],
+                        ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(
                       children: [
-                        _rank(c.rank),
+                        _rank(i + 1, mine: c.me),
                         const SizedBox(width: 10),
-                        Emo(c.emoji, size: 22),
+                        if (c.me)
+                          ProfileAvatarView(
+                            p.avatar,
+                            key: const ValueKey('contributor-me-avatar'),
+                            size: 28,
+                            ring: false,
+                          )
+                        else
+                          Emo(c.emoji, size: 22),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -490,7 +754,11 @@ class LeagueScorePage extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Text('${c.points}', style: AppText.custom(15)),
+                        Text(
+                          Fmt.group(c.points),
+                          key: c.me ? const ValueKey('contributor-me') : null,
+                          style: AppText.custom(15),
+                        ),
                       ],
                     ),
                   ),
@@ -498,10 +766,11 @@ class LeagueScorePage extends StatelessWidget {
             ],
           ),
         ),
-        if (d.ignoredManual > 0)
+        if (t.me.manualIgnored > 0)
           KBanner(
             icon: LucideIcons.triangleAlert,
-            text: '${d.ignoredManual} aktivitas manualmu tidak dihitung',
+            text:
+                '${t.me.manualIgnored} aktivitas manualmu tidak dihitung ke poin klub',
             trailing: KLink(
               'HUBUNGKAN JAM →',
               onTap: () => context.push(R.devices),
@@ -521,15 +790,23 @@ class SeasonEndPage extends StatelessWidget {
     if (d == null) {
       return const KPage(header: KHeader('Musim liga'), children: []);
     }
-    final mine = d.mine;
+    final t = d.table(leagueContribution(p, d));
+    final mine = t.mine;
     final finished = d.daysLeft == 0;
-    final outcome = mine.rank <= d.promoteTop
-        ? 'Promosi'
-        : mine.rank > d.clubCount - 3
+    final outcome = t.promoted
+        ? (d.national ? 'Top ${d.promoteTop} nasional' : 'Promosi')
+        : t.relegated
         ? 'Degradasi'
         : 'Bertahan';
+    final standing = t.promoted
+        ? (d.national
+              ? 'saat ini di zona hadiah'
+              : 'saat ini di zona promosi ke ${d.nextLabel}')
+        : t.relegated
+        ? 'saat ini di zona degradasi'
+        : 'saat ini aman di ${d.label}';
     final text =
-        '${mine.name} · peringkat #${mine.rank} dari ${d.clubCount} · ${Fmt.group(mine.points)} poin. ${finished ? outcome : 'Musim masih berjalan'}';
+        '${mine.name} · peringkat #${mine.rank} dari ${Fmt.group(d.clubCount)} · ${Fmt.group(mine.points)} poin. ${finished ? outcome : 'Musim masih berjalan'}';
     return Stack(
       children: [
         KPage(
@@ -559,8 +836,17 @@ class SeasonEndPage extends StatelessWidget {
               style: AppText.h1(),
             ),
             Text(text, style: AppText.body()),
-            if (!finished)
-              Text('Sisa ${d.daysLeft} hari', style: AppText.bodySm()),
+            if (!finished) ...[
+              Text(
+                'Sisa ${d.daysLeft} hari · $standing',
+                style: AppText.bodySm(),
+              ),
+              if (t.gapToNext != null)
+                Text(
+                  'Butuh ${Fmt.group(t.gapToNext!)} poin lagi untuk naik ke #${mine.rank - 1}',
+                  style: AppText.bodySm(AppColors.primaryD),
+                ),
+            ],
             KCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,11 +911,11 @@ class SeasonEndPage extends StatelessWidget {
               ),
             ),
             KBanner.info(
-              'Data peringkat dan hadiah adalah contoh. Hasil akhir belum ditetapkan sebelum musim selesai.',
+              'Klub lain dan hadiah adalah contoh. Hasil akhir ditetapkan saat musim selesai.',
             ),
           ],
         ),
-        if (finished && outcome != 'Degradasi')
+        if (finished && !t.relegated)
           const Positioned.fill(child: IgnorePointer(child: Confetti())),
       ],
     );

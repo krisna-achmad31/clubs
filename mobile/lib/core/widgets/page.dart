@@ -44,18 +44,23 @@ class KPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (embedded) {
       final items = [...children, ?bottom];
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) SizedBox(height: gap),
-          stagger ? StaggerIn(index: i, child: items[i]) : items[i],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) SizedBox(height: gap),
+            stagger ? StaggerIn(index: i, child: items[i]) : items[i],
+          ],
         ],
-      ]);
+      );
     }
     final inset = MediaQuery.paddingOf(context).bottom;
     final body = ListView(
       controller: controller,
       padding: padding,
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       children: [
         for (var i = 0; i < children.length; i++) ...[
           if (i > 0) SizedBox(height: gap),
@@ -67,18 +72,33 @@ class KPage extends StatelessWidget {
       backgroundColor: bg,
       body: SafeArea(
         bottom: false,
-        child: Column(children: [
-          if (header != null) Padding(padding: headerPadding, child: header),
-          Expanded(
-            child: onRefresh == null ? body : RefreshIndicator(onRefresh: onRefresh!, color: AppColors.primary, child: body),
-          ),
-          if (bottom != null)
-            Container(
-              decoration: bottomBorder ? const BoxDecoration(color: AppColors.bg, border: Border(top: BorderSide(color: AppColors.line, width: 2))) : null,
-              padding: EdgeInsets.fromLTRB(16, 10, 16, 12 + inset),
-              child: bottom,
+        child: Column(
+          children: [
+            if (header != null) Padding(padding: headerPadding, child: header),
+            Expanded(
+              child: onRefresh == null
+                  ? body
+                  : RefreshIndicator(
+                      onRefresh: onRefresh!,
+                      color: AppColors.primary,
+                      child: body,
+                    ),
             ),
-        ]),
+            if (bottom != null)
+              Container(
+                decoration: bottomBorder
+                    ? const BoxDecoration(
+                        color: AppColors.bg,
+                        border: Border(
+                          top: BorderSide(color: AppColors.line, width: 2),
+                        ),
+                      )
+                    : null,
+                padding: EdgeInsets.fromLTRB(16, 10, 16, 12 + inset),
+                child: bottom,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -92,9 +112,16 @@ class KActions extends StatelessWidget {
   final double gap;
 
   @override
-  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
-      ]);
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) SizedBox(height: gap),
+        children[i],
+      ],
+    ],
+  );
 }
 
 /// Row of equally wide children.
@@ -105,14 +132,25 @@ class KSplit extends StatelessWidget {
   final double gap;
 
   @override
-  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(width: gap), Expanded(child: children[i])],
-      ]);
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) SizedBox(width: gap),
+        Expanded(child: children[i]),
+      ],
+    ],
+  );
 }
 
 /// Centered text link ("Nggak jadi", "Batalkan ikut").
 class KLink extends StatelessWidget {
-  const KLink(this.text, {super.key, this.onTap, this.color = AppColors.primary});
+  const KLink(
+    this.text, {
+    super.key,
+    this.onTap,
+    this.color = AppColors.primary,
+  });
 
   final String text;
   final VoidCallback? onTap;
@@ -120,13 +158,20 @@ class KLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Pressable(
-          onTap: onTap,
-          depth: 0,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: onTap == null ? AppColors.faint : color)),
+    child: Pressable(
+      onTap: onTap,
+      depth: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: onTap == null ? AppColors.faint : color,
           ),
         ),
-      );
+      ),
+    ),
+  );
 }

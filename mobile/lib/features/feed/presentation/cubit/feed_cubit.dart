@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../activity/domain/entities/activity.dart';
 import '../../domain/entities/feed_post.dart';
 import '../../domain/repositories/feed_repository.dart';
 
@@ -95,10 +96,36 @@ class FeedCubit extends Cubit<FeedState> {
     await load();
   }
 
+  Future<Activity?> myActivity(String activityId) =>
+      _repo.myActivity(activityId);
+
+  Future<void> editMine(
+    String postId,
+    String activityId, {
+    required String title,
+    required String note,
+    required Privacy privacy,
+  }) async {
+    await _repo.editMine(
+      activityId,
+      title: title,
+      note: note,
+      privacy: privacy,
+    );
+    await _refresh(postId);
+  }
+
   Future<void> mute(String author) async {
     await _repo.mute(author);
     await load();
   }
+
+  Future<void> unmute(String author) async {
+    await _repo.unmute(author);
+    await load();
+  }
+
+  Future<List<String>> muted() => _repo.muted();
 
   Future<void> report(String postId, String reason) async {
     await _repo.report(postId, reason);

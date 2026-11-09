@@ -19,12 +19,18 @@ class Emo extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) => Text(char, style: AppText.emoji(size, color));
+  Widget build(BuildContext context) =>
+      Text(char, style: AppText.emoji(size, color));
 }
 
 /// "NOMOR WHATSAPP" style label above fields/sections.
 class FieldLabel extends StatelessWidget {
-  const FieldLabel(this.text, {super.key, this.color = AppColors.muted, this.trailing});
+  const FieldLabel(
+    this.text, {
+    super.key,
+    this.color = AppColors.muted,
+    this.trailing,
+  });
 
   final String text;
   final Color color;
@@ -34,7 +40,12 @@ class FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = Text(text.toUpperCase(), style: AppText.label(color));
     if (trailing == null) return label;
-    return Row(children: [Expanded(child: label), trailing!]);
+    return Row(
+      children: [
+        Expanded(child: label),
+        trailing!,
+      ],
+    );
   }
 }
 
@@ -78,13 +89,21 @@ class KInput extends StatelessWidget {
       decoration: BoxDecoration(
         color: focused ? AppColors.primaryL : AppColors.soft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: focused ? AppColors.primaryM : AppColors.line, width: 2),
+        border: Border.all(
+          color: focused ? AppColors.primaryM : AppColors.line,
+          width: 2,
+        ),
       ),
       child: Row(
-        crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: maxLines > 1
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
         children: [
           if (icon != null) ...[
-            Padding(padding: EdgeInsets.only(top: maxLines > 1 ? 12 : 0), child: Icon(icon, size: 20, color: iconColor)),
+            Padding(
+              padding: EdgeInsets.only(top: maxLines > 1 ? 12 : 0),
+              child: Icon(icon, size: 20, color: iconColor),
+            ),
             const SizedBox(width: 10),
           ],
           Expanded(
@@ -103,7 +122,11 @@ class KInput extends StatelessWidget {
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 11),
                 hintText: hint,
-                hintStyle: AppText.custom(16, w: FontWeight.w800, c: AppColors.faint),
+                hintStyle: AppText.custom(
+                  16,
+                  w: FontWeight.w800,
+                  c: AppColors.faint,
+                ),
               ),
             ),
           ),
@@ -116,7 +139,15 @@ class KInput extends StatelessWidget {
 
 /// Static value "input" used for pickers (date, time, area…).
 class KField extends StatelessWidget {
-  const KField({super.key, required this.text, this.icon, this.iconColor = AppColors.primary, this.trailing, this.onTap, this.placeholder = false});
+  const KField({
+    super.key,
+    required this.text,
+    this.icon,
+    this.iconColor = AppColors.primary,
+    this.trailing,
+    this.onTap,
+    this.placeholder = false,
+  });
 
   final String text;
   final IconData? icon;
@@ -137,11 +168,26 @@ class KField extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.line, width: 2),
         ),
-        child: Row(children: [
-          if (icon != null) ...[Icon(icon, size: 20, color: iconColor), const SizedBox(width: 10)],
-          Expanded(child: Text(text, style: AppText.custom(16, w: FontWeight.w800, c: placeholder ? AppColors.faint : AppColors.ink), overflow: TextOverflow.ellipsis)),
-          ?trailing,
-        ]),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Text(
+                text,
+                style: AppText.custom(
+                  16,
+                  w: FontWeight.w800,
+                  c: placeholder ? AppColors.faint : AppColors.ink,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
       ),
     );
   }
@@ -149,7 +195,12 @@ class KField extends StatelessWidget {
 
 /// Pill switch from the design (48×28, knob 24).
 class KToggle extends StatelessWidget {
-  const KToggle({super.key, required this.value, this.onChanged, this.color = AppColors.primary});
+  const KToggle({
+    super.key,
+    required this.value,
+    this.onChanged,
+    this.color = AppColors.primary,
+  });
 
   final bool value;
   final ValueChanged<bool>? onChanged;
@@ -170,9 +221,19 @@ class KToggle extends StatelessWidget {
         width: 48,
         height: 28,
         padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(color: value ? color : AppColors.line, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(
+          color: value ? color : AppColors.line,
+          borderRadius: BorderRadius.circular(14),
+        ),
         alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: AppColors.white, shape: BoxShape.circle)),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            shape: BoxShape.circle,
+          ),
+        ),
       ),
     );
   }
@@ -180,7 +241,14 @@ class KToggle extends StatelessWidget {
 
 /// Thick rounded progress bar with springy fill + gloss stripe.
 class KProgress extends StatelessWidget {
-  const KProgress({super.key, required this.value, this.height = 16, this.color = AppColors.primary, this.track = AppColors.line, this.gloss = true});
+  const KProgress({
+    super.key,
+    required this.value,
+    this.height = 16,
+    this.color = AppColors.primary,
+    this.track = AppColors.line,
+    this.gloss = true,
+  });
 
   final double value;
   final double height;
@@ -190,34 +258,58 @@ class KProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      return Container(
-        height: height,
-        decoration: BoxDecoration(color: track, borderRadius: BorderRadius.circular(height / 2)),
-        alignment: Alignment.centerLeft,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(end: value.clamp(0, 1)),
-          duration: Motion.slow,
-          curve: Curves.easeOutBack,
-          builder: (context, v, _) => Container(
-            width: (c.maxWidth * v).clamp(v > 0 ? height : 0, c.maxWidth),
-            height: height,
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(height / 2)),
-            alignment: Alignment.topCenter,
-            padding: EdgeInsets.fromLTRB(height / 2, height * .22, height / 2, 0),
-            child: gloss && height >= 12
-                ? Container(height: height * .22, decoration: BoxDecoration(color: AppColors.white.withValues(alpha: .3), borderRadius: BorderRadius.circular(4)))
-                : null,
+    return LayoutBuilder(
+      builder: (context, c) {
+        return Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: track,
+            borderRadius: BorderRadius.circular(height / 2),
           ),
-        ),
-      );
-    });
+          alignment: Alignment.centerLeft,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: value.clamp(0, 1)),
+            duration: Motion.slow,
+            curve: Curves.easeOutBack,
+            builder: (context, v, _) => Container(
+              width: (c.maxWidth * v).clamp(v > 0 ? height : 0, c.maxWidth),
+              height: height,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(height / 2),
+              ),
+              alignment: Alignment.topCenter,
+              padding: EdgeInsets.fromLTRB(
+                height / 2,
+                height * .22,
+                height / 2,
+                0,
+              ),
+              child: gloss && height >= 12
+                  ? Container(
+                      height: height * .22,
+                      decoration: BoxDecoration(
+                        color: AppColors.white.withValues(alpha: .3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
 /// Onboarding header: back arrow + progress bar.
 class ProgressHeader extends StatelessWidget {
-  const ProgressHeader({super.key, required this.value, this.onBack, this.trailing});
+  const ProgressHeader({
+    super.key,
+    required this.value,
+    this.onBack,
+    this.trailing,
+  });
 
   final double value;
   final VoidCallback? onBack;
@@ -225,18 +317,31 @@ class ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      KIconButton(LucideIcons.arrowLeft, onTap: onBack ?? () => context.canPop() ? context.pop() : context.go('/welcome')),
-      const SizedBox(width: 12),
-      Expanded(child: KProgress(value: value)),
-      if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-    ]);
+    return Row(
+      children: [
+        KIconButton(
+          LucideIcons.arrowLeft,
+          onTap:
+              onBack ??
+              () => context.canPop() ? context.pop() : context.go('/welcome'),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: KProgress(value: value)),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+      ],
+    );
   }
 }
 
 /// Bare icon button with press bounce.
 class KIconButton extends StatelessWidget {
-  const KIconButton(this.icon, {super.key, this.onTap, this.color = AppColors.faint, this.size = 26});
+  const KIconButton(
+    this.icon, {
+    super.key,
+    this.onTap,
+    this.color = AppColors.faint,
+    this.size = 26,
+  });
 
   final IconData icon;
   final VoidCallback? onTap;
@@ -245,13 +350,29 @@ class KIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(onTap: onTap, depth: 0, child: Padding(padding: const EdgeInsets.all(2), child: Icon(icon, size: size, color: color)));
+    return Pressable(
+      onTap: onTap,
+      depth: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: Icon(icon, size: size, color: color),
+      ),
+    );
   }
 }
 
 /// Standard page header: leading icon, title, optional trailing widgets.
 class KHeader extends StatelessWidget {
-  const KHeader(this.title, {super.key, this.leading = LucideIcons.arrowLeft, this.onLeading, this.actions = const [], this.titleSize = 20, this.color = AppColors.ink, this.iconColor = AppColors.faint});
+  const KHeader(
+    this.title, {
+    super.key,
+    this.leading = LucideIcons.arrowLeft,
+    this.onLeading,
+    this.actions = const [],
+    this.titleSize = 20,
+    this.color = AppColors.ink,
+    this.iconColor = AppColors.faint,
+  });
 
   final String title;
   final IconData? leading;
@@ -263,20 +384,42 @@ class KHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      if (leading != null) ...[
-        KIconButton(leading!, color: iconColor, onTap: onLeading ?? () => context.canPop() ? context.pop() : context.go('/feed')),
-        const SizedBox(width: 12),
+    return Row(
+      children: [
+        if (leading != null) ...[
+          KIconButton(
+            leading!,
+            color: iconColor,
+            onTap:
+                onLeading ??
+                () => context.canPop() ? context.pop() : context.go('/feed'),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Text(
+            title,
+            style: AppText.custom(titleSize, c: color),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        for (final a in actions) ...[const SizedBox(width: 14), a],
       ],
-      Expanded(child: Text(title, style: AppText.custom(titleSize, c: color), overflow: TextOverflow.ellipsis)),
-      for (final a in actions) ...[const SizedBox(width: 14), a],
-    ]);
+    );
   }
 }
 
 /// Small stat box: tiny label + coloured value ("JARAK 1,2 km").
 class StatBox extends StatelessWidget {
-  const StatBox(this.label, this.value, {super.key, this.color = AppColors.primary, this.bg = AppColors.soft, this.center = false, this.valueSize = 17});
+  const StatBox(
+    this.label,
+    this.value, {
+    super.key,
+    this.color = AppColors.primary,
+    this.bg = AppColors.soft,
+    this.center = false,
+    this.valueSize = 17,
+  });
 
   final String label;
   final String value;
@@ -289,13 +432,26 @@ class StatBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
-        crossAxisAlignment: center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        crossAxisAlignment: center
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: AppText.micro(), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            label.toUpperCase(),
+            style: AppText.micro(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 1),
-          FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: AppText.value(color, valueSize))),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: AppText.value(color, valueSize)),
+          ),
         ],
       ),
     );
@@ -311,15 +467,31 @@ class StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      for (var i = 0; i < items.length; i++) ...[if (i > 0) SizedBox(width: gap), Expanded(child: items[i])],
-    ]);
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) SizedBox(width: gap),
+          Expanded(child: items[i]),
+        ],
+      ],
+    );
   }
 }
 
 /// Tinted inline banner with icon (tips, warnings, info).
 class KBanner extends StatelessWidget {
-  const KBanner({super.key, required this.text, this.icon, this.emoji, this.bg = AppColors.yellowL, this.fg = AppColors.orangeD, this.iconColor, this.trailing, this.border, this.title});
+  const KBanner({
+    super.key,
+    required this.text,
+    this.icon,
+    this.emoji,
+    this.bg = AppColors.yellowL,
+    this.fg = AppColors.orangeD,
+    this.iconColor,
+    this.trailing,
+    this.border,
+    this.title,
+  });
 
   final String text;
   final String? title;
@@ -331,15 +503,42 @@ class KBanner extends StatelessWidget {
   final Widget? trailing;
   final Color? border;
 
-  static KBanner tip(String text, {IconData icon = LucideIcons.lightbulb}) => KBanner(text: text, icon: icon, iconColor: AppColors.orange);
+  static KBanner tip(String text, {IconData icon = LucideIcons.lightbulb}) =>
+      KBanner(text: text, icon: icon, iconColor: AppColors.orange);
   static KBanner info(String text, {IconData icon = LucideIcons.info}) =>
-      KBanner(text: text, icon: icon, bg: AppColors.blueL, fg: AppColors.blueD, iconColor: AppColors.blue);
-  static KBanner error(String text, {IconData icon = LucideIcons.circleAlert}) =>
-      KBanner(text: text, icon: icon, bg: AppColors.redL, fg: AppColors.redD, iconColor: AppColors.red);
+      KBanner(
+        text: text,
+        icon: icon,
+        bg: AppColors.blueL,
+        fg: AppColors.blueD,
+        iconColor: AppColors.blue,
+      );
+  static KBanner error(
+    String text, {
+    IconData icon = LucideIcons.circleAlert,
+  }) => KBanner(
+    text: text,
+    icon: icon,
+    bg: AppColors.redL,
+    fg: AppColors.redD,
+    iconColor: AppColors.red,
+  );
   static KBanner ok(String text, {IconData icon = LucideIcons.badgeCheck}) =>
-      KBanner(text: text, icon: icon, bg: AppColors.primaryL, fg: AppColors.primaryD, iconColor: AppColors.primary);
+      KBanner(
+        text: text,
+        icon: icon,
+        bg: AppColors.primaryL,
+        fg: AppColors.primaryD,
+        iconColor: AppColors.primary,
+      );
   static KBanner purple(String text, {IconData icon = LucideIcons.sparkles}) =>
-      KBanner(text: text, icon: icon, bg: AppColors.purpleL, fg: AppColors.purpleD, iconColor: AppColors.purple);
+      KBanner(
+        text: text,
+        icon: icon,
+        bg: AppColors.purpleL,
+        fg: AppColors.purpleD,
+        iconColor: AppColors.purple,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -350,24 +549,46 @@ class KBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: border == null ? null : Border.all(color: border!, width: 2),
       ),
-      child: Row(children: [
-        if (icon != null) ...[Icon(icon, size: 20, color: iconColor ?? fg), const SizedBox(width: 10)],
-        if (emoji != null) ...[Emo(emoji!, size: 18, color: iconColor ?? fg), const SizedBox(width: 10)],
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (title != null) Text(title!, style: AppText.custom(14, c: fg)),
-            Text(text, style: AppText.custom(13, w: FontWeight.w800, c: fg, h: 1.3)),
-          ]),
-        ),
-        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-      ]),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 20, color: iconColor ?? fg),
+            const SizedBox(width: 10),
+          ],
+          if (emoji != null) ...[
+            Emo(emoji!, size: 18, color: iconColor ?? fg),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null)
+                  Text(title!, style: AppText.custom(14, c: fg)),
+                Text(
+                  text,
+                  style: AppText.custom(13, w: FontWeight.w800, c: fg, h: 1.3),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        ],
+      ),
     );
   }
 }
 
 /// Grey segmented control with a white selected pill (KOMUNITAS / PUBLIK).
 class KSegmented extends StatelessWidget {
-  const KSegmented({super.key, required this.items, required this.index, required this.onChanged, this.activeColor = AppColors.primary, this.fontSize = 14});
+  const KSegmented({
+    super.key,
+    required this.items,
+    required this.index,
+    required this.onChanged,
+    this.activeColor = AppColors.primary,
+    this.fontSize = 14,
+  });
 
   final List<String> items;
   final int index;
@@ -379,50 +600,79 @@ class KSegmented extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.soft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.line, width: 2)),
-      child: LayoutBuilder(builder: (context, c) {
-        final w = c.maxWidth / items.length;
-        return Stack(children: [
-          AnimatedPositioned(
-            duration: Motion.base,
-            curve: Curves.easeOutBack,
-            left: w * index,
-            top: 0,
-            bottom: 0,
-            width: w,
-            child: Container(
-              decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.line, width: 2)),
-            ),
-          ),
-          Row(children: [
-            for (var i = 0; i < items.length; i++)
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    onChanged(i);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: AnimatedDefaultTextStyle(
-                      duration: Motion.base,
-                      style: AppText.custom(fontSize, c: i == index ? activeColor : AppColors.faint),
-                      child: Text(items[i], textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
+      decoration: BoxDecoration(
+        color: AppColors.soft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line, width: 2),
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth / items.length;
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: Motion.base,
+                curve: Curves.easeOutBack,
+                left: w * index,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.bg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.line, width: 2),
                   ),
                 ),
               ),
-          ]),
-        ]);
-      }),
+              Row(
+                children: [
+                  for (var i = 0; i < items.length; i++)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onChanged(i);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: AnimatedDefaultTextStyle(
+                            duration: Motion.base,
+                            style: AppText.custom(
+                              fontSize,
+                              c: i == index ? activeColor : AppColors.faint,
+                            ),
+                            child: Text(
+                              items[i],
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
 /// Underline tabs (Jadwal / Feed / Chat …).
 class KTabs extends StatelessWidget {
-  const KTabs({super.key, required this.items, required this.index, required this.onChanged, this.color = AppColors.primary, this.scrollable = false});
+  const KTabs({
+    super.key,
+    required this.items,
+    required this.index,
+    required this.onChanged,
+    this.color = AppColors.primary,
+    this.scrollable = false,
+  });
 
   final List<String> items;
   final int index;
@@ -439,25 +689,42 @@ class KTabs extends StatelessWidget {
           onTap: () => onChanged(i),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: scrollable ? 10 : 0),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(items[i], style: AppText.custom(14, c: i == index ? color : AppColors.faint)),
-              ),
-              AnimatedContainer(
-                duration: Motion.base,
-                height: 4,
-                width: i == index ? 36 : 0,
-                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-              ),
-            ]),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    items[i],
+                    style: AppText.custom(
+                      14,
+                      c: i == index ? color : AppColors.faint,
+                    ),
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: Motion.base,
+                  height: 4,
+                  width: i == index ? 36 : 0,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
     ];
     return Container(
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line, width: 2))),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.line, width: 2)),
+      ),
       child: scrollable
-          ? SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: tabs))
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: tabs),
+            )
           : Row(children: [for (final t in tabs) Expanded(child: t)]),
     );
   }
@@ -465,7 +732,16 @@ class KTabs extends StatelessWidget {
 
 /// Rounded square icon container ("bell" in yellow-l box).
 class IconBox extends StatelessWidget {
-  const IconBox(this.icon, {super.key, this.bg = AppColors.primaryL, this.fg = AppColors.primary, this.size = 44, this.iconSize = 22, this.radius = 12, this.emoji});
+  const IconBox(
+    this.icon, {
+    super.key,
+    this.bg = AppColors.primaryL,
+    this.fg = AppColors.primary,
+    this.size = 44,
+    this.iconSize = 22,
+    this.radius = 12,
+    this.emoji,
+  });
 
   final IconData? icon;
   final String? emoji;
@@ -481,15 +757,27 @@ class IconBox extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(radius)),
-      child: emoji != null ? Emo(emoji!, size: iconSize, color: fg) : Icon(icon, size: iconSize, color: fg),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: emoji != null
+          ? Emo(emoji!, size: iconSize, color: fg)
+          : Icon(icon, size: iconSize, color: fg),
     );
   }
 }
 
 /// Circle avatar with initials.
 class LetterAvatar extends StatelessWidget {
-  const LetterAvatar(this.letters, {super.key, this.color = AppColors.primary, this.size = 40, this.textColor = AppColors.white, this.border});
+  const LetterAvatar(
+    this.letters, {
+    super.key,
+    this.color = AppColors.primary,
+    this.size = 40,
+    this.textColor = AppColors.white,
+    this.border,
+  });
 
   final String letters;
   final Color color;
@@ -503,7 +791,11 @@ class LetterAvatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: border == null ? null : Border.all(color: border!, width: 2.5)),
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: border == null ? null : Border.all(color: border!, width: 2.5),
+      ),
       child: Text(letters, style: AppText.custom(size * .42, c: textColor)),
     );
   }
@@ -511,7 +803,12 @@ class LetterAvatar extends StatelessWidget {
 
 /// Overlapping avatar stack with optional "+N".
 class AvatarStack extends StatelessWidget {
-  const AvatarStack({super.key, required this.items, this.size = 32, this.extra});
+  const AvatarStack({
+    super.key,
+    required this.items,
+    this.size = 32,
+    this.extra,
+  });
 
   final List<(String, Color)> items;
   final double size;
@@ -520,20 +817,40 @@ class AvatarStack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final all = [
-      for (final (l, c) in items) LetterAvatar(l, color: c, size: size, border: AppColors.white),
-      if (extra != null) LetterAvatar('+$extra', color: AppColors.soft, textColor: AppColors.muted, size: size, border: AppColors.white),
+      for (final (l, c) in items)
+        LetterAvatar(l, color: c, size: size, border: AppColors.white),
+      if (extra != null)
+        LetterAvatar(
+          '+$extra',
+          color: AppColors.soft,
+          textColor: AppColors.muted,
+          size: size,
+          border: AppColors.white,
+        ),
     ];
     return SizedBox(
       height: size,
       width: size + (all.length - 1) * size * .68,
-      child: Stack(children: [for (var i = 0; i < all.length; i++) Positioned(left: i * size * .68, child: all[i])]),
+      child: Stack(
+        children: [
+          for (var i = 0; i < all.length; i++)
+            Positioned(left: i * size * .68, child: all[i]),
+        ],
+      ),
     );
   }
 }
 
 /// Reaction pill (emoji + count) that pops when tapped.
 class ReactionPill extends StatefulWidget {
-  const ReactionPill({super.key, required this.emoji, required this.count, required this.color, this.active = false, this.onToggle});
+  const ReactionPill({
+    super.key,
+    required this.emoji,
+    required this.count,
+    required this.color,
+    this.active = false,
+    this.onToggle,
+  });
 
   final String emoji;
   final int count;
@@ -574,13 +891,24 @@ class _ReactionPillState extends State<ReactionPill> {
         decoration: BoxDecoration(
           color: _on ? widget.color.withValues(alpha: .12) : AppColors.bg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _on ? widget.color.withValues(alpha: .5) : AppColors.line, width: 2),
+          border: Border.all(
+            color: _on ? widget.color.withValues(alpha: .5) : AppColors.line,
+            width: 2,
+          ),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedScale(duration: Motion.base, curve: Motion.bouncy, scale: _on ? 1.25 : 1, child: Emo(widget.emoji, size: 15, color: widget.color)),
-          const SizedBox(width: 4),
-          Text('$_count', style: AppText.custom(13, c: widget.color)),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              duration: Motion.base,
+              curve: Motion.bouncy,
+              scale: _on ? 1.25 : 1,
+              child: Emo(widget.emoji, size: 15, color: widget.color),
+            ),
+            const SizedBox(width: 4),
+            Text('$_count', style: AppText.custom(13, c: widget.color)),
+          ],
+        ),
       ),
     );
   }
@@ -588,7 +916,14 @@ class _ReactionPillState extends State<ReactionPill> {
 
 /// "TOTAL XP" stat chip: coloured header + white body with emoji & value.
 class StatChip extends StatelessWidget {
-  const StatChip({super.key, required this.label, required this.value, required this.emoji, required this.hue, this.countTo});
+  const StatChip({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.emoji,
+    required this.hue,
+    this.countTo,
+  });
 
   final String label;
   final String value;
@@ -600,21 +935,43 @@ class StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
-      decoration: BoxDecoration(color: hue.base, borderRadius: BorderRadius.circular(16)),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Text(label, style: AppText.custom(12, c: AppColors.white, ls: .5))),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(14)),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Emo(emoji, size: 18, color: hue.base),
-            const SizedBox(width: 6),
-            countTo != null
-                ? CountUp(value: countTo!, style: AppText.value(hue.base, 19), prefix: value.startsWith('+') ? '+' : '')
-                : Text(value, style: AppText.value(hue.base, 19)),
-          ]),
-        ),
-      ]),
+      decoration: BoxDecoration(
+        color: hue.base,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Text(
+              label,
+              style: AppText.custom(12, c: AppColors.white, ls: .5),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Emo(emoji, size: 18, color: hue.base),
+                const SizedBox(width: 6),
+                countTo != null
+                    ? CountUp(
+                        value: countTo!,
+                        style: AppText.value(hue.base, 19),
+                        prefix: value.startsWith('+') ? '+' : '',
+                      )
+                    : Text(value, style: AppText.value(hue.base, 19)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -628,13 +985,34 @@ class OrDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final line = Expanded(child: Container(height: 2, color: AppColors.line));
-    return Row(children: [line, Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(text, style: AppText.label(AppColors.faint))), line]);
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(text, style: AppText.label(AppColors.faint)),
+        ),
+        line,
+      ],
+    );
   }
 }
 
 /// Settings-style row: icon box, title/subtitle, trailing (toggle/chevron/value).
 class KRow extends StatelessWidget {
-  const KRow({super.key, required this.title, this.subtitle, this.icon, this.iconBg = AppColors.primaryL, this.iconFg = AppColors.primary, this.trailing, this.onTap, this.emoji, this.titleColor = AppColors.ink, this.padding = const EdgeInsets.symmetric(vertical: 10)});
+  const KRow({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.icon,
+    this.iconBg = AppColors.primaryL,
+    this.iconFg = AppColors.primary,
+    this.trailing,
+    this.onTap,
+    this.emoji,
+    this.titleColor = AppColors.ink,
+    this.padding = const EdgeInsets.symmetric(vertical: 10),
+  });
 
   final String title;
   final String? subtitle;
@@ -651,24 +1029,71 @@ class KRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final row = Padding(
       padding: padding,
-      child: Row(children: [
-        if (icon != null || emoji != null) ...[IconBox(icon, emoji: emoji, bg: iconBg, fg: iconFg, size: 40, iconSize: 20), const SizedBox(width: 12)],
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: AppText.custom(15, c: titleColor)),
-            if (subtitle != null) Text(subtitle!, style: AppText.custom(13, w: FontWeight.w800, c: AppColors.muted)),
-          ]),
-        ),
-        trailing ?? (onTap != null ? const Icon(LucideIcons.chevronRight, size: 22, color: AppColors.faint) : const SizedBox()),
-      ]),
+      child: Row(
+        children: [
+          if (icon != null || emoji != null) ...[
+            IconBox(
+              icon,
+              emoji: emoji,
+              bg: iconBg,
+              fg: iconFg,
+              size: 40,
+              iconSize: 20,
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.custom(15, c: titleColor)),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: AppText.custom(
+                      13,
+                      w: FontWeight.w800,
+                      c: AppColors.muted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Keeps long subtitles off the toggle/chevron (GPS ready screen).
+          if (trailing != null) const SizedBox(width: 12),
+          trailing ??
+              (onTap != null
+                  ? const Icon(
+                      LucideIcons.chevronRight,
+                      size: 22,
+                      color: AppColors.faint,
+                    )
+                  : const SizedBox()),
+        ],
+      ),
     );
-    return onTap == null ? row : Pressable(onTap: onTap, depth: 0, child: ColoredBox(color: const Color(0x00FFFFFF), child: row));
+    return onTap == null
+        ? row
+        : Pressable(
+            onTap: onTap,
+            depth: 0,
+            child: ColoredBox(color: const Color(0x00FFFFFF), child: row),
+          );
   }
 }
 
 /// − value + stepper with chunky buttons.
 class KStepper extends StatelessWidget {
-  const KStepper({super.key, required this.value, required this.onChanged, this.min = 0, this.max = 99, this.color = AppColors.primary, this.big = false, this.label});
+  const KStepper({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.min = 0,
+    this.max = 99,
+    this.color = AppColors.primary,
+    this.big = false,
+    this.label,
+  });
 
   final int value;
   final ValueChanged<int> onChanged;
@@ -681,32 +1106,53 @@ class KStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget btn(IconData i, bool enabled, VoidCallback f) => Pressable(
-          onTap: enabled ? f : null,
-          child: Container(
-            width: big ? 52 : 38,
-            height: big ? 52 : 38,
-            decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12), border: chunkyBorder(AppColors.line, bottom: 4)),
-            child: Icon(i, size: big ? 24 : 18, color: enabled ? color : AppColors.line),
-          ),
-        );
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      btn(LucideIcons.minus, value > min, () => onChanged(value - 1)),
-      SizedBox(
-        width: big ? 84 : 52,
-        child: AnimatedSwitcher(
-          duration: Motion.fast,
-          transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
-          child: Text(label ?? '$value', key: ValueKey(value), textAlign: TextAlign.center, style: AppText.value(color, big ? 40 : 20)),
+      onTap: enabled ? f : null,
+      child: Container(
+        width: big ? 52 : 38,
+        height: big ? 52 : 38,
+        decoration: BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.circular(12),
+          border: chunkyBorder(AppColors.line, bottom: 4),
+        ),
+        child: Icon(
+          i,
+          size: big ? 24 : 18,
+          color: enabled ? color : AppColors.line,
         ),
       ),
-      btn(LucideIcons.plus, value < max, () => onChanged(value + 1)),
-    ]);
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        btn(LucideIcons.minus, value > min, () => onChanged(value - 1)),
+        SizedBox(
+          width: big ? 84 : 52,
+          child: AnimatedSwitcher(
+            duration: Motion.fast,
+            transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+            child: Text(
+              label ?? '$value',
+              key: ValueKey(value),
+              textAlign: TextAlign.center,
+              style: AppText.value(color, big ? 40 : 20),
+            ),
+          ),
+        ),
+        btn(LucideIcons.plus, value < max, () => onChanged(value + 1)),
+      ],
+    );
   }
 }
 
 /// Small check box with the chunky style.
 class KCheck extends StatelessWidget {
-  const KCheck({super.key, required this.value, required this.onChanged, this.color = AppColors.primary});
+  const KCheck({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.color = AppColors.primary,
+  });
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -725,7 +1171,9 @@ class KCheck extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: value ? color : AppColors.line, width: 2),
         ),
-        child: value ? const Icon(LucideIcons.check, size: 18, color: AppColors.white) : null,
+        child: value
+            ? const Icon(LucideIcons.check, size: 18, color: AppColors.white)
+            : null,
       ),
     );
   }
@@ -733,7 +1181,14 @@ class KCheck extends StatelessWidget {
 
 /// Date tile used in session lists (SAB / 1 / NOV).
 class DateBadge extends StatelessWidget {
-  const DateBadge({super.key, required this.day, required this.date, required this.month, this.hue = Hue.primary, this.size = 54});
+  const DateBadge({
+    super.key,
+    required this.day,
+    required this.date,
+    required this.month,
+    this.hue = Hue.primary,
+    this.size = 54,
+  });
 
   final String day;
   final String date;
@@ -746,19 +1201,32 @@ class DateBadge extends StatelessWidget {
     return Container(
       width: size,
       padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(color: hue.light, borderRadius: BorderRadius.circular(14), border: chunkyBorder(hue.base.withValues(alpha: .35), bottom: 4)),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(day, style: AppText.custom(11, c: hue.dark, ls: .5)),
-        Text(date, style: AppText.custom(22, c: hue.base, h: 1.05)),
-        Text(month, style: AppText.custom(11, c: hue.dark, ls: .5)),
-      ]),
+      decoration: BoxDecoration(
+        color: hue.light,
+        borderRadius: BorderRadius.circular(14),
+        border: chunkyBorder(hue.base.withValues(alpha: .35), bottom: 4),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(day, style: AppText.custom(11, c: hue.dark, ls: .5)),
+          Text(date, style: AppText.custom(22, c: hue.base, h: 1.05)),
+          Text(month, style: AppText.custom(11, c: hue.dark, ls: .5)),
+        ],
+      ),
     );
   }
 }
 
 /// Section title in caps with optional right action.
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.action, this.onAction, this.actionColor = AppColors.primary});
+  const SectionTitle(
+    this.text, {
+    super.key,
+    this.action,
+    this.onAction,
+    this.actionColor = AppColors.primary,
+  });
 
   final String text;
   final String? action;
@@ -767,17 +1235,35 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Expanded(child: Text(text.toUpperCase(), style: AppText.label())),
-      if (action != null && onAction != null)
-        Pressable(onTap: onAction, depth: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), child: Text(action!, style: AppText.label(actionColor)))),
-    ]);
+    return Row(
+      children: [
+        Expanded(child: Text(text.toUpperCase(), style: AppText.label())),
+        if (action != null && onAction != null)
+          Pressable(
+            onTap: onAction,
+            depth: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Text(action!, style: AppText.label(actionColor)),
+            ),
+          ),
+      ],
+    );
   }
 }
 
 /// Mini vertical bar chart (weekly minutes, cash flow).
 class MiniBars extends StatelessWidget {
-  const MiniBars({super.key, required this.values, required this.labels, this.color = AppColors.primary, this.highlight, this.height = 110, this.secondary, this.secondaryColor = AppColors.red});
+  const MiniBars({
+    super.key,
+    required this.values,
+    required this.labels,
+    this.color = AppColors.primary,
+    this.highlight,
+    this.height = 110,
+    this.secondary,
+    this.secondaryColor = AppColors.red,
+  });
 
   final List<double> values;
   final List<double>? secondary;
@@ -789,35 +1275,65 @@ class MiniBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxV = [...values, ...?secondary].fold<double>(1, (m, v) => v > m ? v : m);
+    final maxV = [
+      ...values,
+      ...?secondary,
+    ].fold<double>(1, (m, v) => v > m ? v : m);
     return SizedBox(
       height: height + 22,
-      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        for (var i = 0; i < values.length; i++)
-          Expanded(
-            child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                _bar(values[i] / maxV, highlight == null || highlight == i ? color : color.withValues(alpha: .35), i),
-                if (secondary != null) ...[const SizedBox(width: 4), _bar(secondary![i] / maxV, secondaryColor, i)],
-              ]),
-              const SizedBox(height: 6),
-              Text(labels[i], style: AppText.micro(highlight == i ? AppColors.ink : AppColors.faint)),
-            ]),
-          ),
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (var i = 0; i < values.length; i++)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _bar(
+                        values[i] / maxV,
+                        highlight == null || highlight == i
+                            ? color
+                            : color.withValues(alpha: .35),
+                        i,
+                      ),
+                      if (secondary != null) ...[
+                        const SizedBox(width: 4),
+                        _bar(secondary![i] / maxV, secondaryColor, i),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    labels[i],
+                    style: AppText.micro(
+                      highlight == i ? AppColors.ink : AppColors.faint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _bar(double f, Color c, int i) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: f),
-        duration: Duration(milliseconds: 500 + i * 70),
-        curve: Curves.easeOutBack,
-        builder: (context, v, _) => Container(
-          width: secondary == null ? 22 : 14,
-          height: (height * v).clamp(4, height),
-          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
-        ),
-      );
+    tween: Tween(begin: 0, end: f),
+    duration: Duration(milliseconds: 500 + i * 70),
+    curve: Curves.easeOutBack,
+    builder: (context, v, _) => Container(
+      width: secondary == null ? 22 : 14,
+      height: (height * v).clamp(4, height),
+      decoration: BoxDecoration(
+        color: c,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    ),
+  );
 }
 
 /// Grabber + sheet body. Use with [showKSheet].
@@ -825,8 +1341,14 @@ class MiniBars extends StatelessWidget {
 /// Every sheet is capped at [maxHeightFactor] of the screen (half by default);
 /// longer content scrolls under a fixed grabber. The keyboard is added on top
 /// of the cap so forms keep the same visible area while typing.
-class KSheet extends StatelessWidget {
-  const KSheet({super.key, required this.children, this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 24), this.gap = 14, this.maxHeightFactor = .5});
+class KSheet extends StatefulWidget {
+  const KSheet({
+    super.key,
+    required this.children,
+    this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 24),
+    this.gap = 14,
+    this.maxHeightFactor = .5,
+  });
 
   final List<Widget> children;
   final EdgeInsetsGeometry padding;
@@ -834,26 +1356,127 @@ class KSheet extends StatelessWidget {
   final double maxHeightFactor;
 
   @override
+  State<KSheet> createState() => _KSheetState();
+}
+
+class _KSheetState extends State<KSheet> {
+  final _scroll = ScrollController();
+  bool _overflow = false;
+  bool _moreBelow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_updateScroll);
+    _scheduleUpdate();
+  }
+
+  void _scheduleUpdate() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) _updateScroll();
+  });
+
+  void _updateScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (!position.hasContentDimensions) return;
+    final overflow = position.maxScrollExtent > 1;
+    final below = position.extentAfter > 1;
+    if (overflow != _overflow || below != _moreBelow) {
+      setState(() {
+        _overflow = overflow;
+        _moreBelow = below;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom + MediaQuery.paddingOf(context).bottom;
+    final bottom =
+        MediaQuery.viewInsetsOf(context).bottom +
+        MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 4),
-            child: Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(3)))),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: padding,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-                for (final c in children) ...[SizedBox(height: gap), c],
-              ]),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * widget.maxHeightFactor,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 10, bottom: 4),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.line,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ]),
+            Flexible(
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  _scheduleUpdate();
+                  return false;
+                },
+                child: RawScrollbar(
+                  controller: _scroll,
+                  thumbVisibility: true,
+                  trackVisibility: false,
+                  interactive: false,
+                  thumbColor: AppColors.primary.withValues(alpha: .45),
+                  trackColor: Colors.transparent,
+                  trackBorderColor: Colors.transparent,
+                  crossAxisMargin: 12,
+                  mainAxisMargin: 12,
+                  minThumbLength: 40,
+                  thickness: 3,
+                  radius: const Radius.circular(6),
+                  trackRadius: const Radius.circular(6),
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    physics: const BouncingScrollPhysics(),
+                    padding: widget.padding.add(
+                      const EdgeInsets.only(right: 16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final c in widget.children) ...[
+                          SizedBox(height: widget.gap),
+                          c,
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_overflow)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Text(
+                  _moreBelow
+                      ? '↓ Geser ke atas untuk melihat selengkapnya'
+                      : '↑ Geser ke bawah untuk melihat bagian sebelumnya',
+                  key: const ValueKey('sheet-scroll-hint'),
+                  textAlign: TextAlign.center,
+                  style: AppText.caption(AppColors.muted),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -899,28 +1522,41 @@ class _Toast extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned(
-        top: MediaQuery.paddingOf(context).top + 8,
-        left: 16,
-        right: 16,
-        child: IgnorePointer(
-          child: Semantics(
-            liveRegion: true,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: Motion.fast,
-              curve: Curves.easeOutCubic,
-              builder: (_, t, child) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, -12 * (1 - t)), child: child)),
-              child: Material(
-                color: AppColors.ink,
-                elevation: 6,
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(text, style: AppText.custom(14, w: FontWeight.w800, c: AppColors.white)),
+    top: MediaQuery.paddingOf(context).top + 8,
+    left: 16,
+    right: 16,
+    child: IgnorePointer(
+      child: Semantics(
+        liveRegion: true,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: Motion.fast,
+          curve: Curves.easeOutCubic,
+          builder: (_, t, child) => Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, -12 * (1 - t)),
+              child: child,
+            ),
+          ),
+          child: Material(
+            color: AppColors.ink,
+            elevation: 6,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                text,
+                style: AppText.custom(
+                  14,
+                  w: FontWeight.w800,
+                  c: AppColors.white,
                 ),
               ),
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }

@@ -160,6 +160,12 @@ class MabarSession extends Equatable {
   }
 
   Sport get sport => Sports.byId(sportId);
+
+  /// The session has already ended: it can't be joined any more.
+  bool get past => scheduledEnd.isBefore(DateTime.now());
+
+  /// Open for new RSVPs (not cancelled, not over).
+  bool get joinable => !cancelled && !past;
   bool get full => cancelled || filled >= slots;
   int get open => (slots - filled).clamp(0, slots);
   String get timeRange => '$start–$end';
@@ -290,7 +296,10 @@ class Rsvp extends Equatable {
 /// Fees shown in C2/C3/D2.
 abstract final class Fees {
   static const service = 2000;
-  static int total(int fee, int people) => fee * people + service;
+
+  /// A free mabar has no service fee either.
+  static int serviceFor(int fee) => fee == 0 ? 0 : service;
+  static int total(int fee, int people) => fee * people + serviceFor(fee);
 }
 
 /// Draft for G2 "Buat Mabar Baru".

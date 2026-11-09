@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Heart rate. Wear OS 6 (API 36) replaced BODY_SENSORS with health.READ_HEART_RATE. -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <!-- Steps, cadence, auto-pause -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- GPS distance, pace, route, elevation for outdoor sports -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Keeps the recording alive when the screen is off -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".KlubbyWearApp"
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="Klubby"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!-- Records without the phone; workouts sync when the phone is back. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".exercise.ExerciseService"
+            android:exported="false"
+            android:foregroundServiceType="health|location" />
+
+        <!-- Phone messages (workout ack, phone recording mirror) while the app is closed. -->
+        <service
+            android:name=".link.PhoneListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

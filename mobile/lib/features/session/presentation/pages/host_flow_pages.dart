@@ -10,13 +10,17 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/router/routes.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../club/domain/entities/club.dart';
 import '../../../club/presentation/cubit/clubs_cubit.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../domain/entities/mabar_session.dart';
 import '../cubit/sessions_cubit.dart';
 
 class HostNewPage extends StatefulWidget {
-  const HostNewPage({super.key});
+  const HostNewPage({super.key, this.clubId});
+
+  /// Club the session is created for (BUAT MABAR on a club page).
+  final String? clubId;
   @override
   State<HostNewPage> createState() => _HostNewPageState();
 }
@@ -29,6 +33,32 @@ class _HostNewPageState extends State<HostNewPage> {
         .copyWith(hour: 19, minute: 0),
   );
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start from the club the user came from, else their first admin club,
+    // with that club's sport, never a hardcoded demo club.
+    final admin = context
+        .read<ClubsCubit>()
+        .state
+        .mine
+        .where((c) => c.admin)
+        .toList();
+    final club =
+        admin.where((c) => c.id == widget.clubId).firstOrNull ??
+        admin.firstOrNull;
+    if (club != null) {
+      _draft = _draft.copyWith(
+        clubId: club.id,
+        clubName: club.name,
+        sportId: club.sportId,
+      );
+    } else {
+      _draft = _draft.copyWith(clubId: '', clubName: '');
+    }
+  }
+
   @override
   void dispose() {
     _title.dispose();
@@ -187,9 +217,18 @@ class _HostNewPageState extends State<HostNewPage> {
                 if (clubs.isEmpty)
                   KButton(
                     'BUAT KLUB',
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(ctx);
-                      context.push(R.newClub);
+                      final made = await context.push<Object?>(R.newClub);
+                      if (made is Club && mounted) {
+                        setState(
+                          () => _draft = _draft.copyWith(
+                            clubId: made.id,
+                            clubName: made.name,
+                            sportId: made.sportId,
+                          ),
+                        );
+                      }
                     },
                   ),
               ],
@@ -312,46 +351,46 @@ class HostPublishedPage extends StatelessWidget {
       return Stack(
         children: [
           KPage(
-        header: const KHeader('Mabar diterbitkan'),
-        bottom: KActions([
-          KButton(
-            'BAGIKAN AJAKAN',
-            onTap: () => SharePlus.instance.share(ShareParams(text: text)),
-          ),
-          KButton.secondary(
-            'KELOLA SESI',
-            onTap: () => context.pushReplacement(R.hostManage(s.id)),
-          ),
-        ]),
-        children: [
-          const Center(
-            child: PopIn(
-              from: .4,
-              child: MascotHead(
-                animal: Animal.ciko,
-                stage: Stage.juara,
-                size: 120,
-                bg: AppColors.purpleL,
+            header: const KHeader('Mabar diterbitkan'),
+            bottom: KActions([
+              KButton(
+                'BAGIKAN AJAKAN',
+                onTap: () => SharePlus.instance.share(ShareParams(text: text)),
               ),
-            ),
-          ),
-          Text('Mabar sudah tayang! 🎉', style: AppText.h2()),
-          Text(s.title, style: AppText.h1()),
-          Text(
-            '${s.when}\n${s.venue}\n${s.slots} slot · ${s.guestMax} tamu per peserta\nBatas batal ${s.cancelDeadline}',
-            style: AppText.body(),
-          ),
-          KBanner.info(
-            'Tautan web RSVP ini contoh. Pendaftaran melalui browser dan notifikasi anggota belum aktif.',
-          ),
-          KButton.secondary(
-            'SALIN AJAKAN',
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: text));
-              toast(context, 'Ajakan disalin');
-            },
-          ),
-        ],
+              KButton.secondary(
+                'KELOLA SESI',
+                onTap: () => context.pushReplacement(R.hostManage(s.id)),
+              ),
+            ]),
+            children: [
+              const Center(
+                child: PopIn(
+                  from: .4,
+                  child: MascotHead(
+                    animal: Animal.ciko,
+                    stage: Stage.juara,
+                    size: 120,
+                    bg: AppColors.purpleL,
+                  ),
+                ),
+              ),
+              Text('Mabar sudah tayang! 🎉', style: AppText.h2()),
+              Text(s.title, style: AppText.h1()),
+              Text(
+                '${s.when}\n${s.venue}\n${s.slots} slot · ${s.guestMax} tamu per peserta\nBatas batal ${s.cancelDeadline}',
+                style: AppText.body(),
+              ),
+              KBanner.info(
+                'Tautan web RSVP ini contoh. Pendaftaran melalui browser dan notifikasi anggota belum aktif.',
+              ),
+              KButton.secondary(
+                'SALIN AJAKAN',
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: text));
+                  toast(context, 'Ajakan disalin');
+                },
+              ),
+            ],
           ),
           const Positioned.fill(child: IgnorePointer(child: Confetti())),
         ],
@@ -703,9 +742,8 @@ Future<void> showHostCancelSheet(
     ),
   );
   if (result == null) return;
-  final r = cubit.state.rsvp(s.id);
-  if (r.status == RsvpStatus.joined && context.mounted) {
-    context.read<MeCubit>().addSaldo(s.fee * (1 + r.guests.length));
+  final refund = cubit.cancelSession(s.id, reason: result);
+  if (refund > 0 && context.mounted) {
+    context.read<MeCubit>().addSaldo(refund);
   }
-  cubit.cancelSession(s.id, reason: result);
 }

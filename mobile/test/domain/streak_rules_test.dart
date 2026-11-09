@@ -101,10 +101,11 @@ void main() {
       expect(r.clubPoints, 0);
     });
 
-    test('crossing 14 days evolves to Juara', () {
+    test('crossing 14 verified sessions evolves that animal to Juara', () {
       final p = ProfileRepositoryImpl.seed.copyWith(
         streak: 13,
         lastActive: yesterday,
+        adopted: const {Animal.kiki: 13, Animal.ciko: 48},
       );
       final r = rules.apply(
         p,
@@ -116,6 +117,50 @@ void main() {
       expect(r.streak, 14);
       expect(r.evolvedTo, Stage.juara);
     });
+
+    test('daily streak milestone does not evolve an unrelated animal', () {
+      final p = ProfileRepositoryImpl.seed.copyWith(
+        streak: 13,
+        lastActive: yesterday,
+        adopted: const {Animal.kiki: 4},
+      );
+      final r = rules.apply(
+        p,
+        source: ActivitySource.gps,
+        at: today,
+        sportId: 'lari',
+        animal: Animal.kiki,
+      );
+      expect(r.streak, 14);
+      expect(r.evolvedTo, isNull);
+    });
+
+    test('manual activity never unlocks session evolution', () {
+      final p = ProfileRepositoryImpl.seed.copyWith(
+        adopted: const {Animal.kiki: 13},
+      );
+      final r = rules.apply(
+        p,
+        source: ActivitySource.manual,
+        at: today,
+        sportId: 'lari',
+        animal: Animal.kiki,
+      );
+      expect(r.evolvedTo, isNull);
+    });
+
+    test(
+      'partner stage follows its sessions independently of daily streak',
+      () {
+        final p = ProfileRepositoryImpl.seed.copyWith(
+          activeSportId: 'badminton',
+          streak: 1,
+          adopted: const {Animal.ciko: 30, Animal.kiki: 2},
+        );
+        expect(p.stage, Stage.legend);
+        expect(p.copyWith(activeSportId: 'lari').stage, Stage.pemula);
+      },
+    );
 
     test('verified session in a new sport adopts a new animal', () {
       final p = ProfileRepositoryImpl.seed.copyWith(

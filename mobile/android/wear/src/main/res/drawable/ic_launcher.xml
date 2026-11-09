@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Klubby round launcher: pastel blue disc with a white K. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#4C8DFF"
+        android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,12h6v10l9,-10h7.5l-10,11 10.5,13h-7.5l-7,-9 -2.5,2.7v6.3h-6z" />
+</vector>

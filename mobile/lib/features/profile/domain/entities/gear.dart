@@ -24,6 +24,7 @@ class Gear extends Equatable {
     this.km = 0,
     this.limitKm,
     this.hours = 0,
+    this.minutes = 0,
     this.restrungAt,
     this.retired = false,
     this.isDefault = false,
@@ -40,6 +41,9 @@ class Gear extends Equatable {
 
   /// Rackets only: hours played since the last restring.
   final int hours;
+
+  /// Play time past [hours] that hasn't made a full hour yet.
+  final int minutes;
   final DateTime? restrungAt;
   final bool retired;
 
@@ -57,6 +61,7 @@ class Gear extends Equatable {
     String? name,
     double? km,
     int? hours,
+    int? minutes,
     DateTime? restrungAt,
     bool? retired,
     bool? isDefault,
@@ -68,6 +73,7 @@ class Gear extends Equatable {
     km: km ?? this.km,
     limitKm: limitKm,
     hours: hours ?? this.hours,
+    minutes: minutes ?? this.minutes,
     restrungAt: restrungAt ?? this.restrungAt,
     retired: retired ?? this.retired,
     isDefault: isDefault ?? this.isDefault,
@@ -81,6 +87,7 @@ class Gear extends Equatable {
     'km': km,
     'limit': limitKm,
     'hours': hours,
+    'minutes': minutes,
     'restrung': restrungAt?.millisecondsSinceEpoch,
     'retired': retired,
     'default': isDefault,
@@ -94,6 +101,7 @@ class Gear extends Equatable {
     km: (j['km'] as num? ?? 0).toDouble(),
     limitKm: j['limit'] as int?,
     hours: j['hours'] as int? ?? 0,
+    minutes: j['minutes'] as int? ?? 0,
     restrungAt: j['restrung'] == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(j['restrung']! as int),
@@ -107,6 +115,7 @@ class Gear extends Equatable {
     name,
     km,
     hours,
+    minutes,
     restrungAt,
     retired,
     isDefault,

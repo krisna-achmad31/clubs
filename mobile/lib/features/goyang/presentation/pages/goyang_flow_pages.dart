@@ -413,7 +413,7 @@ class _GoyangInvitePageState extends State<GoyangInvitePage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Budi ngajak main ${Sports.byId(invite.sportId).name}!',
+                  'Raka ngajak main ${Sports.byId(invite.sportId).name}!',
                   style: AppText.custom(15),
                 ),
                 Text(
@@ -457,7 +457,7 @@ class _GoyangInvitePageState extends State<GoyangInvitePage> {
           'Ajakan ini contoh. Notifikasi, pengiriman reaksi, dan respons teman nyata belum terhubung.',
         ),
         Text(
-          'Budi ngajak main!',
+          'Raka ngajak main!',
           textAlign: TextAlign.center,
           style: AppText.custom(28),
         ),

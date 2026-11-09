@@ -61,12 +61,28 @@ class Hue {
   final Color dark;
   final Color light;
 
-  static const primary = Hue(AppColors.primary, AppColors.primaryD, AppColors.primaryL);
+  static const primary = Hue(
+    AppColors.primary,
+    AppColors.primaryD,
+    AppColors.primaryL,
+  );
   static const blue = Hue(AppColors.blue, AppColors.blueD, AppColors.blueL);
-  static const yellow = Hue(AppColors.yellow, AppColors.yellowD, AppColors.yellowL);
+  static const yellow = Hue(
+    AppColors.yellow,
+    AppColors.yellowD,
+    AppColors.yellowL,
+  );
   static const red = Hue(AppColors.red, AppColors.redD, AppColors.redL);
-  static const orange = Hue(AppColors.orange, AppColors.orangeD, AppColors.orangeL);
-  static const purple = Hue(AppColors.purple, AppColors.purpleD, AppColors.purpleL);
+  static const orange = Hue(
+    AppColors.orange,
+    AppColors.orangeD,
+    AppColors.orangeL,
+  );
+  static const purple = Hue(
+    AppColors.purple,
+    AppColors.purpleD,
+    AppColors.purpleL,
+  );
   static const green = Hue(AppColors.green, AppColors.greenD, AppColors.greenL);
   static const white = Hue(AppColors.white, AppColors.line, AppColors.soft);
 

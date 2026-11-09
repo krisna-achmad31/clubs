@@ -40,8 +40,15 @@ class FlatMap extends StatefulWidget {
   final List<Widget> children;
 
   static const demoRoute = [
-    Offset(.16, .78), Offset(.26, .56), Offset(.31, .34), Offset(.47, .30),
-    Offset(.64, .36), Offset(.76, .22), Offset(.88, .40), Offset(.80, .64), Offset(.62, .70),
+    Offset(.16, .78),
+    Offset(.26, .56),
+    Offset(.31, .34),
+    Offset(.47, .30),
+    Offset(.64, .36),
+    Offset(.76, .22),
+    Offset(.88, .40),
+    Offset(.80, .64),
+    Offset(.62, .70),
   ];
 
   @override
@@ -49,8 +56,14 @@ class FlatMap extends StatefulWidget {
 }
 
 class _FlatMapState extends State<FlatMap> with TickerProviderStateMixin {
-  late final AnimationController _draw = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
-  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+  late final AnimationController _draw = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
 
   @override
   void initState() {
@@ -77,57 +90,84 @@ class _FlatMapState extends State<FlatMap> with TickerProviderStateMixin {
       child: SizedBox(
         height: widget.height,
         width: double.infinity,
-        child: Stack(fit: StackFit.expand, children: [
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([_draw, _pulse]),
-              builder: (_, _) => CustomPaint(
-                painter: _MapPainter(
-                  layers: widget.layers,
-                  onboarding: widget.onboarding,
-                  route: widget.route ?? FlatMap.demoRoute,
-                  progress: Curves.easeInOutCubic.transform(_draw.value),
-                  pulse: _pulse.value,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_draw, _pulse]),
+                builder: (_, _) => CustomPaint(
+                  painter: _MapPainter(
+                    layers: widget.layers,
+                    onboarding: widget.onboarding,
+                    route: widget.route ?? FlatMap.demoRoute,
+                    progress: Curves.easeInOutCubic.transform(_draw.value),
+                    pulse: _pulse.value,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (widget.layers.contains(MapLayer.pin))
-            Align(
-              alignment: const Alignment(0, -.1),
-              child: PopIn(
-                offsetY: -30,
+            if (widget.layers.contains(MapLayer.pin))
+              Align(
+                alignment: const Alignment(0, -.1),
+                child: PopIn(
+                  offsetY: -30,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.white, width: 3),
+                    ),
+                    child: const Icon(
+                      LucideIcons.mapPin,
+                      color: AppColors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            if (widget.layers.contains(MapLayer.privacyZone))
+              Center(
                 child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle, border: Border.all(color: AppColors.white, width: 3)),
-                  child: const Icon(LucideIcons.mapPin, color: AppColors.white, size: 20),
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppColors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    LucideIcons.house,
+                    color: AppColors.white,
+                    size: 16,
+                  ),
                 ),
               ),
-            ),
-          if (widget.layers.contains(MapLayer.privacyZone))
-            Center(
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
-                child: const Icon(LucideIcons.house, color: AppColors.white, size: 16),
-              ),
-            ),
-          ...widget.children,
-        ]),
+            ...widget.children,
+          ],
+        ),
       ),
     );
     if (!widget.chunky) return map;
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(widget.radius), border: chunkyBorder(AppColors.line)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(widget.radius),
+        border: chunkyBorder(AppColors.line),
+      ),
       child: map,
     );
   }
 }
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.layers, required this.onboarding, required this.route, required this.progress, required this.pulse});
+  _MapPainter({
+    required this.layers,
+    required this.onboarding,
+    required this.route,
+    required this.progress,
+    required this.pulse,
+  });
 
   final Set<MapLayer> layers;
   final bool onboarding;
@@ -143,13 +183,39 @@ class _MapPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & s, Paint()..color = ground);
 
     final p = Paint();
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width * .04, s.height * .08, s.width * .38, s.height * .42), const Radius.circular(40)), p..color = park);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width * .56, s.height * .58, s.width * .45, s.height * .5), const Radius.circular(60)), p..color = water);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          s.width * .04,
+          s.height * .08,
+          s.width * .38,
+          s.height * .42,
+        ),
+        const Radius.circular(40),
+      ),
+      p..color = park,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          s.width * .56,
+          s.height * .58,
+          s.width * .45,
+          s.height * .5,
+        ),
+        const Radius.circular(60),
+      ),
+      p..color = water,
+    );
 
     final road = Paint()
       ..color = AppColors.white
       ..strokeCap = StrokeCap.butt;
-    void line(Offset a, Offset b, double w) => canvas.drawLine(Offset(a.dx * s.width, a.dy * s.height), Offset(b.dx * s.width, b.dy * s.height), road..strokeWidth = w);
+    void line(Offset a, Offset b, double w) => canvas.drawLine(
+      Offset(a.dx * s.width, a.dy * s.height),
+      Offset(b.dx * s.width, b.dy * s.height),
+      road..strokeWidth = w,
+    );
     line(const Offset(-.1, .62), const Offset(1.1, .44), 14);
     line(const Offset(-.1, .2), const Offset(1.1, .34), 12);
     line(const Offset(.48, -.1), const Offset(.48, 1.1), 12);
@@ -157,24 +223,41 @@ class _MapPainter extends CustomPainter {
 
     if (layers.contains(MapLayer.searchRadius)) {
       final c = Offset(s.width / 2, s.height * .45);
-      canvas.drawCircle(c, s.height * .38, Paint()..color = AppColors.blue.withValues(alpha: .13));
-      canvas.drawCircle(c, s.height * .38, Paint()
-        ..color = AppColors.blue
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2);
+      canvas.drawCircle(
+        c,
+        s.height * .38,
+        Paint()..color = AppColors.blue.withValues(alpha: .13),
+      );
+      canvas.drawCircle(
+        c,
+        s.height * .38,
+        Paint()
+          ..color = AppColors.blue
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
     }
 
     if (layers.contains(MapLayer.privacyZone)) {
       final c = Offset(s.width / 2, s.height / 2);
-      canvas.drawCircle(c, 70, Paint()..color = AppColors.red.withValues(alpha: .13));
-      canvas.drawCircle(c, 70, Paint()
-        ..color = AppColors.red
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2);
+      canvas.drawCircle(
+        c,
+        70,
+        Paint()..color = AppColors.red.withValues(alpha: .13),
+      );
+      canvas.drawCircle(
+        c,
+        70,
+        Paint()
+          ..color = AppColors.red
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
     }
 
     if (layers.contains(MapLayer.route) && route.length > 1) {
-      final path = Path()..moveTo(route.first.dx * s.width, route.first.dy * s.height);
+      final path = Path()
+        ..moveTo(route.first.dx * s.width, route.first.dy * s.height);
       for (final o in route.skip(1)) {
         path.lineTo(o.dx * s.width, o.dy * s.height);
       }
@@ -186,15 +269,26 @@ class _MapPainter extends CustomPainter {
         drawn.addPath(m.extractPath(0, len), Offset.zero);
         tip = m.getTangentForOffset(len)?.position;
       }
-      canvas.drawPath(drawn, Paint()
-        ..color = AppColors.orange
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = ui.StrokeJoin.round);
-      _dot(canvas, Offset(route.first.dx * s.width, route.first.dy * s.height), AppColors.primary);
+      canvas.drawPath(
+        drawn,
+        Paint()
+          ..color = AppColors.orange
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 7
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = ui.StrokeJoin.round,
+      );
+      _dot(
+        canvas,
+        Offset(route.first.dx * s.width, route.first.dy * s.height),
+        AppColors.primary,
+      );
       if (progress >= 1) {
-        _dot(canvas, Offset(route.last.dx * s.width, route.last.dy * s.height), AppColors.red);
+        _dot(
+          canvas,
+          Offset(route.last.dx * s.width, route.last.dy * s.height),
+          AppColors.red,
+        );
       } else if (tip != null) {
         _dot(canvas, tip, AppColors.orange);
       }
@@ -202,8 +296,16 @@ class _MapPainter extends CustomPainter {
 
     if (layers.contains(MapLayer.me)) {
       final c = Offset(s.width * .5, s.height * .55);
-      canvas.drawCircle(c, 14 + 16 * pulse, Paint()..color = AppColors.blue.withValues(alpha: .25 * (1 - pulse)));
-      canvas.drawCircle(c, 14, Paint()..color = AppColors.blue.withValues(alpha: .25));
+      canvas.drawCircle(
+        c,
+        14 + 16 * pulse,
+        Paint()..color = AppColors.blue.withValues(alpha: .25 * (1 - pulse)),
+      );
+      canvas.drawCircle(
+        c,
+        14,
+        Paint()..color = AppColors.blue.withValues(alpha: .25),
+      );
       canvas.drawCircle(c, 9, Paint()..color = AppColors.white);
       canvas.drawCircle(c, 6.5, Paint()..color = AppColors.blue);
     }
@@ -215,5 +317,9 @@ class _MapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_MapPainter old) => old.progress != progress || old.pulse != pulse || old.route != route || old.layers != layers;
+  bool shouldRepaint(_MapPainter old) =>
+      old.progress != progress ||
+      old.pulse != pulse ||
+      old.route != route ||
+      old.layers != layers;
 }

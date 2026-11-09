@@ -15,7 +15,10 @@ class NotificationService {
     importance: Importance.high,
     priority: Priority.high,
   );
-  static const _details = NotificationDetails(android: _channel, iOS: DarwinNotificationDetails());
+  static const _details = NotificationDetails(
+    android: _channel,
+    iOS: DarwinNotificationDetails(),
+  );
 
   Future<void> init() async {
     if (_ready) return;
@@ -25,7 +28,11 @@ class NotificationService {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         // Permission is requested later from A8, not at launch.
-        iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
       ),
     );
     _ready = true;
@@ -33,7 +40,12 @@ class NotificationService {
 
   Future<void> show(int id, String title, String body) async {
     await init();
-    await _plugin.show(id: id, title: title, body: body, notificationDetails: _details);
+    await _plugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: _details,
+    );
   }
 
   /// Daily "streak kamu belum aman" nudge at 20.00 local time.

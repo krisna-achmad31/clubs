@@ -140,7 +140,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 Text('Geng Gemoy', style: AppText.cardTitle()),
                 Text(
-                  'Partner: ${p.partner.label} · ${p.stage.label}',
+                  '${p.activeSport.name} · ${p.partner.label} · ${p.adopted.containsKey(p.partner) ? p.stage.label : 'Belum diadopsi'}',
                   style: AppText.bodySm(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -160,6 +160,22 @@ class _ProfilePageState extends State<ProfilePage> {
     FutureBuilder<List<Activity>>(
       future: _activities(p),
       builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Column(
+            children: [
+              KBanner.info('Aktivitas belum dapat dimuat.'),
+              KButton.secondary(
+                'COBA LAGI',
+                onTap: () => setState(() {
+                  _recent = null;
+                }),
+              ),
+            ],
+          );
+        }
         final all = [...?snap.data]..sort((a, b) => b.start.compareTo(a.start));
         final stamps = StampCalendar.days(p, all).values.toList()
           ..sort((a, b) => b.day.compareTo(a.day));
@@ -168,11 +184,11 @@ class _ProfilePageState extends State<ProfilePage> {
           spacing: 12,
           children: [
             SectionTitle(
-              'Buku Stamp',
+              'Stempel terbaru',
               action: 'LIHAT SEMUA',
               onAction: () => context.push(R.stamps),
             ),
-            _StampRow(stamps.take(6).toList()),
+            _StampRow(stamps.take(6).toList(), activities: all),
             const SectionTitle('Aktivitas minggu ini'),
             KCard(child: _WeekBars(all)),
             _MonthSplit(all),
@@ -209,7 +225,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ],
     ),
     Text(
-      '${p.stamps} stempel terkumpul · Rekor streak ${p.bestStreak} hari',
+      '${p.stamps} sesi tercatat · Rekor streak ${p.bestStreak} hari',
       style: AppText.bodySm(),
     ),
   ];
@@ -236,28 +252,92 @@ class _ProfilePageState extends State<ProfilePage> {
 
 /// Six latest sessions as stamps; empty slots stay locked.
 class _StampRow extends StatelessWidget {
-  const _StampRow(this.recent);
+  const _StampRow(this.recent, {required this.activities});
 
   final List<StampEntry> recent;
+  final List<Activity> activities;
+
+  void _preview(BuildContext context, StampEntry stamp) {
+    final items = activities
+        .where((a) => DateUtils.isSameDay(a.start, stamp.day))
+        .toList();
+    final savedSports = items.map((a) => a.sportId).toSet();
+    final historicalSports = stamp.sportIds
+        .where((id) => !savedSports.contains(id))
+        .toSet();
+    showKSheet<void>(
+      context,
+      (ctx) => KSheet(
+        children: [
+          Text(
+            '${stamp.day.day} ${Fmt.monthsLong[stamp.day.month - 1]} ${stamp.day.year}',
+            style: AppText.title(),
+          ),
+          if (stamp.frozen)
+            KBanner.info('Es Batu melindungi streak pada hari ini.')
+          else if (items.isEmpty)
+            KRow(
+              title: 'Stempel tersimpan',
+              subtitle: stamp.sportIds.isEmpty
+                  ? 'Jenis olahraga tidak tercatat'
+                  : stamp.sportIds.map((id) => Sports.byId(id).name).join(', '),
+              icon: LucideIcons.stamp,
+            ),
+          if (items.isNotEmpty)
+            Text(
+              'Aktivitas tersimpan · ${savedSports.map((id) => Sports.byId(id).name).join(', ')}',
+              style: AppText.bodySm(),
+            ),
+          if (items.isNotEmpty && historicalSports.isNotEmpty)
+            Text(
+              'Riwayat stempel · ${historicalSports.map((id) => Sports.byId(id).name).join(', ')} (detail aktivitas tidak tersedia)',
+              style: AppText.bodySm(),
+            ),
+          for (final a in items)
+            KRow(
+              title: '${a.sport.emoji} ${a.title}',
+              subtitle:
+                  '${a.duration == Duration.zero ? 'Durasi tidak dicatat' : Fmt.hm(a.duration)} · ${a.verified ? 'Terverifikasi' : 'Kasual'}',
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push(R.savedActivity(a.id));
+              },
+            ),
+          KButton.secondary(
+            'LIHAT DI KALENDER',
+            onTap: () {
+              Navigator.pop(ctx);
+              context.push(
+                '${R.stamps}?year=${stamp.day.year}&month=${stamp.day.month}',
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => Pressable(
-    depth: 0,
-    onTap: () => context.push(R.stamps),
-    child: Row(
-      children: [
-        for (var i = 0; i < 6; i++)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 52),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: PopIn(
-                      delay: Duration(milliseconds: 60 * i),
-                      from: .4,
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (var i = 0; i < 6; i++)
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 52),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: PopIn(
+                    delay: Duration(milliseconds: 60 * i),
+                    from: .4,
+                    child: Pressable(
+                      key: ValueKey('recent-stamp-$i'),
+                      depth: 0,
+                      onTap: i < recent.length
+                          ? () => _preview(context, recent[i])
+                          : null,
                       child: _stamp(i < recent.length ? recent[i] : null),
                     ),
                   ),
@@ -265,8 +345,8 @@ class _StampRow extends StatelessWidget {
               ),
             ),
           ),
-      ],
-    ),
+        ),
+    ],
   );
 
   Widget _stamp(StampEntry? entry) {
@@ -288,7 +368,9 @@ class _StampRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Emo(
-            entry?.frozen == true ? '🧊' : sport?.emoji ?? '🔒',
+            entry?.frozen == true
+                ? '🧊'
+                : sport?.emoji ?? (entry == null ? '🔒' : '✓'),
             size: 22,
           ),
         ),
@@ -558,80 +640,66 @@ Future<void> _addProfileSport(BuildContext context) async {
   );
 }
 
-class GengPage extends StatelessWidget {
+class GengPage extends StatefulWidget {
   const GengPage({super.key});
 
-  void _detail(BuildContext context, Animal animal) {
+  @override
+  State<GengPage> createState() => _GengPageState();
+}
+
+class _GengPageState extends State<GengPage> {
+  Animal? _selected;
+  final _pageScroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<MeCubit>().load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageScroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _chooseAnimalSport(Animal animal, {required bool record}) async {
     final me = context.read<MeCubit>();
-    final p = me.state;
-    final sport =
-        p.sports.where((u) => u.sport.animal == animal).firstOrNull?.sport ??
-        Sports.all.firstWhere((s) => s.animal == animal);
-    final sessions = p.adopted[animal];
-    showKSheet<void>(
-      context,
-      (ctx) => KSheet(
-        children: [
-          Center(
-            child: MascotBody(
-              animal: animal,
-              stage: sessions == null ? Stage.pemula : p.stage,
-              size: 160,
+    final choices = Sports.all
+        .where(
+          (s) =>
+              s.animal == animal &&
+              (record || me.state.sports.any((u) => u.sport.id == s.id)),
+        )
+        .toList();
+    if (choices.isEmpty) return;
+    final sport = choices.length == 1
+        ? choices.single
+        : await showKSheet<Sport>(
+            context,
+            (ctx) => KSheet(
+              children: [
+                Text('Pilih olahraga ${animal.label}', style: AppText.title()),
+                for (final s in choices)
+                  KButton.secondary(s.name, onTap: () => Navigator.pop(ctx, s)),
+              ],
             ),
-          ),
-          Text('${animal.label} · ${sport.name}', style: AppText.title()),
-          if (sessions == null)
-            Text(
-              'Main ${sport.name} 1x terverifikasi untuk adopsi.',
-              style: AppText.body(),
-            )
-          else ...[
-            Text(
-              '$sessions sesi · Tahap ${p.stage.label} · 🔥 ${p.streak} hari',
-              style: AppText.body(),
-            ),
-            KProgress(
-              value: EvolutionProgress(p.streak).fraction,
-              height: 10,
-              color: p.stage.next?.color ?? p.stage.color,
-              gloss: false,
-            ),
-            Text(EvolutionProgress(p.streak).nextLine, style: AppText.bodySm()),
-          ],
-          if (sessions != null)
-            KButton.secondary(
-              'BAGIKAN EVOLUSI ${animal.label.toUpperCase()}',
-              icon: LucideIcons.share2,
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push(R.gengStory(animal));
-              },
-            ),
-          if (sessions != null && p.sports.any((u) => u.sport.animal == animal))
-            KButton(
-              'JADIKAN PARTNER',
-              onTap: () {
-                me.setActiveSport(sport.id);
-                Navigator.pop(ctx);
-              },
-            )
-          else
-            KButton(
-              'REKAM AKTIVITAS',
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push(sport.tracksDistance ? R.gps : R.scan);
-              },
-            ),
-        ],
-      ),
-    );
+          );
+    if (sport == null || !mounted) return;
+    if (!me.state.sports.any((u) => u.sport.id == sport.id)) {
+      me.saveSport(UserSport(sport));
+    }
+    me.setActiveSport(sport.id);
+    if (record) context.push(sport.tracksDistance ? R.gps : R.scan);
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<MeCubit>().state;
     final adopted = p.adopted.keys.toList();
+    final selected = _selected ?? p.partner;
     final missing = Animal.values
         .where((a) => !p.adopted.containsKey(a))
         .toList();
@@ -646,28 +714,63 @@ class GengPage extends StatelessWidget {
               child: StaggerIn(
                 index: i,
                 child: KCard(
-                  onTap: () => _detail(context, a),
+                  onTap: () {
+                    setState(() => _selected = a);
+                    _pageScroll.animateTo(
+                      0,
+                      duration: Motion.base,
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                  border: selected == a
+                      ? Stage.forStreak(p.adopted[a] ?? 0).color
+                      : AppColors.line,
                   padding: const EdgeInsets.all(8),
-                  child: Column(
+                  child: Stack(
                     children: [
-                      MascotBody(
-                        animal: a,
-                        stage: adopted.contains(a) ? p.stage : Stage.pemula,
-                        size: 72,
-                        animated: false,
+                      SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          children: [
+                            MascotBody(
+                              animal: a,
+                              stage: Stage.forStreak(p.adopted[a] ?? 0),
+                              size: 72,
+                              animated: false,
+                            ),
+                            Text(
+                              a.label,
+                              style: AppText.name(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              adopted.contains(a)
+                                  // Verified sessions that grow this animal,
+                                  // not every logged session.
+                                  ? '${p.adopted[a]} sesi evolusi'
+                                  : 'Belum diadopsi',
+                              style: AppText.caption(AppColors.muted),
+                            ),
+                          ],
+                        ),
                       ),
-                      Text(
-                        a.label,
-                        style: AppText.name(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        adopted.contains(a)
-                            ? '${p.adopted[a]} sesi'
-                            : 'Belum diadopsi',
-                        style: AppText.caption(AppColors.muted),
-                      ),
+                      if (selected == a)
+                        const Positioned(
+                          top: 0,
+                          right: 0,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              LucideIcons.circleCheck,
+                              size: 20,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -677,6 +780,7 @@ class GengPage extends StatelessWidget {
       ),
     );
     return KPage(
+      controller: _pageScroll,
       header: KHeader(
         'Geng Gemoy',
         actions: [
@@ -689,11 +793,31 @@ class GengPage extends StatelessWidget {
       ),
       children: [
         const FieldLabel('PERKEMBANGAN'),
-        _EvolutionCard(p: p, animal: p.partner),
+        _EvolutionCard(p: p, animal: selected),
+
+        ...[
+          if (selected == p.partner)
+            const KPill(
+              'PARTNER OLAHRAGA AKTIF',
+              bg: AppColors.primaryL,
+              fg: AppColors.primaryD,
+            )
+          else if (p.sports.any((u) => u.sport.animal == selected))
+            KButton.secondary(
+              'AKTIFKAN OLAHRAGA HEWAN INI',
+              onTap: () => _chooseAnimalSport(selected, record: false),
+            ),
+          KButton.secondary(
+            'REKAM OLAHRAGA ${selected.label.toUpperCase()}',
+            onTap: () => _chooseAnimalSport(selected, record: true),
+          ),
+        ],
         KButton(
           'BAGIKAN EVOLUSI',
           icon: LucideIcons.share2,
-          onTap: () => context.push(R.gengStory(p.partner)),
+          onTap: !adopted.contains(selected)
+              ? null
+              : () => context.push(R.gengStory(selected)),
         ),
         FieldLabel('SUDAH DIADOPSI · ${adopted.length}'),
         tiles(adopted),
@@ -713,6 +837,52 @@ class GengPage extends StatelessWidget {
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  /// A quick double tap used to push the page twice, so Back needed two
+  /// presses (Privasi & Keamanan). One push at a time.
+  static bool _opening = false;
+  static Future<void> _open(BuildContext context, String route) async {
+    if (_opening) return;
+    _opening = true;
+    try {
+      final done = context.push<Object?>(route);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await done;
+    } finally {
+      _opening = false;
+    }
+  }
+
+  /// Undo a mute from the post menu.
+  Future<void> _muted(BuildContext context) async {
+    final feed = context.read<FeedCubit>();
+    var names = await feed.muted();
+    if (!context.mounted) return;
+    await showKSheet<void>(
+      context,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, set) => KSheet(
+          children: [
+            Text('Akun dibisukan', style: AppText.title()),
+            if (names.isEmpty)
+              Text('Belum ada akun yang dibisukan.', style: AppText.bodySm()),
+            for (final n in names)
+              KRow(
+                title: n,
+                trailing: KLink(
+                  'BUKA',
+                  onTap: () async {
+                    await feed.unmute(n);
+                    final left = await feed.muted();
+                    set(() => names = left);
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _reminder(BuildContext context) async {
     final me = context.read<MeCubit>();
@@ -804,7 +974,7 @@ class SettingsPage extends StatelessWidget {
       title: title,
       icon: icon,
       trailing: const Icon(LucideIcons.chevronRight),
-      onTap: () => context.push(route),
+      onTap: () => _open(context, route),
     );
     return KPage(
       header: const KHeader('Pengaturan'),
@@ -866,6 +1036,12 @@ class SettingsPage extends StatelessWidget {
         link('Goyang Ajak Main', LucideIcons.vibrate, R.goyangSettings),
         link('Notifikasi lainnya', LucideIcons.bell, R.notifPrefs),
         link('Privasi & Keamanan', LucideIcons.lock, R.privacy),
+        KRow(
+          title: 'Akun dibisukan',
+          icon: LucideIcons.volumeX,
+          trailing: const Icon(LucideIcons.chevronRight),
+          onTap: () => _muted(context),
+        ),
         KRow(
           title: 'Default aktivitas baru',
           subtitle: p.text('visibility', fallback: 'Pengikut'),

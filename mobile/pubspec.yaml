@@ -2,13 +2,15 @@ name: klubby
 description: "Klubby - main bareng, makin seru."
 publish_to: 'none'
 
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: ^3.13.5
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
 
   # State management, DI & navigation
@@ -39,6 +41,8 @@ dependencies:
   url_launcher: ^6.3.3
   watch_connectivity: ^0.2.11
   flutter_contacts: ^2.6.0
+  flutter_map: 8.3.2
+  latlong2: 0.9.1
 
 dev_dependencies:
   flutter_test:

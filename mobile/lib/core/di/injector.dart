@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/activity/data/wearable_import.dart';
 import '../../features/activity/data/activity_repository_impl.dart';
 import '../../features/activity/domain/repositories/activity_repository.dart';
 import '../../features/activity/presentation/cubit/recorder_cubit.dart';
@@ -48,23 +49,54 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(WatchBridge.new)
     ..registerLazySingleton<ContactsService>(DeviceContactsService.new)
     // Data
-    ..registerLazySingleton<ProfileRepository>(() => ProfileRepositoryImpl(sl()))
+    ..registerLazySingleton<ProfileRepository>(
+      () => ProfileRepositoryImpl(sl()),
+    )
     ..registerLazySingleton<GearRepository>(() => GearRepositoryImpl(sl()))
-    ..registerLazySingleton<ClubRepository>(ClubRepositoryImpl.new)
-    ..registerLazySingleton<SessionRepository>(SessionRepositoryImpl.new)
+    ..registerLazySingleton<ClubRepository>(() => ClubRepositoryImpl(sl()))
+    ..registerLazySingleton<SessionRepository>(
+      () => SessionRepositoryImpl(sl()),
+    )
     ..registerLazySingleton<ActivityRepository>(ActivityRepositoryImpl.new)
-    ..registerLazySingleton<FeedRepository>(() => FeedRepositoryImpl(activities: sl(), profiles: sl()))
-    ..registerLazySingleton<LeagueRepository>(LeagueRepositoryImpl.new)
+    ..registerLazySingleton<FeedRepository>(
+      () => FeedRepositoryImpl(activities: sl(), profiles: sl(), prefs: sl()),
+    )
+    ..registerLazySingleton<LeagueRepository>(() => LeagueRepositoryImpl(sl()))
     // App-wide state
-    ..registerLazySingleton(() => MeCubit(sl(), ProfileRepositoryImpl.seed)..load())
+    ..registerLazySingleton(
+      () => MeCubit(sl(), ProfileRepositoryImpl.seed)..load(),
+    )
     ..registerLazySingleton(() => GearCubit(sl())..load())
     ..registerLazySingleton(() => SessionsCubit(sl())..load())
     ..registerLazySingleton(() => ClubsCubit(sl())..load())
     ..registerLazySingleton(() => FeedCubit(sl())..load())
     ..registerLazySingleton(() => LeagueCubit(sl())..load())
-    ..registerLazySingleton(() => WearableCubit(sl(), sl())..refresh())
+    ..registerLazySingleton(
+      () => WearableCubit(
+        sl(),
+        sl(),
+        onWorkout: (w) async {
+          final imported = await importWearableWorkout(
+            w,
+            repo: sl(),
+            me: sl(),
+            gear: sl(),
+          );
+          final me = sl<MeCubit>();
+          if (imported && me.state.flag('notif_liga', fallback: true)) {
+            final r = me.lastReward;
+            await sl<NotificationService>().show(
+              w.start.millisecondsSinceEpoch ~/ 1000,
+              'Latihan dari jam tercatat',
+              'Streak ${r?.streak ?? me.state.streak} hari · +${r?.clubPoints ?? 0} poin klub',
+            );
+          }
+          return imported;
+        },
+      )..refresh(),
+    )
     ..registerLazySingleton(GoyangCubit.new)
-    ..registerLazySingleton(TournamentCubit.new)
+    ..registerLazySingleton(() => TournamentCubit(sl()))
     // Flow-scoped state
     ..registerFactory(() => RecorderCubit(sl(), sl()))
     ..registerFactory(() => OnboardingCubit(sl()));

@@ -111,11 +111,12 @@ Menjamin integritas Leaderboard Komunitas dengan membagi validitas aktivitas ke 
 
 ### Modul 5: Gamifikasi 2D, Kalender Stempel, & Stiker (Pilar Duolingo)
 * **F-5.1 Kalender Stempel 2D (Stamp Card):** Selesai 1 sesi olahraga $\rightarrow$ stempel kartun 2D lucu tercap di kalender hari itu.
-* **F-5.2 Evolusi Karakter Streak (RPG-Style):**
-  * *Day 1–6:* Hewan kecil lucu dengan pita/headband pemula.
-  * *Day 7 (1 Minggu):* Karakter bersinar + membuka stiker chat eksklusif.
-  * *Day 14 (2 Minggu):* Membuka bingkai profil avatar baru.
-  * *Day 30 (1 Bulan):* Karakter berevolusi membawa piala dan jubah juara.
+* **F-5.2 Evolusi Maskot per Keluarga Olahraga (revisi 7 November 2026):**
+  * Olahraga aktif menentukan partner melalui pemetaan olahraga–maskot. Preview hewan hanya mengubah tampilan lokal, bukan olahraga aktif.
+  * Menambah olahraga belum mengadopsi maskot; sesi terverifikasi pertama dari keluarga olahraga tersebut membuka adopsi.
+  * Evolusi memakai total sesi terverifikasi keluarga maskot: Pemula 1, Gesit 3, Turbo 7, Juara 14, Legend 30 sesi. Sesi manual tidak menambah evolusi/adopsi.
+  * Streak harian akun mencakup semua olahraga dan terpisah dari evolusi maskot; Es Batu melindungi streak harian, bukan menghapus sesi maskot.
+  * Rincian sesi per olahraga disimpan mulai pencatatan yang mendukungnya. Total historis per hewan tetap ada tanpa mengarang pembagian olahraga lama.
 * **F-5.3 Kartu Ekspor Instagram Stories:** Kartu visual estetik resolusi 9:16 yang memamerkan avatar, stempel streak, dan recap olahraga untuk dibagikan ke IG Story/TikTok.
 * **F-5.4 Kolom Komentar Berbasis Stiker (Sticker-First Social):** Stiker celoteh olahraga lokal ("Betis Pedes", "Ayo Rematch!", "Napas Habis", "Paha Gemetar").
 

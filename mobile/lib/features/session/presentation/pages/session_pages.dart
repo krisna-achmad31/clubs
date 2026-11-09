@@ -178,6 +178,8 @@ class SessionPage extends StatelessWidget {
         () => context.push(R.pay(s.id)),
         Hue.primary,
       ),
+      _ when s.cancelled => ('SESI DIBATALKAN', () {}, Hue.red),
+      _ when s.past => ('MABAR SUDAH SELESAI', () {}, Hue.blue),
       _ when s.full => (
         'MASUK WAITING LIST',
         () {

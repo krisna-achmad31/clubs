@@ -42,7 +42,7 @@ Future<void> showJoinSheet(
             ),
           _Breakdown([
             ('Iuran × ${count + 1}', s.fee * (count + 1)),
-            ('Biaya layanan', Fees.service),
+            ('Biaya layanan', Fees.serviceFor(s.fee)),
           ], total: Fees.total(s.fee, count + 1)),
           Text('Batas batal: ${s.cancelDeadline}', style: AppText.bodySm()),
           KRow(
@@ -156,7 +156,10 @@ class _PayPageState extends State<PayPage> {
             'SIMULASIKAN BERHASIL',
             onTap: r.remaining > Duration.zero
                 ? () {
-                    context.read<SessionsCubit>().paid(s.id);
+                    context.read<SessionsCubit>().paid(
+                      s.id,
+                      name: context.read<MeCubit>().state.name,
+                    );
                     if (context.read<SessionsCubit>().state.rsvp(s.id).status ==
                         RsvpStatus.joined) {
                       context.pushReplacement(R.ticket(s.id));
@@ -196,7 +199,7 @@ class _PayPageState extends State<PayPage> {
           ),
           _Breakdown([
             ('Iuran × ${1 + r.guests.length}', s.fee * (1 + r.guests.length)),
-            ('Biaya layanan', Fees.service),
+            ('Biaya layanan', Fees.serviceFor(s.fee)),
           ], total: r.amount),
         ],
       );
@@ -237,75 +240,77 @@ class TicketPage extends StatelessWidget {
       return Stack(
         children: [
           KPage(
-        header: const KHeader('Tiket Mabar'),
-        bottom: KActions([
-          if (r.status == RsvpStatus.pendingPayment)
-            KButton(
-              'LANJUT BAYAR',
-              onTap: () => context.pushReplacement(R.pay(s.id)),
-            ),
-          KSplit([
-            KButton.secondary(
-              'KALENDER',
-              small: true,
-              icon: LucideIcons.calendarPlus,
-              onTap: () => _calendar(s),
-            ),
-            KButton.secondary(
-              'CHAT KLUB',
-              small: true,
-              icon: LucideIcons.messageCircle,
-              onTap: () => context.push(R.chat(s.clubId)),
-            ),
-          ]),
-          KButton(
-            'LIHAT DETAIL MABAR',
-            onTap: () =>
-                context.canPop() ? context.pop() : context.go(R.session(s.id)),
-          ),
-          if (r.status == RsvpStatus.joined)
-            KLink(
-              'Batalkan ikut',
-              color: AppColors.red,
-              onTap: () => showCancelSheet(context, s, r),
-            ),
-        ]),
-        children: [
-          if (joined)
-            const Center(
-              child: PopIn(
-                from: .4,
-                child: MascotHead(
-                  animal: Animal.ciko,
-                  stage: Stage.turbo,
-                  size: 128,
-                  bg: AppColors.orangeL,
+            header: const KHeader('Tiket Mabar'),
+            bottom: KActions([
+              if (r.status == RsvpStatus.pendingPayment)
+                KButton(
+                  'LANJUT BAYAR',
+                  onTap: () => context.pushReplacement(R.pay(s.id)),
                 ),
+              KSplit([
+                KButton.secondary(
+                  'KALENDER',
+                  small: true,
+                  icon: LucideIcons.calendarPlus,
+                  onTap: () => _calendar(s),
+                ),
+                KButton.secondary(
+                  'CHAT KLUB',
+                  small: true,
+                  icon: LucideIcons.messageCircle,
+                  onTap: () => context.push(R.chat(s.clubId)),
+                ),
+              ]),
+              KButton(
+                'LIHAT DETAIL MABAR',
+                onTap: () => context.pushReplacement(R.session(s.id)),
               ),
-            ),
-          _SessionSummary(s),
-          KPill(status, bg: hue.light, fg: hue.dark),
-          if (r.status == RsvpStatus.joined) ...[
-            Text('Tiket #${r.ticketNo ?? 1}', style: AppText.h1()),
-            Center(
-              child: QrImageView(
-                data: 'klubby://ticket/${s.id}/${r.ticketNo ?? 1}',
-                size: 200,
+              if (r.status == RsvpStatus.joined)
+                KLink(
+                  'Batalkan ikut',
+                  color: AppColors.red,
+                  onTap: () => showCancelSheet(context, s, r),
+                ),
+            ]),
+            children: [
+              if (joined)
+                const Center(
+                  child: PopIn(
+                    from: .4,
+                    child: MascotHead(
+                      animal: Animal.ciko,
+                      stage: Stage.turbo,
+                      size: 128,
+                      bg: AppColors.orangeL,
+                    ),
+                  ),
+                ),
+              _SessionSummary(s),
+              KPill(status, bg: hue.light, fg: hue.dark),
+              if (r.status == RsvpStatus.joined) ...[
+                Text('Tiket #${r.ticketNo ?? 1}', style: AppText.h1()),
+                Center(
+                  child: QrImageView(
+                    data: 'klubby://ticket/${s.id}/${r.ticketNo ?? 1}',
+                    size: 200,
+                  ),
+                ),
+                Text(
+                  'Kode untuk host: ${r.ticketNo ?? 1}',
+                  style: AppText.body(),
+                ),
+              ],
+              Text(
+                '${s.venue}${s.court.isEmpty ? '' : ' · ${s.court}'}',
+                style: AppText.body(),
               ),
-            ),
-            Text('Kode untuk host: ${r.ticketNo ?? 1}', style: AppText.body()),
-          ],
-          Text(
-            '${s.venue}${s.court.isEmpty ? '' : ' · ${s.court}'}',
-            style: AppText.body(),
-          ),
-          if (r.guests.isNotEmpty)
-            Text('Tamu: ${r.guests.join(', ')}', style: AppText.body()),
-          Text('Total demo: ${Fmt.rp(r.amount)}', style: AppText.body()),
-          KBanner.info(
-            'Tiket dan pembayaran ini contoh lokal. Tidak ada transaksi nyata.',
-          ),
-        ],
+              if (r.guests.isNotEmpty)
+                Text('Tamu: ${r.guests.join(', ')}', style: AppText.body()),
+              Text('Total demo: ${Fmt.rp(r.amount)}', style: AppText.body()),
+              KBanner.info(
+                'Tiket dan pembayaran ini contoh lokal. Tidak ada transaksi nyata.',
+              ),
+            ],
           ),
           if (joined)
             const Positioned.fill(child: IgnorePointer(child: Confetti())),
@@ -431,7 +436,9 @@ class ExpiredPage extends StatelessWidget {
           onTap: s.full
               ? null
               : () {
-                  if (context.read<SessionsCubit>().startPayment(s.id, [])) {
+                  // Same guests as the hold that ran out.
+                  final cubit = context.read<SessionsCubit>();
+                  if (cubit.startPayment(s.id, cubit.state.rsvp(s.id).guests)) {
                     context.pushReplacement(R.pay(s.id));
                   }
                 },
@@ -576,67 +583,65 @@ class _SlotPageState extends State<SlotPage> {
     builder: (context, s, r) => Stack(
       children: [
         KPage(
-      header: const KHeader('Slot tersedia · Demo'),
-      children: [
-        const Center(
-          child: PopIn(
-            from: .4,
-            child: MascotHead(
-              animal: Animal.ciko,
-              stage: Stage.juara,
-              size: 140,
-              bg: AppColors.purpleL,
-            ),
-          ),
-        ),
-        Text(
-          'Kamu dapat slot!',
-          textAlign: TextAlign.center,
-          style: AppText.custom(26, c: AppColors.primaryD),
-        ),
-        _SessionSummary(s),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.redL,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            children: [
-              Text('BAYAR DALAM', style: AppText.label(AppColors.redD)),
-              Text(
-                Fmt.clock(r.remaining),
-                style: AppText.custom(44, c: AppColors.redD),
+          header: const KHeader('Slot tersedia · Demo'),
+          children: [
+            const Center(
+              child: PopIn(
+                from: .4,
+                child: MascotHead(
+                  animal: Animal.ciko,
+                  stage: Stage.juara,
+                  size: 140,
+                  bg: AppColors.purpleL,
+                ),
               ),
-            ],
-          ),
+            ),
+            Text(
+              'Kamu dapat slot!',
+              textAlign: TextAlign.center,
+              style: AppText.custom(26, c: AppColors.primaryD),
+            ),
+            _SessionSummary(s),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.redL,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  Text('BAYAR DALAM', style: AppText.label(AppColors.redD)),
+                  Text(
+                    Fmt.clock(r.remaining),
+                    style: AppText.custom(44, c: AppColors.redD),
+                  ),
+                ],
+              ),
+            ),
+            _Breakdown([
+              ('Iuran × ${1 + r.guests.length}', s.fee * (1 + r.guests.length)),
+              ('Biaya layanan', Fees.serviceFor(s.fee)),
+            ], total: r.amount),
+            KButton(
+              'LANJUT BAYAR',
+              onTap: r.status == RsvpStatus.pendingPayment
+                  ? () => context.pushReplacement(R.pay(s.id))
+                  : null,
+            ),
+            KButton.secondary(
+              'LEPAS SLOT',
+              onTap: () {
+                context.read<SessionsCubit>().releaseSlot(s.id);
+                context.pushReplacement(R.session(s.id));
+              },
+            ),
+            Text(
+              'Slot diteruskan ke antrean berikutnya. Waktu pembayaran tidak direset saat pindah halaman.',
+              style: AppText.bodySm(),
+            ),
+          ],
         ),
-        _Breakdown([
-          ('Iuran × ${1 + r.guests.length}', s.fee * (1 + r.guests.length)),
-          ('Biaya layanan', Fees.service),
-        ], total: r.amount),
-        KButton(
-          'LANJUT BAYAR',
-          onTap: r.status == RsvpStatus.pendingPayment
-              ? () => context.pushReplacement(R.pay(s.id))
-              : null,
-        ),
-        KButton.secondary(
-          'LEPAS SLOT',
-          onTap: () {
-            context.read<SessionsCubit>().releaseSlot(s.id);
-            context.pushReplacement(R.session(s.id));
-          },
-        ),
-        Text(
-          'Slot diteruskan ke antrean berikutnya. Waktu pembayaran tidak direset saat pindah halaman.',
-          style: AppText.bodySm(),
-        ),
-      ],
-        ),
-        const Positioned.fill(
-          child: IgnorePointer(child: Confetti(count: 30)),
-        ),
+        const Positioned.fill(child: IgnorePointer(child: Confetti(count: 30))),
       ],
     ),
   );
@@ -698,10 +703,17 @@ class _ClaimPageState extends State<ClaimPage> {
         ),
         KButton(
           'KLAIM TIKET DEMO',
-          onTap: _code.length == 6 && _code != '000000' && !s.cancelled
+          onTap: _code.length == 6 && _code != '000000' && s.joinable
               ? () {
-                  context.read<SessionsCubit>().claimTicket(s.id);
-                  context.pushReplacement(R.ticket(s.id));
+                  final ok = context.read<SessionsCubit>().claimTicket(
+                    s.id,
+                    name: r.guests.firstOrNull ?? 'Tamu',
+                  );
+                  if (ok) {
+                    context.pushReplacement(R.ticket(s.id));
+                  } else {
+                    toast(context, 'Slot sudah penuh atau mabar sudah lewat.');
+                  }
                 }
               : null,
         ),

@@ -9,7 +9,12 @@ import 'core/services/notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
   await initializeDateFormatting('id_ID');
   await configureDependencies();
   // Notification permission itself is asked on A8, this only wires channels.

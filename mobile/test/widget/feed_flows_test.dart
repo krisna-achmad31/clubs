@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 // ignore: implementation_imports
 import 'package:google_fonts/src/google_fonts_base.dart' as font_base;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:klubby/features/feed/domain/entities/feed_post.dart';
 import 'package:klubby/core/di/injector.dart';
 import 'package:klubby/core/router/app_router.dart';
 import 'package:klubby/core/router/routes.dart';
@@ -262,7 +263,11 @@ void main() {
       router.push(R.notifications);
       await settle(tester);
       expect(find.byType(NotificationsPage), findsOneWidget);
-      await tapText(tester, n.title);
+      // The seed is still queued (#4), so the slot tile shows the queue.
+      await tapText(
+        tester,
+        n.kind == NotifKind.slot ? 'Masih di waiting list' : n.title,
+      );
       healthy(tester, 'notification ${n.id} → ${n.route}');
       expect(find.byType(NotificationsPage), findsNothing, reason: n.id);
       router.go(R.feed);
@@ -329,11 +334,11 @@ void main() {
     expect(find.widgetWithText(KSticker, '🔥 Gacor!'), findsOneWidget);
     // Segment card.
     await tester.scrollUntilVisible(
-      find.text('Tanjakan Senayan · 4:12 · PR'),
+      find.text('Tanjakan Senayan · 3:55'),
       -250,
       scrollable: detailList,
     );
-    await tapText(tester, 'Tanjakan Senayan · 4:12 · PR');
+    await tapText(tester, 'Tanjakan Senayan · 3:55');
     expect(find.byType(SegmentPage), findsOneWidget);
     healthy(tester, 'segment');
     await back(tester);
@@ -397,10 +402,11 @@ void main() {
       await tapText(tester, 'REKAM');
       final sheet = tester.getRect(find.byType(KSheet));
       expect(sheet.height, lessThanOrEqualTo(896 / 2 + 1));
-      await tester.dragUntilVisible(
-        find.text(option),
-        find.byType(KSheet),
-        const Offset(0, -80),
+      // Centre the tile: the sheet can scroll once an upcoming mabar row
+      // is shown under the tiles.
+      await Scrollable.ensureVisible(
+        tester.element(find.text(option).first),
+        alignment: .5,
       );
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text(option).hitTestable().first);

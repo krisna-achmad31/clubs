@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/di/injector.dart';
+import '../../../feed/presentation/cubit/feed_cubit.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/utils/card_export.dart';
@@ -25,6 +26,7 @@ import '../cubit/me_cubit.dart';
 import 'streak_calendar_pages.dart' show StampsPage;
 
 part 'geng_evolution.dart';
+part 'evolution_copy.dart';
 part 'profile_helpers.dart';
 
 const _avatarBg = {
@@ -337,7 +339,8 @@ class _RatingPageState extends State<RatingPage> {
     final rating = 1.5 + (seed % 25) / 10;
     // Demo curve per sport, ending on the current rating.
     final chart = [
-      for (var i = 0; i < 8; i++) rating - (7 - i) * .06 + (i == 7 ? 0 : wave(i)),
+      for (var i = 0; i < 8; i++)
+        rating - (7 - i) * .06 + (i == 7 ? 0 : wave(i)),
     ];
     final delta = chart.last - chart[4];
     final history = [
@@ -557,7 +560,10 @@ class _GearPageState extends State<GearPage> {
               title: g.name,
               emoji: g.kind.emoji,
               trailing: g.isDefault
-                  ? const Icon(LucideIcons.circleCheck, color: AppColors.primary)
+                  ? const Icon(
+                      LucideIcons.circleCheck,
+                      color: AppColors.primary,
+                    )
                   : null,
               onTap: () {
                 cubit.setDefault(g.id);

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:watch_connectivity/watch_connectivity.dart';
 
+import 'test_account.dart';
+
 /// Messages the phone and the Klubby watch companion exchange.
 /// The protocol is plain maps so the WearOS (Kotlin) and watchOS (Swift)
 /// companions can decode them without shared code. See docs/SMARTWATCH.md.
@@ -10,18 +12,22 @@ sealed class WatchEvent {
   const WatchEvent();
 
   static WatchEvent? parse(Map<String, dynamic> m) => switch (m['type']) {
-        'hr' => WatchHeartRate((m['bpm'] as num).toInt()),
-        'cadence' when m['spm'] is num => WatchCadence((m['spm'] as num).toDouble()),
-        'control' => WatchControl(m['action'] as String? ?? ''),
-        'workout' => WatchWorkout(
-            sportId: m['sport'] as String? ?? 'lari',
-            start: DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()),
-            end: DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt()),
-            distanceMeters: (m['distance'] as num?)?.toDouble(),
-            avgHr: (m['avgHr'] as num?)?.toInt(),
-          ),
-        _ => null,
-      };
+    'hr' => WatchHeartRate((m['bpm'] as num).toInt()),
+    'cadence' when m['spm'] is num => WatchCadence(
+      (m['spm'] as num).toDouble(),
+    ),
+    'control' => WatchControl(m['action'] as String? ?? ''),
+    'whoami' => const WatchWhoAmI(),
+    'workout' => WatchWorkout(
+      sportId: m['sport'] as String? ?? 'lari',
+      start: DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()),
+      end: DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt()),
+      distanceMeters: (m['distance'] as num?)?.toDouble(),
+      avgHr: (m['avgHr'] as num?)?.toInt(),
+      account: m['account'] as String?,
+    ),
+    _ => null,
+  };
 }
 
 class WatchHeartRate extends WatchEvent {
@@ -40,13 +46,31 @@ class WatchControl extends WatchEvent {
   final String action;
 }
 
+/// The watch asks which Klubby account this phone is signed in to.
+class WatchWhoAmI extends WatchEvent {
+  const WatchWhoAmI();
+}
+
 class WatchWorkout extends WatchEvent {
-  const WatchWorkout({required this.sportId, required this.start, required this.end, this.distanceMeters, this.avgHr});
+  const WatchWorkout({
+    required this.sportId,
+    required this.start,
+    required this.end,
+    this.distanceMeters,
+    this.avgHr,
+    this.account,
+  });
   final String sportId;
   final DateTime start;
   final DateTime end;
   final double? distanceMeters;
   final int? avgHr;
+
+  /// Account the watch was linked to when it sent this; null from older builds.
+  final String? account;
+
+  /// Recorded on a watch linked to another Klubby account.
+  bool get otherAccount => account != null && account != TestAccount.id;
 }
 
 /// Live link to a paired Apple Watch (WatchConnectivity) or Wear OS watch
@@ -81,15 +105,51 @@ class WatchBridge {
       .asBroadcastStream();
 
   /// Glanceable state for the watch face/complication (streak, next mabar, mascot).
-  Future<void> pushGlance({required int streak, required int xp, required String mascot, String? nextSession}) =>
-      _safe(() => _wc.updateApplicationContext({'streak': streak, 'xp': xp, 'mascot': mascot, 'next': ?nextSession}));
+  Future<void> pushGlance({
+    required int streak,
+    required int xp,
+    required String mascot,
+    String? nextSession,
+  }) => _safe(
+    () => _wc.updateApplicationContext({
+      'streak': streak,
+      'xp': xp,
+      'mascot': mascot,
+      'next': ?nextSession,
+    }),
+  );
 
-  Future<void> startSession(String sportId) => _send({'type': 'session_start', 'sport': sportId, 'at': DateTime.now().millisecondsSinceEpoch});
+  Future<void> startSession(String sportId) => _send({
+    'type': 'session_start',
+    'sport': sportId,
+    'at': DateTime.now().millisecondsSinceEpoch,
+  });
 
-  Future<void> tick({required int elapsedSec, double? distanceKm, String? pace}) =>
-      _send({'type': 'tick', 'elapsed': elapsedSec, 'distance': ?distanceKm, 'pace': ?pace});
+  Future<void> tick({
+    required int elapsedSec,
+    double? distanceKm,
+    String? pace,
+  }) => _send({
+    'type': 'tick',
+    'elapsed': elapsedSec,
+    'distance': ?distanceKm,
+    'pace': ?pace,
+  });
 
   Future<void> stopSession() => _send({'type': 'session_stop'});
+
+  /// Tells the watch a `workout` arrived, so it stops resending it.
+  /// The watch keeps a workout as "Belum sinkron" until this ack.
+  Future<void> ackWorkout(DateTime start) =>
+      _send({'type': 'workout_ack', 'start': start.millisecondsSinceEpoch});
+
+  /// Phone app is open: tells the watch which account to link to, and the
+  /// watch uploads workouts recorded while the phone app was closed.
+  Future<void> hello() => _send({
+    'type': 'hello',
+    'account': TestAccount.id,
+    'name': TestAccount.name,
+  });
 
   Future<void> _send(Map<String, dynamic> msg) async {
     if (!await isReachable) return;

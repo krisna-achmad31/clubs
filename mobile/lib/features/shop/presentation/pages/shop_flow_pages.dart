@@ -378,7 +378,7 @@ class _VenuePageState extends State<VenuePage> {
         .state
         .sessions
         .values
-        .where((s) => s.venue == venue.name)
+        .where((s) => s.venue == venue.name && s.joinable)
         .toList();
     return KPage(
       header: KHeader(venue.name),

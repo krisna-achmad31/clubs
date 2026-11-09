@@ -68,6 +68,8 @@ abstract final class R {
   static const saveActivity = '/record/gps/save';
   static const manual = '/record/manual';
   static const done = '/record/done';
+  static String savedActivity(String id) =>
+      '/activity/${Uri.encodeComponent(id)}';
   static const evolve = '/record/evolve';
   static const story = '/story';
 

@@ -68,9 +68,25 @@ class ActivityRepositoryImpl implements ActivityRepository {
   }
 
   @override
+  Future<void> update(Activity a) async {
+    await _ensureLoaded();
+    final i = _items.indexWhere((old) => old.id == a.id);
+    if (i < 0) return;
+    _items[i] = a;
+    await _persist();
+  }
+
+  @override
   Future<void> discard(String id) async {
     await _ensureLoaded();
     _items.removeWhere((a) => a.id == id);
+    await _persist();
+  }
+
+  @override
+  Future<void> clearAll() async {
+    await _ensureLoaded();
+    _items.clear();
     await _persist();
   }
 
@@ -83,6 +99,15 @@ class ActivityRepositoryImpl implements ActivityRepository {
         uri.host != 'checkin' ||
         uri.pathSegments.isEmpty) {
       throw const CheckInException(CheckInError.unknownCode);
+    }
+    // The host QR rotates every 30 s (`klubby://checkin/<id>/<window>`):
+    // accept the current or the previous window only.
+    if (uri.pathSegments.length > 1) {
+      final window = int.tryParse(uri.pathSegments[1]);
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 30000;
+      if (window == null || now - window > 1 || window - now > 1) {
+        throw const CheckInException(CheckInError.expired);
+      }
     }
     return uri.pathSegments.first;
   }

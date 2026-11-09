@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -32,30 +33,36 @@ class _KlubbyAppState extends State<KlubbyApp> {
 
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
-        providers: [
-          BlocProvider.value(value: sl<MeCubit>()),
-          BlocProvider.value(value: sl<SessionsCubit>()),
-          BlocProvider.value(value: sl<ClubsCubit>()),
-          BlocProvider.value(value: sl<FeedCubit>()),
-          BlocProvider.value(value: sl<LeagueCubit>()),
-          BlocProvider.value(value: sl<WearableCubit>()),
-          BlocProvider.value(value: sl<GoyangCubit>()),
-          BlocProvider.value(value: sl<TournamentCubit>()),
-        ],
-        child: MaterialApp.router(
-          title: 'Klubby',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          themeMode: ThemeMode.light,
-          routerConfig: _router,
-          // Keep the chunky layout intact even with very large system fonts.
-          builder: (context, child) {
-            final mq = MediaQuery.of(context);
-            return MediaQuery(
-              data: mq.copyWith(textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3)),
-              child: child!,
-            );
-          },
-        ),
-      );
+    providers: [
+      BlocProvider.value(value: sl<MeCubit>()),
+      BlocProvider.value(value: sl<SessionsCubit>()),
+      BlocProvider.value(value: sl<ClubsCubit>()),
+      BlocProvider.value(value: sl<FeedCubit>()),
+      BlocProvider.value(value: sl<LeagueCubit>()),
+      BlocProvider.value(value: sl<WearableCubit>()),
+      BlocProvider.value(value: sl<GoyangCubit>()),
+      BlocProvider.value(value: sl<TournamentCubit>()),
+    ],
+    child: MaterialApp.router(
+      title: 'Klubby',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      themeMode: ThemeMode.light,
+      routerConfig: _router,
+      // Date/time pickers and other Material text in Bahasa Indonesia.
+      locale: const Locale('id'),
+      supportedLocales: const [Locale('id'), Locale('en')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      // Keep the chunky layout intact even with very large system fonts.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
+          ),
+          child: child!,
+        );
+      },
+    ),
+  );
 }

@@ -16,6 +16,7 @@ import '../../../../core/services/contacts_service.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../feed/domain/entities/feed_post.dart';
 import '../../../feed/presentation/cubit/feed_cubit.dart';
+import '../../../league/presentation/pages/league_pages.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../../../session/domain/entities/mabar_session.dart';
 import '../../../session/presentation/cubit/sessions_cubit.dart';
@@ -192,7 +193,7 @@ class _ClubRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sub = club.division != null
-        ? '#${club.rank} Divisi ${club.division} · ${club.schedule}'
+        ? '#${liveLeagueRank(context, club)} Divisi ${club.division} · ${club.schedule}'
         : '${club.schedule} · ${club.members} anggota';
     return Pressable(
       onTap: () => context.push(R.club(club.id)),
@@ -450,18 +451,20 @@ class _ClubPageState extends State<ClubPage> {
   Widget _build(BuildContext context, Club club) {
     final clubs = context.watch<ClubsCubit>().state;
     final member = clubs.isMember(club.id);
-    final sessions = context
-        .watch<SessionsCubit>()
-        .state
-        .sessions
-        .values
-        .where((s) => s.clubId == club.id)
-        .toList();
+    final sessions =
+        context
+            .watch<SessionsCubit>()
+            .state
+            .sessions
+            .values
+            .where((s) => s.clubId == club.id && !s.past)
+            .toList()
+          ..sort((a, b) => a.scheduledStart.compareTo(b.scheduledStart));
     final inset = MediaQuery.paddingOf(context);
     final pills = [
       if (club.division != null)
         KPill(
-          '#${club.rank} DIVISI ${club.division}',
+          '#${liveLeagueRank(context, club)} DIVISI ${club.division}',
           bg: AppColors.yellow,
           fg: AppColors.ink,
         ),
@@ -665,7 +668,7 @@ class _ClubPageState extends State<ClubPage> {
                   if (club.admin && member)
                     KButton.secondary(
                       'BUAT MABAR',
-                      onTap: () => context.push(R.hostNew),
+                      onTap: () => context.push('${R.hostNew}?club=${club.id}'),
                     ),
                   for (final (i, s) in sessions.indexed)
                     Padding(
@@ -834,9 +837,14 @@ class _SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = session;
-    final (hue, label) = switch (s.kind) {
-      'ANTRE' => (Hue.orange, 'ANTRE'),
-      'DAFTAR' => (Hue.purple, 'DAFTAR'),
+    final r = context.watch<SessionsCubit>().state.rsvp(s.id);
+    // Same status as the Klub tab and the session page: my ticket first.
+    final (hue, label) = switch (r.status) {
+      _ when s.cancelled => (Hue.red, 'BATAL'),
+      RsvpStatus.joined => (Hue.primary, 'LUNAS ✓'),
+      RsvpStatus.waiting => (Hue.orange, '#${r.queue ?? '-'}'),
+      RsvpStatus.pendingPayment => (Hue.primary, 'BAYAR'),
+      _ when s.kind == 'DAFTAR' => (Hue.purple, 'DAFTAR'),
       _ when s.full => (Hue.orange, 'ANTRE'),
       _ => (Hue.primary, 'IKUT'),
     };
@@ -871,7 +879,9 @@ class _SessionCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  s.full
+                  s.cancelled
+                      ? 'Dibatalkan host'
+                      : s.full
                       ? '${s.filled}/${s.slots} · ${s.waiting} antrean'
                       : '${s.filled}/${s.slots} ${team ? 'tim' : 'slot'}',
                   style: AppText.custom(
@@ -934,6 +944,9 @@ class _ChatViewState extends State<_ChatView> {
   final _text = TextEditingController();
   final _scroll = ScrollController();
 
+  /// Message count last scrolled to; a new count lands on the latest one.
+  var _shown = -1;
+
   static const _stickers = [
     ('🏸🔥 Ayo Rematch!', AppColors.orangeL),
     ('🦵🌶️ Betis Pedes', AppColors.redL),
@@ -987,6 +1000,15 @@ class _ChatViewState extends State<_ChatView> {
     final club = widget.club;
     final chat = context.watch<ClubChatCubit>().state;
     final inset = MediaQuery.paddingOf(context);
+    // Open on the newest message, and follow new ones as they arrive.
+    if (chat.messages.length != _shown) {
+      _shown = chat.messages.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    }
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -1375,7 +1397,11 @@ class _NewClubPageState extends State<NewClubPage> {
       return toast(context, 'Isi nama klub dulu ya');
     }
     if (_payout == null) {
-      return toast(context, 'Tambahkan rekening pencairan kas dulu');
+      // The field sits below the fold: open it right away instead of
+      // leaving the button looking dead.
+      toast(context, 'Tambahkan rekening pencairan kas dulu');
+      await _editPayout();
+      return;
     }
     setState(() => _busy = true);
     final clubs = context.read<ClubsCubit>();

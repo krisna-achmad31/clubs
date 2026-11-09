@@ -17,9 +17,13 @@ enum Stage {
   final Color tint;
   final Color color;
 
-  static Stage forStreak(int days) => Stage.values.lastWhere((s) => days >= s.minStreak, orElse: () => Stage.pemula);
+  static Stage forStreak(int days) => Stage.values.lastWhere(
+    (s) => days >= s.minStreak,
+    orElse: () => Stage.pemula,
+  );
 
-  Stage? get next => index + 1 < Stage.values.length ? Stage.values[index + 1] : null;
+  Stage? get next =>
+      index + 1 < Stage.values.length ? Stage.values[index + 1] : null;
 }
 
 /// The 18 sport-family mascots ("Geng Gemoy").
@@ -30,17 +34,17 @@ enum Animal {
   gugun('Gugun', 'Kambing', 'Hiking & paralayang'),
   rubi('Rubi', 'Rubah', 'Sepeda & roda'),
   doni('Doni', 'Corgi', 'Lempar-tangkap'),
-  ciko('Ciko', 'Anak Ayam', 'Badminton & takraw'),
+  ciko('Ciko', 'Anak Ayam', 'Badminton'),
   pandu('Pandu', 'Panda', 'Padel, tenis & pickleball'),
   cimot('Cimot', 'Kucing', 'Tenis meja & squash'),
-  koko('Koko', 'Koala', 'Sepak bola & futsal'),
-  jeri('Jeri', 'Jerapah', 'Basket & voli'),
+  koko('Koko', 'Koala', 'Sepak bola, futsal & takraw'),
+  jeri('Jeri', 'Jerapah', 'Basket, voli & net'),
   bento('Bento', 'Banteng', 'Rugby & hoki'),
   tara('Tara', 'Harimau', 'Bela diri'),
-  gembul('Gembul', 'Gajah', 'Fitness'),
+  gembul('Gembul', 'Gajah', 'Fitness & angkat beban'),
   kura('Kura', 'Kura-kura', 'Yoga, pilates & catur'),
   flami('Flami', 'Flamingo', 'Dansa & senam'),
-  momo('Momo', 'Monyet', 'Panjat'),
+  momo('Momo', 'Monyet', 'Panjat & kalistenik'),
   eko('Eko', 'Elang', 'Presisi');
 
   const Animal(this.label, this.species, this.family);
@@ -83,7 +87,8 @@ enum ShopIcon {
   pelangi,
   boostPetir;
 
-  String get asset => 'assets/icons/${switch (this) {
+  String get asset =>
+      'assets/icons/${switch (this) {
         permata => 'permata',
         esBatu => 'es_batu',
         bingkaiEmas => 'bingkai_emas',
