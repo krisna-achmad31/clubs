@@ -1,0 +1,386 @@
+{
+  "repoUrl": "https://github.com/krisna-achmad31/clubs.git",
+  "project": {
+    "name": "Klubby",
+    "description": "Aplikasi Flutter Android/iOS komunitas olahraga dengan Cubit, go_router dan repository per fitur. Implementasi working tree dev yang dibaca mencakup onboarding demo, klub/chat/kas lokal, mabar/RSVP/tamu/pembayaran demo, engine turnamen, rekaman GPS/manual/QR, detail sensor/grafik, feed, profil/gear, kalender streak, toko dan Goyang. Profil, aktivitas, gear serta sebagian preferensi sudah persisten; banyak data komunitas masih seed atau dalam memori. Health Connect/HealthKit dan bridge jam sudah memiliki implementasi ponsel; backend, OAuth Strava dan companion jam belum terhubung. Audit statis mencakup perubahan lokal dan file belum terlacak; tes tidak dijalankan ulang.",
+    "flow": "Splash memeriksa onboarding lalu welcome/login OTP demo → identitas, area, olahraga, klub dan izin → tab Feed, Clubs, League, Profile dengan tombol aksi rekam. Klub membuka chat/kas dan sesi; host membuat jadwal, membagikan link, mengelola peserta/QR/turnamen. Peserta melakukan RSVP/tamu, pembayaran demo/antrean, tiket atau pembatalan. Rekaman GPS/manual atau check-in QR menghasilkan aktivitas lokal, reward/stempel/evolusi dan Story; aktivitas tersimpan dibentuk menjadi posting dengan detail rute/sensor. Profil menyediakan dashboard, gear, kalender, perangkat, privasi dan toko; Goyang menjalankan ajakan simulasi lokal. Branch utama diverifikasi melalui origin/HEAD → origin/main; branch pengembangan lokal aktif adalah dev.",
+    "branchMain": "main",
+    "branchDev": "dev"
+  },
+  "tasks": [
+    {
+      "title": "[P0] Hubungkan autentikasi OTP dan sesi akun nyata",
+      "description": "Pasti: mobile/lib/features/onboarding/presentation/cubit/onboarding_cubit.dart::verifyOtp menerima sembarang enam digit selain 000000; resetOtp hanya mereset percobaan lokal. mobile/lib/core/router/app_router.dart belum memiliki redirect berdasarkan sesi autentikasi. Implementasikan kirim/verifikasi OTP, expiry, pembatasan percobaan di server, sesi dan logout; hubungkan alur login yang ada. Selesai bila OTP salah/kedaluwarsa ditolak server, akun dipulihkan sesuai identitas, dan rute privat menolak sesi tidak sah.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P0] Isolasi aktivitas dan state antar akun saat logout",
+      "description": "Pasti: mobile/lib/features/profile/data/profile_repository_impl.dart::clear hanya menghapus profile/onboarded; MeCubit.signOut tidak membersihkan activities. Logout di profile_helpers.dart mereset gear, tetapi repository aktivitas/feed/klub/sesi tetap singleton di core/di/injector.dart. FeedRepositoryImpl._syncActivities memberi nama profil aktif pada aktivitas lokal tanpa ownerId. Tambahkan pemisahan penyimpanan per identitas dan reset state saat pergantian akun. Selesai bila aktivitas akun A tidak tampil atau diterbitkan atas nama B dan pengingat A dibatalkan saat logout.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P0] Validasi check-in QR di server sebelum memberi reward",
+      "description": "Pasti: mobile/lib/features/activity/data/activity_repository_impl.dart::checkIn hanya memeriksa scheme, host, dan sessionId; rotatingToken tidak diperiksa. activity_pages.dart::_handle lalu menyimpan ActivitySource.qr dan memberi reward; UI sudah menandainya demo. Hubungkan validator token bertanda tangan, expiry, waktu/lokasi venue, keanggotaan dan sesi batal, dengan idempotency akun+sesi. Selesai bila QR palsu/ulang/kedaluwarsa/di luar radius ditolak dan reward hanya sekali setelah server menyetujui.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Pulihkan pemindai QR setelah gagal menyimpan aktivitas",
+      "description": "Pasti: mobile/lib/features/activity/presentation/pages/activity_pages.dart::_handle mengaktifkan _busy tetapi hanya menangkap CheckInException; ActivityRepositoryImpl._persist dapat melempar StateError. Tambahkan penanganan kegagalan umum dan pelepasan busy dalam finally dengan mounted guard. Selesai bila kegagalan storage menampilkan pesan, tidak memberi reward, dan scan berikutnya dapat dilakukan tanpa membuka ulang halaman.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Jadikan penyimpanan aktivitas dan reward konsisten serta idempoten",
+      "description": "Pasti: activity_pages.dart::_save/_handle dan activity_result_pages.dart::_save menyimpan aktivitas lalu memanggil MeCubit.recordActivity; MeCubit._set tidak menunggu ProfileRepository.save. ActivityRepositoryImpl.save/discard memutasi _items sebelum persist berhasil. Tambahkan koordinasi penyimpanan dengan activityId sebagai kunci reward, rollback/recovery, serta hasil penyimpanan profil yang ditunggu. Selesai bila simulasi kegagalan tulis/restart/retry tidak menghasilkan aktivitas semu, reward hilang, atau reward ganda.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Pisahkan profil akun baru dari seed pengguna demo",
+      "description": "Pasti: mobile/lib/features/profile/data/profile_repository_impl.dart::load mengembalikan seed dengan XP, saldo, stempel dan adopsi; MeCubit.completeOnboarding menyalin state tersebut dengan mengganti identitas. Buat inisialisasi akun baru yang kosong dan jalur demo eksplisit, sambil mempertahankan migrasi riwayat akun demo yang sudah ada. Selesai bila pendaftaran baru tidak mewarisi saldo/XP/riwayat Budi dan mode demo tetap bisa diuji.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Simpan sesi mabar dan RSVP melintasi restart",
+      "description": "Pasti: mobile/lib/features/session/data/session_repository_impl.dart memakai map _byId dalam memori; SessionsCubit menyimpan rsvps di state dan load mengisi RSVP contoh. Persistensikan sesi, peserta, RSVP, deadline dan pembatalan menggunakan repository yang ada. Selesai bila sesi buatan host, tiket, antrean dan tenggat pembayaran tetap sama setelah restart tanpa kembali menjadi seed.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Perbaiki kapasitas dan promosi antrean berdasarkan jumlah orang",
+      "description": "Pasti: mobile/lib/features/session/presentation/cubit/sessions_cubit.dart::promote tidak memeriksa slot atau guestMax; paid melakukan clamp filled sehingga kapasitas berlebih dapat tertutupi. cancel menjaga filled tetap saat ada satu antrean meskipun peserta batal membawa beberapa tamu. Hitung reservasi per orang dan release/expiry secara konsisten; pertahankan idempotency yang sudah diuji di session_recovery_test.dart. Selesai bila skenario slot penuh, pembatalan +2 tamu, promosi kurang slot, dan pembayaran terlambat menjaga total reservasi tidak melebihi kapasitas.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Integrasikan QRIS, webhook pembayaran dan refund yang otoritatif",
+      "description": "Pasti: mobile/lib/features/session/presentation/cubit/sessions_cubit.dart::paid/cancel masih transisi lokal; docs/FIX_RECOVERY_REPORT.md menyatakan pembayaran/refund nyata belum terhubung. Implementasikan invoice QRIS melalui backend, webhook terverifikasi/idempoten, expiry dan ledger refund; UI tiket mengikuti status server. Selesai bila tombol klien tidak dapat mengesahkan pembayaran sendiri, webhook ulang tidak menggandakan tiket/saldo, dan refund memiliki status yang dapat dilacak.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Hubungkan transaksi sesi ke daftar peserta host",
+      "description": "Pasti: SessionsCubit.paid menambah filled dan RSVP tanpa menambah participants; claimTicket langsung mengubah RSVP menjadi joined tanpa validasi bukti tiket atau kapasitas. Di sesi baru participants tetap kosong setelah pembayaran lokal. Satukan sumber peserta dan RSVP, validasi klaim dengan identitas/bukti tiket dan otorisasi host. Selesai bila peserta/tamu yang membayar muncul tepat sekali di pengelolaan host, dan klaim tidak sah ditolak.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Persistensikan klub, keanggotaan, chat dan kas lokal",
+      "description": "Pasti: mobile/lib/features/club/data/club_repository_impl.dart menyimpan _created, _joined, _patch, _chats dan _kas dalam memori; club_actions.dart mengakui mutasi hanya selama sesi aplikasi. Tambahkan persistensi lewat interface repository yang sudah ada dengan versi skema dan pemulihan kegagalan. Selesai bila klub baru, perubahan anggota, pesan dan transaksi kas tetap tersedia setelah restart serta tidak bercampur antar akun.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Terapkan persetujuan masuk dan hak akses klub di backend",
+      "description": "Pasti: ClubRepositoryImpl.join langsung menambah _joined dan members tanpa membaca ClubPrivacy.persetujuan; create menyimpan privacy tetapi tidak ada proses approval di repository. Implementasikan permintaan bergabung, persetujuan/penolakan admin dan otorisasi operasi anggota/host/kas. Selesai bila klub berpersetujuan tidak langsung menerima anggota dan pengguna non-admin ditolak server saat mengubah data pengurus.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Ganti sumber feed lokal dengan layanan sosial tersinkron",
+      "description": "Pasti: mobile/lib/features/feed/data/feed_repository_impl.dart membentuk posting dari aktivitas perangkat; reaksi, komentar, mute, report dan notifikasi hanya memutasi koleksi lokal. Implementasikan API posting/komentar/reaksi dan persistensi mute/laporan/read-state melalui interface yang ada. Selesai bila dua akun melihat pembaruan yang sama, restart mempertahankan interaksi, dan laporan masuk antrean moderator.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Terapkan izin baca dan penyamaran data aktivitas pada server",
+      "description": "Pasti: FeedRepositoryImpl hanya memetakan Privacy menjadi boolean publik dan menyertakan objek Activity lengkap; profile_helpers.dart menyimpan zona privasi sebagai preferensi dan menyatakan pemotongan rute server belum ada. Sebelum distribusi feed, terapkan audiens publik/pengikut/klub sesuai enum yang tersedia serta redaksi koordinat zona pribadi dan HR pada respons API. Selesai bila pemanggil tanpa izin tidak memperoleh aktivitas/koordinat/HR tersembunyi melalui endpoint detail maupun feed.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Pulihkan rekaman aktif setelah proses aplikasi berhenti",
+      "description": "Pasti: mobile/lib/features/activity/presentation/cubit/recorder_cubit.dart menyimpan startedAt, samples, route dan timer hanya di state; persistensi dilakukan pada halaman simpan. Tambahkan draft berkala dan alur lanjutkan/akhiri/buang saat startup, tanpa membuat titik atau waktu bergerak fiktif selama proses mati. Selesai bila kill/relaunch memulihkan sampel terakhir dan menjelaskan interval yang tidak terekam.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Lindungi perhitungan GPS dari lonjakan titik dan waktu tidak valid",
+      "description": "Pasti: RecorderCubit._onPoint memfilter koordinat/akurasi dan jitter minimum, tetapi menambah seluruh jarak antartitik tanpa pemeriksaan timestamp atau kecepatan wajar; GeoPoint sudah membawa time dan speed di core/services/location_service.dart. Tambahkan filter lonjakan dan urutan waktu yang sesuai olahraga serta pemulihan setelah kehilangan sinyal. Selesai bila fixture teleport, titik mundur, dan reconnect tidak menambah jarak/pace palsu, sedangkan gerakan sah tetap tercatat.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Koreksi waktu bergerak ketika timer tertunda di latar belakang",
+      "description": "Pasti: RecorderCubit._tick menambah tepat satu detik per callback Timer.periodic, sedangkan elapsedTime dihitung dari jam absolut. Belum ada rekonsiliasi jeda callback untuk moving time. Gunakan clock/delta dan interval pause yang konsisten tanpa menghitung manual pause sebagai gerak. Selesai bila tes callback terlambat dan resume menjaga moving/elapsed/split benar; validasi perilaku OS nyata melalui task QA perangkat.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Gunakan not-found untuk ID sesi yang tidak tersedia",
+      "description": "Pasti: mobile/lib/features/session/data/session_repository_impl.dart::byId mengembalikan sesi pertama ketika ID tidak ditemukan; ini dapat menampilkan mabar lain untuk tautan salah. Kembalikan error/domain result eksplisit dan arahkan UI ke keadaan tidak tersedia. Selesai bila ID acak/dihapus tidak pernah membuka, membayar, atau mengklaim sesi lain.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Hapus pembacaan wearable lama setelah disconnect atau sinkron kosong",
+      "description": "Pasti: mobile/lib/features/wearable/presentation/cubit/wearable_cubit.dart::copyWith memakai null-coalescing untuk bpm/lastWorkout/lastSync; sync mengirim null saat list kosong sehingga data lama tidak terhapus, dan disconnectHealth hanya mengubah healthConnected. Tambahkan clear sentinel/flag dan reset asal sensor yang sesuai saat disconnect. Selesai bila workout/HR lama hilang saat sumber terputus atau pembacaan kosong tanpa menghapus sumber lain yang masih aktif.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Impor workout Health store sebagai aktivitas tanpa duplikasi",
+      "description": "Pasti: WearableCubit.sync hanya memperbarui lastWorkout/bpm; tidak menulis ActivityRepository atau memberi reward. docs/SMARTWATCH.md menyatakan XP wearable tersedia, tetapi belum ada pipeline impor workout pada jalur ini. Implementasikan mapping olahraga, source ID, provenance, deduplikasi dan pencegahan impor balik workout yang ditulis Klubby. Selesai bila workout baru muncul sekali setelah restart/sync ulang dan dokumentasi sesuai perilaku sebenarnya.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P1] Hubungkan akumulasi kilometer dan jam gear ke aktivitas",
+      "description": "Pasti: activity_pages.dart menyimpan gearId, tetapi mobile/lib/features/profile/presentation/cubit/gear_cubit.dart hanya menyediakan CRUD/reset dan tidak menambah km/hours dari aktivitas. Tambahkan pembaruan usage berbasis activityId termasuk edit/hapus agar tidak terhitung ganda. Selesai bila aktivitas dengan gear menaikkan pemakaian sesuai jarak/durasi, retry tidak menggandakan, dan gear lain tidak berubah.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Persistensikan turnamen beserta riwayat babak",
+      "description": "Pasti: mobile/lib/features/tournament/presentation/cubit/tournament_engine.dart menyimpan _history, _planned, _stageWinners, _queue dan state hanya di memori. Simpan snapshot ber-versi dan pulihkan turnamen aktif termasuk konflik skor. Selesai bila restart di tengah babak memulihkan pasangan, skor, standings dan babak berikutnya yang sama; pertahankan perilaku edit skor yang sudah diuji.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Gunakan roster peserta sesi untuk turnamen",
+      "description": "Pasti: TournamentCubit._roster di tournament_engine.dart berasal dari daftar _names tetap dan placeholder Pemain N, bukan peserta mabar. Hubungkan pemilihan roster dari SessionsCubit/identitas peserta, simpan ID stabil dan tangani tamu. Selesai bila jadwal serta podium menampilkan peserta terpilih sebenarnya dan nama ganda tidak membuat skor tertukar.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Hubungkan liga ke kontribusi aktivitas dan siklus musim",
+      "description": "Pasti: mobile/lib/features/league/data/league_repository_impl.dart mengembalikan Division/score/contributors konstan; MeCubit.recordActivity menghasilkan clubPoints tetapi tidak memperbarui repository liga. Implementasikan agregasi server per klub/olahraga/area dengan periode musim dan deduplikasi kontribusi. Selesai bila aktivitas sah mengubah standings yang sama untuk semua akun, aktivitas manual mengikuti aturan yang ada, dan pergantian musim menghitung promosi/degradasi.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Bangun pengiriman ajakan Goyang dan respons lintas perangkat",
+      "description": "Pasti: mobile/lib/features/goyang/presentation/cubit/goyang_cubit.dart::send mengisi respons contoh melalui Timer, bukan jaringan; laporan pemulihan menyatakan pencocokan dua HP belum tersedia. Hubungkan undangan, expiry, audiens dan respons real-time pada backend serta notifikasi penerima. Selesai bila dua perangkat dapat mengirim/menjawab ajakan dengan status konsisten tanpa respons contoh; jangan memberi status verified sebelum validasi server tersedia.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Lengkapi OAuth dan sinkronisasi Strava",
+      "description": "Pasti: WearableCubit.connectStrava di mobile/lib/features/wearable/presentation/cubit/wearable_cubit.dart kosong; docs/ACTIVITY_DETAILS.md menyatakan OAuth/impor belum ditambahkan. Implementasikan authorization callback, pertukaran/refresh token di backend, revoke dan impor idempoten. Selesai bila koneksi mewakili akun Strava nyata, impor ulang tidak menduplikasi aktivitas, dan token tidak ditanam atau disimpan di tasks/log klien.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Tambahkan companion Wear OS untuk protokol WatchBridge",
+      "description": "Pasti: mobile/docs/SMARTWATCH.md menyebut modul Wear OS belum tersedia; mobile/lib/core/services/watch_bridge.dart sudah memiliki session_start/tick/session_stop, sensor dan kontrol. Buat companion mengikuti protokol yang ada, pairing dan status koneksi. Selesai bila jam nyata menerima status sesi dan mengirim HR/cadence serta pause/resume/stop yang tersimpan pada aktivitas ponsel.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Tambahkan companion watchOS untuk protokol WatchBridge",
+      "description": "Pasti: mobile/docs/SMARTWATCH.md menyebut target watchOS belum tersedia. Implementasikan companion WCSession mengikuti mobile/lib/core/services/watch_bridge.dart, termasuk lifecycle workout dan pembacaan sensor yang diizinkan. Selesai bila Apple Watch nyata menerima glance/sesi, mengontrol rekaman dan mengirim data sensor ke detail aktivitas ponsel.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Selesaikan validasi payload masuk dari jam",
+      "description": "Pasti: WatchEvent.parse di mobile/lib/core/services/watch_bridge.dart melakukan cast langsung bpm/start/end tanpa validasi tipe lengkap; payload invalid dapat melempar error yang hanya dicetak oleh stream handler. Validasi skema, urutan waktu, nilai sensor dan action yang diizinkan, lalu abaikan payload rusak secara terkendali. Selesai bila payload hilang field/salah tipe/angka tak hingga tidak mengganggu stream berikutnya atau memicu kontrol yang tidak sah.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Buat Web-RSVP untuk tautan berbagi sesi yang sudah dihasilkan",
+      "description": "Pasti: session_pages.dart dan host_flow_pages.dart menghasilkan https://klubby.id/m/<id>; PRD_SPORTS_COMMUNITY_APP.md F-1.4 mensyaratkan RSVP tanpa instalasi, sedangkan source tree ini berisi aplikasi Flutter Android/iOS dan belum memiliki implementasi web RSVP. Bangun halaman ringan berbasis API sesi yang sama untuk detail, tamu, reservasi dan pembayaran. Selesai bila pengguna browser dapat RSVP sesi nyata dan hasilnya muncul di pengelolaan host, termasuk keadaan penuh/kedaluwarsa.",
+      "labels": [
+        "FE-web",
+        "BE"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Verifikasi dan lengkapi routing tautan publik serta deep link",
+      "description": "Pasti: core/router/app_router.dart memiliki /m/:id tetapi tidak /k/:code atau /checkin/:id; club_actions.dart membagikan /k/<code>. AndroidManifest.xml hanya mendaftarkan scheme klubby, belum domain HTTPS. Perlu verifikasi: kepemilikan/routing domain dan konfigurasi universal link produksi di luar repo belum diperiksa. Lengkapi pemetaan URI dan asosiasi Android/iOS berdasarkan domain yang disahkan. Selesai bila tautan sesi/klub/check-in membuka target yang benar saat cold/warm start dan ID invalid menampilkan error.",
+      "labels": [
+        "FE-mobile",
+        "DevOps"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Selesaikan discovery klub berdasarkan lokasi pengguna",
+      "description": "Pasti: ClubRepositoryImpl.nearby mengembalikan empat klub contoh dan hanya memfilter sportId; area/radius profil tidak menjadi parameter pencarian. Hubungkan query lokasi/radius pada repository/API dan pertahankan fallback manual area_picker.dart. Selesai bila pindah area/radius mengubah hasil secara terukur dan izin lokasi ditolak tetap memungkinkan pencarian manual.",
+      "labels": [
+        "BE",
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Terapkan rendering aksesori maskot yang sudah dapat dipilih",
+      "description": "Pasti: MeCubit.equipAccessory menyimpan accessory; docs/FIX_RECOVERY_REPORT.md menyebut rendering belum lengkap dan core/widgets/mascot_view.dart tidak menerima accessory. Tambahkan rendering aksesori yang memang tersedia/dijual dengan tetap memakai aset dan animasi yang ada. Selesai bila item yang dibeli dan dipasang terlihat di profil/preview yang relevan setelah restart tanpa memotong maskot.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Tambahkan pengingat streak yang mengikuti status aktivitas dan zona perangkat",
+      "description": "Pasti: core/services/notification_service.dart menjadwalkan pesan berulang harian tanpa membaca aktivitas; _guessLocation hanya memetakan UTC+7/+8/+9 dan fallback UTC. MeCubit.recordActivity tidak menyesuaikan reminder setelah streak aman. Sinkronkan jadwal dengan preferensi, status harian, logout dan zona perangkat. Selesai bila pengingat hari aktif tidak mengklaim streak belum aman, jam lokal benar saat berpindah zona, dan notifikasi nonaktif tidak muncul.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Lengkapi audio split sesuai kontrol Suara",
+      "description": "Pasti: activity_pages.dart::RecordingPage listener hanya memanggil HapticFeedback dan toast ketika voice aktif; tidak ada pemutaran suara pada jalur tersebut, padahal PRD menyebut audio split. Tambahkan audio split sesuai pilihan pengguna dan hindari pengumuman ulang saat pause/resume tanpa split baru. Selesai bila setiap kilometer diumumkan sekali ketika aktif dan tidak bersuara ketika dimatikan.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Simpan media terpilih ke lokasi aplikasi yang tahan lama",
+      "description": "Pasti: activity_pages.dart menyimpan _photos.map((f) => f.path) dan MeCubit.setPhoto menyimpan path mentah ke JSON; tidak ada penyalinan pada jalur simpan tersebut. Perlu verifikasi: ketahanan path hasil image_picker bergantung sumber dan platform. Uji kamera/galeri setelah cache dibersihkan, lalu salin media ke penyimpanan aplikasi permanen dengan cleanup referensi. Selesai bila foto aktivitas/profil tetap dapat dibuka setelah restart dan pembersihan cache OS.",
+      "labels": [
+        "FE-mobile",
+        "QA"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Konfigurasi signing rilis Android",
+      "description": "Pasti: mobile/android/app/build.gradle.kts::release menggunakan signingConfigs.getByName(\"debug\") dengan TODO signing produksi. Tambahkan konfigurasi release dari secret environment/keystore di luar Git serta panduan build tanpa rahasia. Selesai bila artefak rilis memakai sertifikat rilis yang benar dan gagal secara jelas bila konfigurasi signing belum tersedia.",
+      "labels": [
+        "DevOps"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2] Tambahkan CI untuk pemeriksaan Flutter yang sudah tersedia",
+      "description": "Pasti: mobile/test memiliki tes domain/cubit/widget dan mobile/README.md mendokumentasikan analyze/test; git ls-files .github tidak menemukan workflow terlacak. Tambahkan pipeline SDK yang cocok dengan pubspec.yaml/pubspec.lock untuk analyze dan test serta laporan kegagalan. Selesai bila push/PR menjalankan pemeriksaan dan kegagalan tes menggagalkan pipeline. Audit ini belum menjalankan ulang tes; angka 90 lulus di FIX_RECOVERY_REPORT.md adalah hasil historis.",
+      "labels": [
+        "DevOps"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P2][Verifikasi] Uji GPS, sensor dan Health store pada perangkat nyata",
+      "description": "Perlu verifikasi runtime: mobile/docs/FIX_RECOVERY_REPORT.md dan ACTIVITY_DETAILS.md menyatakan GPS/APK/sensor terbaru belum diuji langsung; location_service.dart sudah mengatur foreground notification/background location sehingga jangan menganggap layanan itu belum ada. Uji Android/iOS: layar mati, background, pause/resume, izin ditolak/dicabut, GPS hilang, Health read/write dan reconnect jam. Selesai bila tersedia matriks perangkat, hasil dan reproduksi; buat perbaikan hanya untuk kegagalan terbukti.",
+      "labels": [
+        "QA"
+      ],
+      "status": "todo",
+      "assignee": ""
+    },
+    {
+      "title": "[P3] Selaraskan dokumentasi privasi platform dengan implementasi saat ini",
+      "description": "Pasti: mobile/ios/Runner/Info.plist menjelaskan Beacon sebagai lokasi live dan motion sebagai penghitung cadence, sedangkan activity_pages.dart berbagi titik awal dan ACTIVITY_DETAILS.md menjelaskan cadence dari jam/health store. README.md root juga masih hanya merekomendasikan stack meski Flutter sudah berjalan. Perbarui uraian izin dan status implementasi dengan membedakan fungsi lokal, backend belum selesai, dan pengujian historis. Selesai bila README serta prompt izin sesuai perilaku nyata tanpa mengklaim integrasi yang belum aktif.",
+      "labels": [
+        "FE-mobile"
+      ],
+      "status": "todo",
+      "assignee": ""
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+project_id = "klubby"
+
+[auth.email]
+enable_confirmations = false
+
+[db.seed]
+enabled = false

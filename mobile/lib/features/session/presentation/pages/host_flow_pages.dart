@@ -65,6 +65,9 @@ class _HostNewPageState extends State<HostNewPage> {
     super.dispose();
   }
 
+  static const _hourOptions = [1, 2, 3];
+  static const _feeOptions = [0, 25000, 30000, 35000, 50000, 75000, 100000];
+
   Future<void> _options(
     String title,
     List<String> values,
@@ -175,11 +178,13 @@ class _HostNewPageState extends State<HostNewPage> {
           subtitle: Fmt.hm(_draft.duration),
           onTap: () => _options(
             'Durasi',
-            ['1 jam', '2 jam', '3 jam'],
+            [for (final h in _hourOptions) '$h jam'],
             '${_draft.duration.inHours} jam',
             (v) => setState(
               () => _draft = _draft.copyWith(
-                duration: Duration(hours: int.parse(v[0])),
+                duration: Duration(
+                  hours: _hourOptions.firstWhere((h) => v == '$h jam'),
+                ),
               ),
             ),
           ),
@@ -250,9 +255,13 @@ class _HostNewPageState extends State<HostNewPage> {
           subtitle: Fmt.rp(_draft.fee),
           onTap: () => _options(
             'Iuran',
-            ['0', '25000', '30000', '35000', '50000', '75000', '100000'],
-            '${_draft.fee}',
-            (v) => setState(() => _draft = _draft.copyWith(fee: int.parse(v))),
+            [for (final f in _feeOptions) Fmt.rpShort(f)],
+            Fmt.rpShort(_draft.fee),
+            (v) => setState(
+              () => _draft = _draft.copyWith(
+                fee: _feeOptions.firstWhere((f) => Fmt.rpShort(f) == v),
+              ),
+            ),
           ),
         ),
         KRow(

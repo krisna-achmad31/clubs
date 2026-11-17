@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +19,7 @@ import '../../features/onboarding/presentation/pages/setup_pages.dart';
 import '../../features/onboarding/presentation/pages/signup_pages.dart';
 import '../../features/onboarding/presentation/pages/welcome_pages.dart';
 import '../../features/profile/presentation/cubit/me_cubit.dart';
+import '../../features/wearable/presentation/cubit/wearable_cubit.dart';
 import '../../features/profile/presentation/pages/profile_pages.dart';
 import '../../features/profile/presentation/pages/streak_pages.dart';
 import '../../features/session/presentation/pages/host_pages.dart';
@@ -25,7 +27,12 @@ import '../../features/session/presentation/pages/session_pages.dart';
 import '../../features/shop/presentation/pages/misc_pages.dart';
 import '../../features/tournament/presentation/pages/tournament_pages.dart';
 import '../../features/club/domain/repositories/club_repository.dart';
+import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../di/injector.dart';
+import '../backend/dev_api.dart';
+import '../app_data.dart';
+import '../services/test_account.dart';
+import '../services/watch_bridge.dart';
 import '../widgets/widgets.dart';
 import 'routes.dart';
 
@@ -64,11 +71,59 @@ final _rootKey = GlobalKey<NavigatorState>();
 // are not delayed; only a club invite code needs an async lookup.
 FutureOr<String?> _deepLink(GoRouterState s) {
   final u = s.uri;
+  final callback = DevApi.oauthCallback;
+  if (u.scheme == callback.scheme &&
+      u.authority == callback.authority &&
+      u.path == callback.path) {
+    return _completeAuthLink(u);
+  }
   final custom = u.scheme == 'klubby' && u.host.isNotEmpty;
   final segs = [if (custom) u.host, ...u.pathSegments];
+  final shared = segs.length == 2 && const {'p', 'k', 'm'}.contains(segs[0]);
+  if (!custom && !shared) return null;
+  // A link must not skip onboarding for a user who has not finished it.
+  if (_onboarded != true) return _afterOnboarding(s);
   if (segs.length == 2 && segs[0] == 'p') return R.post(segs[1]);
   if (segs.length == 2 && segs[0] == 'k') return _clubByCode(segs[1]);
   return custom ? '/${segs.join('/')}' : null;
+}
+
+Future<String> _completeAuthLink(Uri uri) async {
+  if (kDebugMode) debugPrint('[Klubby Auth] callback received');
+  try {
+    if (await sl<DevApi>().finishOAuth(uri)) {
+      await reloadAllAppData();
+      final route = await sl<ProfileRepository>().isOnboarded()
+          ? R.feed
+          : R.about;
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] callback accepted, navigating to $route');
+      }
+      return route;
+    }
+    if (kDebugMode) {
+      debugPrint('[Klubby Auth] callback ignored: no matching login');
+    }
+  } on DevApiException catch (error) {
+    if (kDebugMode) {
+      debugPrint('[Klubby Auth] callback failed status=${error.status}');
+    }
+  } on Exception catch (error) {
+    if (kDebugMode) {
+      debugPrint('[Klubby Auth] callback failed ${error.runtimeType}');
+    }
+    // The user can recover by signing in again after confirming the email.
+  }
+  return '${R.signup}?mode=login&auth=callback-failed';
+}
+
+/// Cached once true, so normal navigation never waits on storage.
+bool? _onboarded;
+
+Future<String?> _afterOnboarding(GoRouterState s) async {
+  _onboarded = await sl<ProfileRepository>().isOnboarded();
+  if (_onboarded != true) return R.intro;
+  return _deepLink(s);
 }
 
 Future<String> _clubByCode(String raw) async {
@@ -82,7 +137,8 @@ Future<String> _clubByCode(String raw) async {
 GoRouter buildRouter() => GoRouter(
   navigatorKey: _rootKey,
   initialLocation: R.splash,
-  redirect: (_, s) => _deepLink(s),
+  redirect: (_, s) =>
+      !AppData.phoneOtpEnabled && s.uri.path == R.otp ? R.signup : _deepLink(s),
   routes: [
     // A · onboarding
     _r(R.splash, (_) => const SplashPage()),
@@ -155,7 +211,6 @@ GoRouter buildRouter() => GoRouter(
     _r('/session/:id/expired', (s) => ExpiredPage(id: _id(s))),
     _r('/session/:id/waitlist', (s) => WaitlistPage(id: _id(s))),
     _r('/session/:id/slot', (s) => SlotPage(id: _id(s))),
-    _r(R.claim, (s) => ClaimPage(id: s.uri.queryParameters['id'] ?? '')),
     _r('/m/:id', (s) => ClaimPage(id: _id(s))),
 
     // G · host
@@ -207,8 +262,6 @@ GoRouter buildRouter() => GoRouter(
 
     // M · profile
     _r(R.avatar, (_) => const AvatarPage()),
-    _r(R.rating, (_) => const RatingPage()),
-    _r(R.gear, (_) => const GearPage()),
     _r(R.settings, (_) => const SettingsPage()),
     _r(R.privacy, (_) => const PrivacyPage()),
     _r(R.goyangSettings, (_) => const GoyangSettingsPage()),
@@ -265,6 +318,9 @@ class _TabShellState extends State<_TabShell> with WidgetsBindingObserver {
       _goyang.startListening();
       // A day may have passed in the background: settle the streak.
       context.read<MeCubit>().refreshStreak();
+      // Pull new Health Connect workouts (e.g. Samsung Health auto-detected
+      // walks) and greet the watch so it uploads what it recorded meanwhile.
+      context.read<WearableCubit>().refresh();
     } else {
       _goyang.stopListening();
     }
@@ -279,14 +335,23 @@ class _TabShellState extends State<_TabShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<GoyangCubit, GoyangState>(
-      listenWhen: (a, b) =>
-          b.shakeCount > a.shakeCount &&
-          ModalRoute.of(context)?.isCurrent != false,
-      listener: (context, _) {
-        HapticFeedback.heavyImpact();
-        showGoyangSheet(context);
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<GoyangCubit, GoyangState>(
+          listenWhen: (a, b) =>
+              b.shakeCount > a.shakeCount &&
+              ModalRoute.of(context)?.isCurrent != false,
+          listener: (context, _) {
+            HapticFeedback.heavyImpact();
+            showGoyangSheet(context);
+          },
+        ),
+        BlocListener<WearableCubit, WearableState>(
+          listenWhen: (a, b) =>
+              b.pairRequest != null && a.pairRequest != b.pairRequest,
+          listener: (context, s) => _confirmWatch(context, s.pairRequest!),
+        ),
+      ],
       child: Scaffold(
         body: widget.shell,
         bottomNavigationBar: KTabBar(
@@ -300,6 +365,33 @@ class _TabShellState extends State<_TabShell> with WidgetsBindingObserver {
       ),
     );
   }
+}
+
+/// Watch handshake: the user checks the code on the watch matches.
+Future<void> _confirmWatch(BuildContext context, WatchPairRequest r) async {
+  final cubit = context.read<WearableCubit>();
+  final ok = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (c) => AlertDialog(
+      title: const Text('Hubungkan jam?'),
+      content: Text(
+        '${r.device} ingin terhubung ke akun ${TestAccount.name}.\n\n'
+        'Pastikan kode di jam sama:\n\n${r.code}',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: const Text('Tolak'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, true),
+          child: const Text('Hubungkan'),
+        ),
+      ],
+    ),
+  );
+  await (ok == true ? cubit.acceptPair() : cubit.denyPair());
 }
 
 /// Done/Evolve are reached with `go`, so there is nothing under them: Back

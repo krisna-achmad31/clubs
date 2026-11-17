@@ -61,7 +61,7 @@ class _ManualPageState extends State<ManualPage> {
           cancel: 'Lanjut isi',
         ) &&
         mounted) {
-      context.pop();
+      context.canPop() ? context.pop() : context.go(R.feed);
     }
   }
 
@@ -740,7 +740,7 @@ class _StoryPageState extends State<StoryPage> {
           ? '${payload['month'] ?? ''}\n${payload['count'] ?? 0} hari aktif'
           : activity == null
           ? 'Streak ${p.streak} hari'
-          : '${activity.sport.name}\n${Fmt.hm(activity.duration)}${activity.distanceKm > 0 ? ' · ${Fmt.dec(activity.distanceKm)} km' : ''}${activity.score == null ? '' : '\n${activity.score}'}';
+          : '${activity.sport.name}\n${Fmt.hm(activity.duration)}${activity.sport.tracksDistance && activity.distanceKm > 0 ? ' · ${Fmt.dec(activity.distanceKm)} km' : ''}${activity.score == null ? '' : '\n${activity.score}'}';
       return KPage(
         header: const KHeader('Bagikan ke Story'),
         bottom: KActions([

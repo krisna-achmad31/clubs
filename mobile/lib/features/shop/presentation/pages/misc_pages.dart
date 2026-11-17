@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../../core/backend/dev_api.dart';
+import '../../../../core/di/injector.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';

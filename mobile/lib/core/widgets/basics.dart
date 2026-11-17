@@ -66,6 +66,7 @@ class KInput extends StatelessWidget {
     this.initialValue,
     this.inputFormatters,
     this.focused = false,
+    this.obscureText = false,
   });
 
   final TextEditingController? controller;
@@ -81,6 +82,7 @@ class KInput extends StatelessWidget {
   final String? initialValue;
   final List<TextInputFormatter>? inputFormatters;
   final bool focused;
+  final bool obscureText;
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +113,7 @@ class KInput extends StatelessWidget {
               controller: controller,
               initialValue: controller == null ? initialValue : null,
               readOnly: readOnly,
+              obscureText: obscureText,
               onTap: onTap,
               maxLines: maxLines,
               keyboardType: keyboardType,

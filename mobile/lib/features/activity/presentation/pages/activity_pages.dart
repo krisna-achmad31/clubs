@@ -433,7 +433,8 @@ class _GpsReadyPageState extends State<GpsReadyPage> {
                 top: top + 12,
                 left: 16,
                 child: Pressable(
-                  onTap: () => context.pop(),
+                  onTap: () =>
+                      context.canPop() ? context.pop() : context.go(R.feed),
                   child: Container(
                     width: 40,
                     height: 40,

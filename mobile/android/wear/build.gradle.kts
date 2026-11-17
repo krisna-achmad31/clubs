@@ -15,13 +15,16 @@ android {
         // Wear OS 3+ (Galaxy Watch4 and newer, Pixel Watch).
         minSdk = 30
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0-wear"
+        versionCode = 4
+        versionName = "1.3.0-wear"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: smaller, faster code. Compose scrolls far smoother in release.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Same debug key as the phone app until a release key exists.
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -66,4 +69,9 @@ dependencies {
     // Phone link. Same version as the phone's watch_connectivity plugin.
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
+
+    // Installs src/main/baseline-prof.txt so first scrolls are AOT-compiled, not interpreted.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    // Background retry for workouts the phone has not acknowledged yet.
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 }

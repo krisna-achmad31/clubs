@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "landing-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server@14.1.1", "build/web", "-p", "5174", "-c-1"],
+      "port": 5174
+    }
+  ]
+}

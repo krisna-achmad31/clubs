@@ -1112,7 +1112,7 @@ class HelpPage extends StatelessWidget {
           ),
           (
             'Bagaimana menyambungkan smartwatch?',
-            'Gunakan Perangkat Terhubung untuk Health Connect atau Apple Health. Aplikasi pendamping jam dan Strava belum tersedia.',
+            'Gunakan Perangkat Terhubung untuk Health Connect atau Apple Health. Strava ikut masuk jika Strava diizinkan menulis ke Health Connect atau Apple Health. Aplikasi Klubby untuk jam Wear OS tersedia; untuk Apple Watch belum.',
           ),
         ])
           KCard(

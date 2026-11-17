@@ -14,6 +14,8 @@ import '../../../../core/router/routes.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/utils/card_export.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../core/services/health_service.dart';
+import '../../../activity/data/wearable_import.dart' show sportForWorkout;
 import '../../../activity/domain/entities/activity.dart' show Activity;
 import '../../../activity/domain/repositories/activity_repository.dart';
 import '../../../wearable/presentation/cubit/wearable_cubit.dart';
@@ -1321,9 +1323,52 @@ class _DevicesPageState extends State<DevicesPage> {
       children: [
         Text('Aplikasi pendamping jam', style: AppText.title()),
         KBanner.info(
-          'Aplikasi Klubby untuk Apple Watch dan Wear OS belum dibuat. Data latihan tetap dapat dibaca melalui Health Connect atau Apple Health jika perangkat dan izin mendukung.',
+          isIos
+              ? 'Aplikasi Klubby untuk Apple Watch belum tersedia. Latihan dari Apple Watch tetap masuk lewat Apple Health.'
+              : 'Pasang aplikasi Klubby versi Wear OS di jam (Galaxy Watch, Pixel Watch). Jam merek lain tetap masuk lewat Health Connect.',
         ),
         KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
+      ],
+    ),
+  );
+
+  /// "Fitness · 36m" or "Lari · 5,20 km": Klubby sport name, and distance
+  /// only for sports that track it.
+  String _workoutLabel(WorkoutRecord r) {
+    final id = sportForWorkout(r.activity);
+    final sport = id == null ? null : Sports.byId(id);
+    final km = (r.distanceMeters ?? 0) / 1000;
+    final detail = sport != null && sport.tracksDistance && km > 0
+        ? '${Fmt.dec(km)} km'
+        : Fmt.hm(r.duration);
+    return '${sport?.name ?? r.activity} · $detail';
+  }
+
+  void _stravaHowTo(String health, bool healthConnected) => showKSheet<void>(
+    context,
+    (ctx) => KSheet(
+      children: [
+        Text('Strava lewat $health', style: AppText.title()),
+        Text(
+          '1. Buka aplikasi Strava, masuk ke Pengaturan.\n'
+          '2. Pilih Aplikasi, Layanan, dan Perangkat.\n'
+          '3. Pilih $health, lalu izinkan Strava menulis latihan.\n'
+          '4. Kembali ke Klubby dan tekan SINKRON.',
+          style: AppText.body(),
+        ),
+        KBanner.info(
+          'Lari, jalan, gowes, gym, dan olahraga lain dari Strava masuk otomatis sebagai aktivitas terverifikasi.',
+        ),
+        if (healthConnected)
+          KButton('MENGERTI', onTap: () => Navigator.pop(ctx))
+        else
+          KButton(
+            'HUBUNGKAN ${health.toUpperCase()}',
+            onTap: () {
+              Navigator.pop(ctx);
+              _cubit.connectHealth();
+            },
+          ),
       ],
     ),
   );
@@ -1405,8 +1450,8 @@ class _DevicesPageState extends State<DevicesPage> {
                       Text(
                         w.watchPaired
                             ? (w.watchReachable
-                                  ? 'Terhubung · siap rekam dari jam'
-                                  : 'Terpasang · buka Klubby di jam')
+                                  ? 'Jam terhubung · buka Klubby di jam untuk rekam'
+                                  : 'Jam tidak terjangkau · dekatkan ke HP')
                             : (isIos
                                   ? 'Rekam & lihat streak langsung dari Apple Watch'
                                   : 'Rekam & lihat streak dari Galaxy Watch / Wear OS'),
@@ -1458,28 +1503,16 @@ class _DevicesPageState extends State<DevicesPage> {
                   ),
                   source(
                     title: 'Strava',
-                    hint: 'Integrasi belum tersedia',
+                    hint: w.healthConnected
+                        ? 'Masuk lewat $health'
+                        : 'Lewat $health · hubungkan dulu',
                     icon: LucideIcons.activity,
                     bg: AppColors.orangeL,
                     fg: AppColors.orange,
-                    on: w.strava,
-                    connectLabel: 'INFO',
-                    connect: () => showKSheet<void>(
-                      context,
-                      (ctx) => KSheet(
-                        children: [
-                          Text('Strava', style: AppText.title()),
-                          KBanner.info(
-                            'Login OAuth dan pertukaran token Strava memerlukan backend yang belum terhubung.',
-                          ),
-                          KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
-                        ],
-                      ),
-                    ),
-                    disconnect: () => _disconnect(
-                      'Strava',
-                      () async => _cubit.disconnectStrava(),
-                    ),
+                    on: false,
+                    connectLabel: 'CARA',
+                    connect: () => _stravaHowTo(health, w.healthConnected),
+                    disconnect: () {},
                   ),
                 ],
               ),
@@ -1507,7 +1540,7 @@ class _DevicesPageState extends State<DevicesPage> {
                           Text(
                             w.lastWorkout == null
                                 ? 'Belum ada aktivitas baru'
-                                : '${w.lastWorkout!.activity} · ${Fmt.dec((w.lastWorkout!.distanceMeters ?? 0) / 1000)} km',
+                                : _workoutLabel(w.lastWorkout!),
                             style: AppText.name(),
                           ),
                           const SizedBox(height: 2),

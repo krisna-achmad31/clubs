@@ -1,5 +1,9 @@
 import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../app_data.dart';
+import '../backend/dev_api.dart';
 
 import '../../features/activity/data/wearable_import.dart';
 import '../../features/activity/data/activity_repository_impl.dart';
@@ -41,6 +45,9 @@ Future<void> configureDependencies() async {
   final prefs = await SharedPreferences.getInstance();
   sl
     ..registerSingleton<SharedPreferences>(prefs)
+    ..registerLazySingleton(
+      () => DevApi(http.Client(), AppData.publishableKey, prefs: prefs),
+    )
     // Platform services
     ..registerLazySingleton(PermissionService.new)
     ..registerLazySingleton(LocationService.new)
@@ -50,21 +57,34 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton<ContactsService>(DeviceContactsService.new)
     // Data
     ..registerLazySingleton<ProfileRepository>(
-      () => ProfileRepositoryImpl(sl()),
+      () => ProfileRepositoryImpl(sl(), sl()),
     )
-    ..registerLazySingleton<GearRepository>(() => GearRepositoryImpl(sl()))
-    ..registerLazySingleton<ClubRepository>(() => ClubRepositoryImpl(sl()))
+    ..registerLazySingleton<GearRepository>(
+      () => GearRepositoryImpl(sl(), sl()),
+    )
+    ..registerLazySingleton<ClubRepository>(
+      () => ClubRepositoryImpl(sl(), sl()),
+    )
     ..registerLazySingleton<SessionRepository>(
-      () => SessionRepositoryImpl(sl()),
+      () => SessionRepositoryImpl(sl(), sl()),
     )
-    ..registerLazySingleton<ActivityRepository>(ActivityRepositoryImpl.new)
+    ..registerLazySingleton<ActivityRepository>(
+      () => ActivityRepositoryImpl(sl(), sl()),
+    )
     ..registerLazySingleton<FeedRepository>(
-      () => FeedRepositoryImpl(activities: sl(), profiles: sl(), prefs: sl()),
+      () => FeedRepositoryImpl(
+        activities: sl(),
+        profiles: sl(),
+        prefs: sl(),
+        api: sl(),
+      ),
     )
-    ..registerLazySingleton<LeagueRepository>(() => LeagueRepositoryImpl(sl()))
+    ..registerLazySingleton<LeagueRepository>(
+      () => LeagueRepositoryImpl(sl(), sl()),
+    )
     // App-wide state
     ..registerLazySingleton(
-      () => MeCubit(sl(), ProfileRepositoryImpl.seed)..load(),
+      () => MeCubit(sl(), ProfileRepositoryImpl.empty)..load(),
     )
     ..registerLazySingleton(() => GearCubit(sl())..load())
     ..registerLazySingleton(() => SessionsCubit(sl())..load())
@@ -93,11 +113,22 @@ Future<void> configureDependencies() async {
           }
           return imported;
         },
+        prefs: sl(),
       )..refresh(),
     )
-    ..registerLazySingleton(GoyangCubit.new)
-    ..registerLazySingleton(() => TournamentCubit(sl()))
+    ..registerLazySingleton(() => GoyangCubit(sl()))
+    ..registerLazySingleton(() => TournamentCubit(sl(), sl()))
     // Flow-scoped state
     ..registerFactory(() => RecorderCubit(sl(), sl()))
     ..registerFactory(() => OnboardingCubit(sl()));
 }
+
+/// Reloads all app-wide cubits from [DevApi] after sign-in / sign-up.
+Future<void> reloadAllAppData() => Future.wait([
+  sl<MeCubit>().load(),
+  sl<GearCubit>().load(),
+  sl<SessionsCubit>().load(),
+  sl<ClubsCubit>().load(),
+  sl<FeedCubit>().load(),
+  sl<LeagueCubit>().load(),
+]);

@@ -18,6 +18,11 @@ sealed class WatchEvent {
     ),
     'control' => WatchControl(m['action'] as String? ?? ''),
     'whoami' => const WatchWhoAmI(),
+    'pair_request' when m['code'] is String => WatchPairRequest(
+      m['code'] as String,
+      m['device'] as String? ?? 'Jam',
+    ),
+    'unpair' => const WatchUnpair(),
     'workout' => WatchWorkout(
       sportId: m['sport'] as String? ?? 'lari',
       start: DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()),
@@ -49,6 +54,19 @@ class WatchControl extends WatchEvent {
 /// The watch asks which Klubby account this phone is signed in to.
 class WatchWhoAmI extends WatchEvent {
   const WatchWhoAmI();
+}
+
+/// The watch shows [code] and asks to link to this phone's account.
+/// Linking only happens after the user confirms on the phone.
+class WatchPairRequest extends WatchEvent {
+  const WatchPairRequest(this.code, this.device);
+  final String code;
+  final String device;
+}
+
+/// The user disconnected the account on the watch.
+class WatchUnpair extends WatchEvent {
+  const WatchUnpair();
 }
 
 class WatchWorkout extends WatchEvent {
@@ -150,6 +168,24 @@ class WatchBridge {
     'account': TestAccount.id,
     'name': TestAccount.name,
   });
+
+  /// User confirmed the code: the watch links to this account.
+  Future<void> pairOk(String code) => _send({
+    'type': 'pair_ok',
+    'code': code,
+    'account': TestAccount.id,
+    'name': TestAccount.name,
+  });
+
+  Future<void> pairDenied(String code) =>
+      _send({'type': 'pair_denied', 'code': code});
+
+  /// Answer to `whoami` from a watch that was never confirmed on this phone,
+  /// or that this phone has disconnected.
+  Future<void> notPaired() => _send({'type': 'not_paired'});
+
+  /// Disconnect from the phone side.
+  Future<void> unpair() => _send({'type': 'unpair'});
 
   Future<void> _send(Map<String, dynamic> msg) async {
     if (!await isReachable) return;

@@ -316,7 +316,8 @@ object Recorder {
             distanceM = distance,
             speedMps = m.getData(DataType.SPEED).lastOrNull()?.value ?: cur.speedMps,
             calories = m.getData(DataType.CALORIES_TOTAL)?.total ?: cur.calories,
-            elevationM = m.getData(DataType.ABSOLUTE_ELEVATION).lastOrNull()?.value ?: cur.elevationM,
+            // Health Services reports -1000 m before the first GPS altitude fix.
+            elevationM = m.getData(DataType.ABSOLUTE_ELEVATION).lastOrNull()?.value?.takeIf { it > -500.0 } ?: cur.elevationM,
             elevGainM = m.getData(DataType.ELEVATION_GAIN_TOTAL)?.total ?: cur.elevGainM,
             cadence = m.getData(DataType.STEPS_PER_MINUTE).lastOrNull()?.value?.toDouble() ?: cur.cadence,
             steps = m.getData(DataType.STEPS_TOTAL)?.total ?: cur.steps,

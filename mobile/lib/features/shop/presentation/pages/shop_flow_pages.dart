@@ -66,55 +66,8 @@ typedef _Product = ({
   ShopIcon icon,
   bool available,
 });
-const _products = <_Product>[
-  (
-    id: 'es_batu',
-    name: 'Es Batu Pelindung',
-    price: 200,
-    category: 'Pelindung',
-    description:
-        'Melindungi satu hari terlewat. Maksimal sesuai kapasitas profil.',
-    icon: ShopIcon.esBatu,
-    available: true,
-  ),
-  (
-    id: 'bingkai_emas',
-    name: 'Bingkai Emas',
-    price: 300,
-    category: 'Bingkai',
-    description: 'Lingkaran emas pada avatar profil.',
-    icon: ShopIcon.bingkaiEmas,
-    available: true,
-  ),
-  (
-    id: 'stiker_hewan',
-    name: 'Stiker Hewan',
-    price: 150,
-    category: 'Stiker',
-    description: 'Koleksi stiker hewan di profil. Pilihan stiker chat saat ini masih contoh.',
-    icon: ShopIcon.stikerHewan,
-    available: true,
-  ),
-  (
-    id: 'pelangi',
-    name: 'Rute Pelangi',
-    price: 400,
-    category: 'Rute',
-    description:
-        'Tampilan rute pelangi belum tersedia. Permata tidak akan dikurangi.',
-    icon: ShopIcon.pelangi,
-    available: false,
-  ),
-  (
-    id: 'boost_xp',
-    name: 'Boost XP 2x',
-    price: 250,
-    category: 'Bonus XP',
-    description: 'Pengganda XP belum tersedia. Permata tidak akan dikurangi.',
-    icon: ShopIcon.boostPetir,
-    available: false,
-  ),
-];
+// Hardcoded demo shop products disabled — loaded dynamically from DevApi.
+// const _products = <_Product>[...];
 
 class ShopPage extends StatefulWidget {
   const ShopPage({super.key});
@@ -124,6 +77,41 @@ class ShopPage extends StatefulWidget {
 
 class _ShopPageState extends State<ShopPage> {
   String _category = 'Semua';
+  List<_Product> _items = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final api = sl<DevApi>();
+    if (!api.isSignedIn) return;
+    try {
+      final rows = await api.shopProducts();
+      if (!mounted) return;
+      setState(() {
+        _items = [
+          for (final r in rows)
+            (
+              id: r['id'] as String,
+              name: r['name'] as String,
+              price: (r['price'] as num).toInt(),
+              category: r['category'] as String,
+              description: r['description'] as String,
+              icon: ShopIcon.values
+                      .where((v) => v.name == r['icon'])
+                      .firstOrNull ??
+                  ShopIcon.permata,
+              available: r['available'] as bool? ?? true,
+            ),
+        ];
+      });
+    } on Object {
+      // Keep empty list if offline.
+    }
+  }
   Future<void> _detail(_Product product) async {
     final me = context.read<MeCubit>();
     final purchased = await showKSheet<bool>(
@@ -154,13 +142,18 @@ class _ShopPageState extends State<ShopPage> {
                     ? 'ES BATU PENUH'
                     : 'BELI · 💎 ${product.price}',
                 onTap: product.available && !owned && !full && enough
-                    ? () {
-                        if (me.buy(
-                          product.id,
-                          product.price,
-                          consumable: product.id == 'es_batu',
-                        )) {
-                          Navigator.pop(ctx, true);
+                    ? () async {
+                        final api = sl<DevApi>();
+                        if (api.isSignedIn) {
+                          try {
+                            await api.buyShopItem(product.id);
+                            await me.load();
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } on Object {
+                            if (ctx.mounted) {
+                              toast(ctx, 'Pembelian gagal. Coba lagi.');
+                            }
+                          }
                         }
                       }
                     : null,
@@ -179,13 +172,14 @@ class _ShopPageState extends State<ShopPage> {
   @override
   Widget build(BuildContext context) {
     final p = context.watch<MeCubit>().state;
-    final products = _products
+    final products = _items
         .where(
           (p) =>
               p.id != 'es_batu' &&
               (_category == 'Semua' || p.category == _category),
         )
         .toList();
+    final esBatu = _items.where((e) => e.id == 'es_batu').firstOrNull;
     return KPage(
       header: const KHeader('Toko Klubby'),
       children: [
@@ -245,7 +239,7 @@ class _ShopPageState extends State<ShopPage> {
           KCard(
             color: AppColors.blueL,
             border: AppColors.blue,
-            onTap: () => _detail(_products.first),
+            onTap: esBatu == null ? null : () => _detail(esBatu),
             child: Row(
               children: [
                 Floaty(
@@ -269,7 +263,10 @@ class _ShopPageState extends State<ShopPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                KMiniButton('💎 200', onTap: () => _detail(_products.first)),
+                KMiniButton(
+                  '💎 ${esBatu?.price ?? 200}',
+                  onTap: esBatu == null ? null : () => _detail(esBatu),
+                ),
               ],
             ),
           ),

@@ -1,5 +1,14 @@
 # Changelog
 
+## 17 November 2026 (1.3.0+4)
+achmad_yukrisna
+
+- Supabase: satu proyek untuk Dev dan Live dengan schema terpisah. `AppData.appMode` memilih schema. Akun yang sudah login bisa menggunakan Dev tanpa pendaftaran izin tambahan.
+- Flutter: integrasi API untuk autentikasi, profil, klub, mabar, notifikasi, dan sinkronisasi data fitur. Log debug mencatat status API dan tahap autentikasi.
+- Backend: migrasi untuk aktivitas, feed, perangkat, notifikasi, dan pencatatan pembayaran mabar secara manual. Dev menyediakan data contoh untuk pengujian.
+- Wear OS: pembaruan pengaturan jam, pengiriman ulang workout, dan sinkronisasi aktivitas ke HP.
+- Landing: situs Klubby berbahasa Indonesia dan Inggris dengan konfigurasi Firebase Hosting.
+
 ## 09 November 2026 (1.2.0+3)
 achmad_yukrisna
 

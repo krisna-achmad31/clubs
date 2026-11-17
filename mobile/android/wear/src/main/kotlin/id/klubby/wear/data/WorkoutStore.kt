@@ -31,6 +31,12 @@ data class WorkoutRecord(
     /** Google encoded polyline of the GPS route, empty for indoor sports. */
     val polyline: String = "",
     val synced: Boolean = false,
+    /**
+     * Klubby account the watch was linked to when this was recorded. Null only
+     * for workouts recorded before the first link; those take the first linked
+     * account. A workout is only ever sent to a phone on this account.
+     */
+    val account: String? = null,
 ) {
     /**
      * Message for the phone. Keys follow docs/SMARTWATCH.md: the phone reads
@@ -70,6 +76,7 @@ data class WorkoutRecord(
         put("hr", JSONArray().apply { hr.forEach { (t, b) -> put(JSONArray(listOf(t, b))) } })
         put("polyline", polyline)
         put("synced", synced)
+        account?.let { put("account", it) }
     }
 
     companion object {
@@ -96,6 +103,7 @@ data class WorkoutRecord(
                 }.orEmpty(),
                 polyline = o.optString("polyline"),
                 synced = o.optBoolean("synced"),
+                account = if (o.has("account")) o.getString("account") else null,
             )
         }
     }
@@ -125,7 +133,8 @@ object WorkoutStore {
 
     @Synchronized
     fun add(record: WorkoutRecord) {
-        _all.value = listOf(record) + _all.value.filterNot { it.startMs == record.startMs }
+        val stamped = if (record.account == null) record.copy(account = account?.id) else record
+        _all.value = listOf(stamped) + _all.value.filterNot { it.startMs == record.startMs }
         trimAndSave()
         bumpRecent(record.sport)
     }
@@ -134,8 +143,22 @@ object WorkoutStore {
     fun markSynced(startMs: Long) {
         if (_all.value.none { it.startMs == startMs && !it.synced }) return
         _all.value = _all.value.map { if (it.startMs == startMs) it.copy(synced = true) else it }
+        lastSyncMs = System.currentTimeMillis()
         trimAndSave()
     }
+
+    /** Gives workouts recorded before any link to the account just linked. */
+    @Synchronized
+    fun adopt(accountId: String) {
+        if (_all.value.none { it.account == null && !it.synced }) return
+        _all.value = _all.value.map { if (it.account == null && !it.synced) it.copy(account = accountId) else it }
+        trimAndSave()
+    }
+
+    /** When the phone last acknowledged a workout, 0 if never. */
+    var lastSyncMs: Long
+        get() = prefs.getLong("last_sync", 0L)
+        private set(v) = prefs.edit().putLong("last_sync", v).apply()
 
     var autoPause: Boolean
         get() = prefs.getBoolean("auto_pause", true)

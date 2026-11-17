@@ -51,6 +51,38 @@ object PhoneLink : MessageClient.OnMessageReceivedListener {
     /** Klubby account of the phone; workouts only go to a phone on this account. */
     val account: StateFlow<WearAccount?> = _account.asStateFlow()
 
+    /** Pairing: code shown on the watch while waiting for the phone to confirm. */
+    sealed interface Pairing {
+        data object Idle : Pairing
+        data class Waiting(val code: String) : Pairing
+        data object Denied : Pairing
+    }
+
+    private val _pairing = MutableStateFlow<Pairing>(Pairing.Idle)
+    val pairing: StateFlow<Pairing> = _pairing.asStateFlow()
+
+    /**
+     * Starts the handshake: shows a 6-digit code and asks the phone to link.
+     * The phone shows the same code and the user confirms there; the watch
+     * only takes an account from a `pair_ok` carrying this code.
+     */
+    fun startPairing() {
+        val code = (100000 + java.security.SecureRandom().nextInt(900000)).toString()
+        _pairing.value = Pairing.Waiting(code)
+        sendAsync(mapOf("type" to "pair_request", "code" to code, "device" to android.os.Build.MODEL))
+    }
+
+    fun cancelPairing() {
+        _pairing.value = Pairing.Idle
+    }
+
+    private fun link(acc: WearAccount) {
+        WorkoutStore.account = acc
+        _account.value = acc
+        WorkoutStore.adopt(acc.id)
+        scope.launch { syncPending() }
+    }
+
     private val _phoneSession = MutableStateFlow<PhoneSession?>(null)
     val phoneSession: StateFlow<PhoneSession?> = _phoneSession.asStateFlow()
 
@@ -66,11 +98,27 @@ object PhoneLink : MessageClient.OnMessageReceivedListener {
      * answers with `hello`), and uploads workouts it has not acknowledged yet.
      */
     fun refresh() {
-        scope.launch {
-            _connected.value = phoneNodes().isNotEmpty()
-            send(mapOf("type" to "whoami"))
-            syncPending()
-        }
+        scope.launch { syncNow() }
+    }
+
+    /**
+     * Cheap reachability check for the open app. Only when the phone comes
+     * back does it run a full [syncNow], so the status line stays truthful
+     * and pending workouts go out without the user pressing anything.
+     */
+    suspend fun checkConnection() {
+        val was = _connected.value
+        val now = phoneNodes().isNotEmpty()
+        _connected.value = now
+        if (now && !was) syncNow()
+    }
+
+    /** Same as [refresh], but waits; used by [SyncWorker]. */
+    suspend fun syncNow() {
+        _connected.value = phoneNodes().isNotEmpty()
+        if (!_connected.value) return
+        send(mapOf("type" to "whoami"))
+        syncPending()
     }
 
     fun sendAsync(msg: Map<String, Any?>) {
@@ -96,7 +144,8 @@ object PhoneLink : MessageClient.OnMessageReceivedListener {
         val acc = _account.value ?: return
         if (!syncing.compareAndSet(false, true)) return
         try {
-            for (w in WorkoutStore.unsynced().reversed()) {
+            // Workouts of another account stay on the watch until that account links again.
+            for (w in WorkoutStore.unsynced().reversed().filter { it.account == acc.id }) {
                 if (!send(w.toMessage() + ("account" to acc.id))) break
             }
         } finally {
@@ -116,15 +165,32 @@ object PhoneLink : MessageClient.OnMessageReceivedListener {
         _connected.value = true
         when (m["type"]) {
             "workout_ack" -> (m["start"] as? Number)?.let { WorkoutStore.markSynced(it.toLong()) }
-            "hello" -> {
-                (m["account"] as? String)?.let { id ->
-                    val acc = WearAccount(id, m["name"] as? String ?: id)
-                    if (acc != _account.value) {
-                        WorkoutStore.account = acc
-                        _account.value = acc
-                    }
+            "pair_ok" -> {
+                val waiting = _pairing.value as? Pairing.Waiting
+                val id = m["account"] as? String
+                // Only the phone that saw this watch's code may link it.
+                if (waiting != null && m["code"] == waiting.code && id != null) {
+                    _pairing.value = Pairing.Idle
+                    link(WearAccount(id, m["name"] as? String ?: id))
                 }
-                scope.launch { syncPending() }
+            }
+            "pair_denied" -> if ((_pairing.value as? Pairing.Waiting)?.code == m["code"]) {
+                _pairing.value = Pairing.Denied
+            }
+            // Phone no longer trusts this watch (disconnected there).
+            "not_paired", "unpair" -> if (_account.value != null) {
+                WorkoutStore.account = null
+                _account.value = null
+            }
+            "hello" -> {
+                // Only an already linked watch accepts hello; linking needs the code.
+                val acc = _account.value
+                if (acc != null && m["account"] == acc.id) {
+                    (m["name"] as? String)?.let { n ->
+                        if (n != acc.name) link(acc.copy(name = n))
+                    }
+                    scope.launch { syncPending() }
+                }
             }
             "session_start" -> {
                 val sport = m["sport"] as? String ?: "lari"
@@ -146,6 +212,16 @@ object PhoneLink : MessageClient.OnMessageReceivedListener {
                 Notifier.cancelPhoneRecording(app)
             }
         }
+    }
+
+    /**
+     * Forgets the linked account. Unsynced workouts stay on the watch, tagged
+     * with their account, and are only sent if that account links again.
+     */
+    fun unlink() {
+        WorkoutStore.account = null
+        _account.value = null
+        sendAsync(mapOf("type" to "unpair"))
     }
 
     /** Pause / resume / stop the phone recording from the watch. */

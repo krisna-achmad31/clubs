@@ -1,5 +1,7 @@
 package id.klubby.wear
 
+import kotlinx.coroutines.delay
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -34,6 +36,7 @@ import id.klubby.wear.ui.LinkAccountScreen
 import id.klubby.wear.ui.PhoneSessionScreen
 import id.klubby.wear.ui.RecordingScreen
 import id.klubby.wear.ui.SavedScreen
+import id.klubby.wear.ui.SettingsScreen
 import id.klubby.wear.ui.SummaryScreen
 import id.klubby.wear.ui.UnsyncedScreen
 import kotlinx.coroutines.launch
@@ -44,6 +47,7 @@ private sealed interface Nav {
     data class Countdown(val sport: WearSport) : Nav
     data object Unsynced : Nav
     data object PhoneSession : Nav
+    data object Settings : Nav
     data class Saved(val startMs: Long) : Nav
 }
 
@@ -96,8 +100,15 @@ private fun MainActivity.Root(ambient: Boolean) {
     val live by Recorder.state.collectAsState()
     val records by WorkoutStore.all.collectAsState()
     val connected by PhoneLink.connected.collectAsState()
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000)
+            PhoneLink.checkConnection()
+        }
+    }
     val phoneSession by PhoneLink.phoneSession.collectAsState()
     val account by PhoneLink.account.collectAsState()
+    val pairing by PhoneLink.pairing.collectAsState()
     var skipLink by remember { mutableStateOf(false) }
     var nav by remember { mutableStateOf<Nav>(Nav.Home) }
     var autoPause by remember { mutableStateOf(WorkoutStore.autoPause) }
@@ -150,8 +161,12 @@ private fun MainActivity.Root(ambient: Boolean) {
                 Nav.Home -> if (account == null && !skipLink) {
                     LinkAccountScreen(
                         phoneConnected = connected,
-                        onCheck = { PhoneLink.refresh() },
-                        onSkip = { skipLink = true },
+                        pairing = pairing,
+                        onPair = { PhoneLink.startPairing() },
+                        onSkip = {
+                            PhoneLink.cancelPairing()
+                            skipLink = true
+                        },
                     )
                 } else HomeScreen(
                     account = account?.name,
@@ -159,7 +174,6 @@ private fun MainActivity.Root(ambient: Boolean) {
                     unsynced = records.count { !it.synced },
                     phoneConnected = connected,
                     phoneRecording = phoneSession?.let { WearSports.byId(it.sport).name },
-                    autoPause = autoPause,
                     onSport = { sport ->
                         val missing = missingPermissions(sport)
                         if (missing.isEmpty()) begin(sport) else {
@@ -169,6 +183,28 @@ private fun MainActivity.Root(ambient: Boolean) {
                     },
                     onUnsynced = { nav = Nav.Unsynced },
                     onPhoneSession = { nav = Nav.PhoneSession },
+                    onSettings = { nav = Nav.Settings },
+                )
+
+                Nav.Settings -> SettingsScreen(
+                    account = account,
+                    phoneConnected = connected,
+                    pending = records.count { !it.synced && it.account == account?.id },
+                    otherAccount = records.count { !it.synced && it.account != null && it.account != account?.id },
+                    lastSyncMs = remember(records) { WorkoutStore.lastSyncMs },
+                    autoPause = autoPause,
+                    version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty() },
+                    onSync = { PhoneLink.refresh() },
+                    onLink = {
+                        skipLink = false
+                        nav = Nav.Home
+                        PhoneLink.refresh()
+                    },
+                    onUnlink = {
+                        PhoneLink.unlink()
+                        skipLink = false
+                        nav = Nav.Home
+                    },
                     onToggleAutoPause = {
                         autoPause = !autoPause
                         WorkoutStore.autoPause = autoPause
@@ -200,6 +236,7 @@ private fun MainActivity.Root(ambient: Boolean) {
                 is Nav.Saved -> SavedScreen(
                     synced = records.firstOrNull { it.startMs == n.startMs }?.synced == true,
                     phoneConnected = connected,
+                    linked = account != null,
                     onDone = { nav = Nav.Home },
                 )
             }

@@ -27,6 +27,28 @@ class WorkoutRecord {
   Duration get duration => end.difference(start);
 }
 
+/// Readable name for the app that wrote a Health record. Health Connect
+/// reports the writer's package name (e.g. `com.strava`).
+String healthSourceLabel(String source) {
+  const known = {
+    'com.strava': 'Strava',
+    'com.google.android.apps.fitness': 'Google Fit',
+    'com.sec.android.app.shealth': 'Samsung Health',
+    'com.xiaomi.wearable': 'Mi Fitness',
+    'com.mi.health': 'Mi Fitness',
+    'com.huami.watch.hmwatchmanager': 'Zepp',
+    'com.huawei.health': 'Huawei Health',
+    'com.garmin.android.apps.connectmobile': 'Garmin Connect',
+    'com.fitbit.FitbitMobile': 'Fitbit',
+    'com.google.android.apps.fitbit': 'Fitbit',
+    'com.coros.coros': 'COROS',
+    'com.suunto.android': 'Suunto',
+    'com.nike.plusgps': 'Nike Run Club',
+    'com.adidas.app': 'adidas Running',
+  };
+  return known[source] ?? source;
+}
+
 class HealthService {
   final Health _health = Health();
   bool _configured = false;
@@ -113,7 +135,7 @@ class HealthService {
                 ?.toDouble(),
             calories: (p.value as WorkoutHealthValue).totalEnergyBurned
                 ?.toDouble(),
-            source: p.sourceName,
+            source: healthSourceLabel(p.sourceName),
             device: p.deviceModel ?? '',
           ),
     ];

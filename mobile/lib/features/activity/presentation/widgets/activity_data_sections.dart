@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/health_service.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_analysis.dart';
@@ -42,14 +43,14 @@ class ActivityDataSections extends StatelessWidget {
                 ('Total waktu', Fmt.clock(data.elapsed)),
                 if (activity.score?.isNotEmpty == true)
                   ('Skor', activity.score!),
-                if (activity.distanceKm > 0)
+                if (activity.sport.tracksDistance && activity.distanceKm > 0)
                   ('Pace rata-rata', _pace(data.averagePace)),
-                if (activity.distanceKm > 0)
+                if (activity.sport.tracksDistance && activity.distanceKm > 0)
                   ('Pace termasuk jeda', _pace(data.elapsedPace)),
-                if (activity.distanceKm > 0)
+                if (activity.sport.tracksDistance && activity.distanceKm > 0)
                   ('Split tercepat', _pace(data.fastestSplit)),
                 if (activity.device?.isNotEmpty == true)
-                  ('Perangkat', activity.device!),
+                  ('Perangkat', healthSourceLabel(activity.device!)),
                 (
                   'Sumber',
                   switch (activity.source.name) {
@@ -93,7 +94,7 @@ class ActivityDataSections extends StatelessWidget {
               ('Maksimum', sensor(data.maxHeartRate, 'bpm')),
             ],
           ),
-        if (activity.distanceKm > 0)
+        if (activity.sport.tracksDistance && activity.distanceKm > 0)
           ActivityMetricChart(
             title: 'Pace',
             points: data.series(ActivityMetric.pace),

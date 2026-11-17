@@ -1396,13 +1396,6 @@ class _NewClubPageState extends State<NewClubPage> {
     if (_name.text.trim().isEmpty) {
       return toast(context, 'Isi nama klub dulu ya');
     }
-    if (_payout == null) {
-      // The field sits below the fold: open it right away instead of
-      // leaving the button looking dead.
-      toast(context, 'Tambahkan rekening pencairan kas dulu');
-      await _editPayout();
-      return;
-    }
     setState(() => _busy = true);
     final clubs = context.read<ClubsCubit>();
     try {
@@ -1704,7 +1697,7 @@ class _NewClubPageState extends State<NewClubPage> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const FieldLabel('REKENING PENCAIRAN KAS'),
+            const FieldLabel('REKENING PENCAIRAN KAS (OPSIONAL)'),
             const SizedBox(height: 8),
             if (_payout case final p?)
               KCard(

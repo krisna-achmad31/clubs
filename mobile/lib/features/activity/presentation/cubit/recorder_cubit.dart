@@ -70,6 +70,8 @@ class RecorderCubit extends Cubit<RecorderState> {
           if (action == 'stop') finish();
         case WatchWorkout():
         case WatchWhoAmI():
+        case WatchPairRequest():
+        case WatchUnpair():
           break;
       }
     });

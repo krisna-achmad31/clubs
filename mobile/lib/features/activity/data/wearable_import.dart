@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../../core/entities/sport.dart';
 import '../../../core/services/health_service.dart';
 import '../../profile/domain/usecases/streak_rules.dart';
@@ -13,17 +14,65 @@ String? sportForWorkout(String activity) {
   if (known != null) return known.id;
   final a = activity.toUpperCase();
   return switch (a) {
-    'RUNNING' || 'RUNNING_TREADMILL' => 'lari',
-    'WALKING' => 'jalan',
-    'BIKING' || 'BIKING_STATIONARY' => 'sepeda',
+    // Cardio & outdoor
+    'RUNNING' || 'RUNNING_TREADMILL' || 'TRACK_AND_FIELD' => 'lari',
+    'WALKING' || 'WALKING_TREADMILL' => 'jalan',
+    'BIKING' || 'BIKING_STATIONARY' || 'HAND_CYCLING' => 'sepeda',
     _ when a.startsWith('SWIMMING') => 'renang',
+    'HIKING' || 'SNOWSHOEING' => 'hiking',
+    'ROWING' || 'ROWING_MACHINE' => 'dayung',
+    'PADDLE_SPORTS' => 'kayak',
+    'SURFING' => 'selancar',
+    'SAILING' => 'layar',
+    'SCUBA_DIVING' || 'UNDERWATER_DIVING' => 'selam',
+    'WATER_POLO' => 'polo_air',
+    'CLIMBING' || 'ROCK_CLIMBING' => 'panjat',
+    'PARAGLIDING' => 'paralayang',
+    // Gym
+    'WEIGHTLIFTING' ||
+    'STRENGTH_TRAINING' ||
+    'TRADITIONAL_STRENGTH_TRAINING' ||
+    'FUNCTIONAL_STRENGTH_TRAINING' ||
+    'CORE_TRAINING' ||
+    'ELLIPTICAL' ||
+    'STAIR_CLIMBING' ||
+    'STAIR_CLIMBING_MACHINE' ||
+    'STAIRS' ||
+    'STEP_TRAINING' ||
+    'MIXED_CARDIO' ||
+    'JUMP_ROPE' ||
+    'WATER_FITNESS' => 'fitness',
+    'HIGH_INTENSITY_INTERVAL_TRAINING' || 'CROSS_TRAINING' => 'crossfit',
+    'CALISTHENICS' || 'GYMNASTICS' => 'kalistenik',
+    'YOGA' || 'FLEXIBILITY' || 'MIND_AND_BODY' => 'yoga',
+    'PILATES' || 'BARRE' => 'pilates',
+    'DANCING' || 'SOCIAL_DANCE' => 'dansa',
+    'CARDIO_DANCE' => 'zumba',
+    // Bela diri
+    'BOXING' || 'KICKBOXING' => 'tinju',
+    'MARTIAL_ARTS' || 'WRESTLING' || 'TAI_CHI' => 'bela_diri',
+    'FENCING' => 'anggar',
+    // Raket & bola
     'BADMINTON' => 'badminton',
     'TENNIS' => 'tenis',
+    'TABLE_TENNIS' => 'tenis_meja',
+    'SQUASH' || 'RACQUETBALL' => 'squash',
+    'PICKLEBALL' => 'pickleball',
     'SOCCER' => 'mini_soccer',
     'BASKETBALL' => 'basket',
     'VOLLEYBALL' => 'voli',
-    'YOGA' => 'yoga',
-    'HIKING' => 'hiking',
+    'RUGBY' || 'AUSTRALIAN_FOOTBALL' => 'rugby',
+    'AMERICAN_FOOTBALL' => 'american_football',
+    'HOCKEY' => 'hoki',
+    'LACROSSE' => 'lacrosse',
+    'SOFTBALL' => 'softball',
+    'BASEBALL' => 'baseball',
+    'CRICKET' => 'kriket',
+    'DISC_SPORTS' || 'FRISBEE_DISC' => 'frisbee',
+    // Presisi
+    'GOLF' => 'golf',
+    'ARCHERY' => 'panahan',
+    'BOWLING' => 'bowling',
     _ => null,
   };
 }
@@ -40,7 +89,10 @@ Future<bool> importWearableWorkout(
   required GearCubit gear,
 }) async {
   final sportId = sportForWorkout(w.activity);
-  if (sportId == null || w.duration < const Duration(minutes: 5)) return false;
+  if (sportId == null || w.duration < const Duration(minutes: 5)) {
+    debugPrint('wear import skip: sport=${w.activity}->$sportId dur=${w.duration}');
+    return false;
+  }
   final id = 'wear_${w.start.millisecondsSinceEpoch}';
   final existing = await repo.recent();
   final clash = existing.any(
@@ -48,14 +100,22 @@ Future<bool> importWearableWorkout(
         a.id == id ||
         (a.start.isBefore(w.end) && a.start.add(a.duration).isAfter(w.start)),
   );
-  if (clash) return false;
-  final km = (w.distanceMeters ?? 0) / 1000;
+  if (clash) {
+    debugPrint('wear import skip: clash ${w.start}-${w.end}');
+    return false;
+  }
+  debugPrint('wear import ok: $sportId ${w.duration}');
+  // Health also attaches step distance to gym/court workouts; only keep it
+  // for sports that actually track distance (and wear gear by km).
+  final km = Sports.byId(sportId).tracksDistance
+      ? (w.distanceMeters ?? 0) / 1000
+      : 0.0;
   final gearId = gear.defaultFor(sportId)?.id;
   await repo.save(
     Activity(
       id: id,
       sportId: sportId,
-      title: '${Sports.byId(sportId).name} (jam)',
+      title: '${Sports.byId(sportId).name} (smartwatch)',
       start: w.start,
       duration: w.duration,
       source: ActivitySource.wearable,

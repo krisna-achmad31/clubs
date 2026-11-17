@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -5,6 +6,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/backend/dev_api.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/usecases/validate_tournament.dart';
 
@@ -103,36 +105,24 @@ class TournamentState extends Equatable {
 
 class TournamentCubit extends Cubit<TournamentState> {
   /// With [prefs] the running tournament survives an app restart: every
-  /// change is written under [storageKey] and read back here.
-  TournamentCubit([this._prefs]) : super(const TournamentState()) {
+  /// change is written under [storageKey] and synced to [DevApi].
+  TournamentCubit([this._prefs, this._api]) : super(const TournamentState()) {
     _restore();
   }
 
   static const storageKey = 'tournament_live';
   final SharedPreferences? _prefs;
+  final DevApi? _api;
   final _history = <int, List<CourtMatch>>{};
   List<List<CourtMatch>> _planned = [];
   List<String> _stageWinners = [];
   List<String> _queue = [];
   int _game = 0;
   int _stage = 1;
-  static const _names = [
-    'Kamu',
-    'Dinda',
-    'Raka',
-    'Sisca',
-    'Andi',
-    'Bima',
-    'Ayu',
-    'Fajar',
-    'Kevin',
-    'Maya',
-    'Rian',
-    'Sinta',
-  ];
+  // Hardcoded demo player names disabled — use generic slots.
   List<String> get _roster => [
     for (var i = 0; i < state.players; i++)
-      i < _names.length ? _names[i] : 'Pemain ${i + 1}',
+      i == 0 ? 'Kamu' : 'Pemain ${i + 1}',
   ];
 
   /// When the running tournament started; null before the first start.
@@ -218,35 +208,43 @@ class TournamentCubit extends Cubit<TournamentState> {
       prefs.remove(storageKey);
       return;
     }
-    prefs.setString(
-      storageKey,
-      jsonEncode({
-        'format': s.format.name,
-        'courts': s.courts,
-        'points': s.points,
-        'players': s.players,
-        'title': s.title,
-        'round': s.round,
-        'rounds': s.rounds,
-        'latestRound': s.latestRound,
-        'matches': s.matches.map(_match).toList(),
-        'standings': [
-          for (final p in s.standings) {'n': p.name, 'p': p.points, 'me': p.me},
-        ],
-        'finished': s.finished,
-        'eliminated': s.eliminated,
-        'history': {
-          for (final e in _history.entries)
-            '${e.key}': e.value.map(_match).toList(),
-        },
-        'planned': [for (final wave in _planned) wave.map(_match).toList()],
-        'stageWinners': _stageWinners,
-        'queue': _queue,
-        'game': _game,
-        'stage': _stage,
-        'startedAt': startedAt?.microsecondsSinceEpoch,
-      }),
-    );
+    final payload = {
+      'format': s.format.name,
+      'courts': s.courts,
+      'points': s.points,
+      'players': s.players,
+      'title': s.title,
+      'round': s.round,
+      'rounds': s.rounds,
+      'latestRound': s.latestRound,
+      'matches': s.matches.map(_match).toList(),
+      'standings': [
+        for (final p in s.standings) {'n': p.name, 'p': p.points, 'me': p.me},
+      ],
+      'finished': s.finished,
+      'eliminated': s.eliminated,
+      'history': {
+        for (final e in _history.entries)
+          '${e.key}': e.value.map(_match).toList(),
+      },
+      'planned': [for (final wave in _planned) wave.map(_match).toList()],
+      'stageWinners': _stageWinners,
+      'queue': _queue,
+      'game': _game,
+      'stage': _stage,
+      'startedAt': startedAt?.microsecondsSinceEpoch,
+    };
+    prefs.setString(storageKey, jsonEncode(payload));
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      unawaited(
+        api.upsertTournament({
+          'title': s.title,
+          'format': s.format.name,
+          'state': payload,
+        }),
+      );
+    }
   }
 
   void _restore() {

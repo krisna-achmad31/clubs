@@ -162,7 +162,7 @@ class SessionPage extends StatelessWidget {
       for (final p in s.participants.take(6)) (p.initials, p.color),
     ];
 
-    final (String label, VoidCallback onTap, Hue hue) = switch (r.status) {
+    final (String label, VoidCallback? onTap, Hue hue) = switch (r.status) {
       RsvpStatus.joined => (
         'SUDAH IKUT ✓',
         () => context.push(R.ticket(s.id)),
@@ -178,8 +178,8 @@ class SessionPage extends StatelessWidget {
         () => context.push(R.pay(s.id)),
         Hue.primary,
       ),
-      _ when s.cancelled => ('SESI DIBATALKAN', () {}, Hue.red),
-      _ when s.past => ('MABAR SUDAH SELESAI', () {}, Hue.blue),
+      _ when s.cancelled => ('SESI DIBATALKAN', null, Hue.red),
+      _ when s.past => ('MABAR SUDAH SELESAI', null, Hue.blue),
       _ when s.full => (
         'MASUK WAITING LIST',
         () {
@@ -208,7 +208,8 @@ class SessionPage extends StatelessWidget {
                     KIconButton(
                       LucideIcons.arrowLeft,
                       color: AppColors.white,
-                      onTap: () => context.pop(),
+                      onTap: () =>
+                          context.canPop() ? context.pop() : context.go(R.feed),
                     ),
                     const Spacer(),
                     KIconButton(

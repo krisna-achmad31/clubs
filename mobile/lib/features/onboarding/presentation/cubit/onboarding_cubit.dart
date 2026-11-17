@@ -184,13 +184,15 @@ class OnboardingCubit extends Cubit<OnboardingDraft> {
       final p = await _location.current();
       if (isClosed) return false;
       final area = p == null ? null : Areas.nearby(p.lat, p.lng);
-      locationError = p == null
-          ? _location.failureMessage
-          : area == null
-          ? 'Lokasi terbaca, tetapi kecamatanmu belum ada di daftar. Pilih area secara manual.'
-          : null;
-      if (area != null) emit(state.copyWith(area: area.label));
-      return area != null;
+      locationError = p == null ? _location.failureMessage : null;
+      if (p != null) {
+        final label =
+            area?.label ??
+            'Lokasi GPS (${p.lat.toStringAsFixed(3)}, ${p.lng.toStringAsFixed(3)})';
+        emit(state.copyWith(area: label));
+        return true;
+      }
+      return false;
     } on Exception {
       locationError =
           'Lokasi belum bisa dibaca. Coba lagi atau pilih area secara manual.';

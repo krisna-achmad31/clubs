@@ -646,7 +646,7 @@ class _ProPageState extends State<ProPage> {
                   context,
                   title: 'Aktifkan trial demo?',
                   body:
-                      '${club.name}\nPaket ${_yearly ? 'Tahunan · Rp399rb' : 'Bulanan · Rp49rb'}. Tidak ada tagihan, langganan, atau broadcast WhatsApp nyata.',
+                      '${club.name}\nPaket ${_yearly ? 'Tahunan · ${Fmt.rpShort(399000)}' : 'Bulanan · ${Fmt.rpShort(49000)}'}. Tidak ada tagihan, langganan, atau broadcast WhatsApp nyata.',
                   confirm: 'AKTIFKAN DEMO',
                   hue: Hue.primary,
                 );
@@ -675,12 +675,12 @@ class _ProPageState extends State<ProPage> {
           runSpacing: 8,
           children: [
             KChip(
-              'Bulanan · Rp49rb',
+              'Bulanan · ${Fmt.rpShort(49000)}',
               selected: !_yearly,
               onTap: () => setState(() => _yearly = false),
             ),
             KChip(
-              'Tahunan · Rp399rb',
+              'Tahunan · ${Fmt.rpShort(399000)}',
               selected: _yearly,
               onTap: () => setState(() => _yearly = true),
             ),

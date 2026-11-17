@@ -54,16 +54,7 @@ class SessionsCubit extends Cubit<SessionsState> {
         sessions: {for (final s in list) s.id: s},
         rsvps: state.rsvps.isNotEmpty
             ? state.rsvps
-            : _repo.storedRsvps() ??
-                  const {
-                    'rabu-malam': Rsvp(
-                      status: RsvpStatus.joined,
-                      guests: ['Andi'],
-                      ticketNo: 9,
-                      amount: 72000,
-                    ),
-                    'padel-pagi': Rsvp(status: RsvpStatus.waiting, queue: 4),
-                  },
+            : _repo.storedRsvps() ?? const {},
       ),
     );
   }

@@ -1,0 +1,12 @@
+# Hand-written baseline profile: AOT-compile app code and the Compose/Wear
+# libraries used on the scrolling screens. Regenerate with a Macrobenchmark
+# BaselineProfileRule module for tighter coverage.
+HSPLid/klubby/wear/**->**(**)**
+Lid/klubby/wear/**;
+HSPLandroidx/compose/runtime/**->**(**)**
+HSPLandroidx/compose/ui/**->**(**)**
+HSPLandroidx/compose/foundation/**->**(**)**
+HSPLandroidx/compose/animation/**->**(**)**
+HSPLandroidx/wear/compose/**->**(**)**
+Landroidx/compose/**;
+Landroidx/wear/compose/**;

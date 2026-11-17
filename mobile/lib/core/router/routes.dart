@@ -45,7 +45,6 @@ abstract final class R {
   static String expired(String id) => '/session/$id/expired';
   static String waitlist(String id) => '/session/$id/waitlist';
   static String slot(String id) => '/session/$id/slot';
-  static const claim = '/claim';
 
   /// WhatsApp RSVP deep link (klubby.id/m/:id) → claim the guest ticket.
   static String claimLink(String id) => '/m/$id';
@@ -83,8 +82,6 @@ abstract final class R {
 
   // Profile (M)
   static const avatar = '/profil/avatar';
-  static const rating = '/profil/rating';
-  static const gear = '/profil/gear';
   static const settings = '/settings';
   static const privacy = '/settings/privacy';
   static const goyangSettings = '/settings/goyang';

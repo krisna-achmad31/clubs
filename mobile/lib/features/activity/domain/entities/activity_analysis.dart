@@ -41,10 +41,15 @@ class ActivityAnalysis {
       ? activity.duration
       : activity.elapsedTime!;
   double? get averagePace =>
-      activity.distanceKm > 0 && activity.duration.inSeconds > 0
+      activity.sport.tracksDistance &&
+          activity.distanceKm > 0 &&
+          activity.duration.inSeconds > 0
       ? activity.duration.inSeconds / activity.distanceKm
       : null;
-  double? get elapsedPace => activity.distanceKm > 0 && elapsed.inSeconds > 0
+  double? get elapsedPace =>
+      activity.sport.tracksDistance &&
+          activity.distanceKm > 0 &&
+          elapsed.inSeconds > 0
       ? elapsed.inSeconds / activity.distanceKm
       : null;
   bool get distanceAxis => samples.any((p) => p.distanceMeters > 0);

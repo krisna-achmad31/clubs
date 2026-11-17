@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/backend/dev_api.dart';
 import '../../../../core/services/shake_detector.dart';
 import '../../domain/entities/goyang.dart';
 
@@ -65,9 +67,12 @@ class GoyangState extends Equatable {
 /// "Goyang Ajak Main" (P1–P6). Listens to the accelerometer only while the app
 /// is in the foreground and the feature is on, as promised in P6.
 class GoyangCubit extends Cubit<GoyangState> {
-  GoyangCubit() : super(const GoyangState()) {
+  GoyangCubit([this._api]) : super(const GoyangState()) {
     unawaited(_restore());
   }
+
+  final DevApi? _api;
+  String? _lobbyId;
 
   Future<void> _restore() async {
     try {
@@ -127,12 +132,21 @@ class GoyangCubit extends Cubit<GoyangState> {
     if (!state.settings.enabled) return;
     _shakes = ShakeDetector(threshold: state.settings.sensitivity.threshold)
         .shakes()
-        .listen((_) {
-          final hour = DateTime.now().hour;
-          if (state.settings.quietHours && (hour >= 22 || hour < 6)) return;
-          // Haptic fires in the tab shell's listener, only when the sheet will show.
-          emit(state.copyWith(shakeCount: state.shakeCount + 1));
-        }, onError: (_) {});
+        .listen(
+          (_) {
+            final hour = DateTime.now().hour;
+            if (state.settings.quietHours && (hour >= 22 || hour < 6)) return;
+            // Haptic fires in the tab shell's listener, only when the sheet will show.
+            emit(state.copyWith(shakeCount: state.shakeCount + 1));
+          },
+          onError: (Object e) {
+            // Sensor unavailable (emulator, missing accelerometer): stop
+            // listening instead of failing silently on every event.
+            debugPrint('goyang: $e');
+            _shakes?.cancel();
+            _shakes = null;
+          },
+        );
   }
 
   void stopListening() {
@@ -148,8 +162,7 @@ class GoyangCubit extends Cubit<GoyangState> {
 
   void updateInvite(GoyangInvite i) => emit(state.copyWith(invite: i));
 
-  /// P1 "KIRIM AJAKAN" → P2 lobby. Responses trickle in to keep the lobby alive.
-  /// [again] = "AJAK LAGI" from the lobby: keep who already answered.
+  /// P1 "KIRIM AJAKAN" → P2 lobby. Syncs real lobby & responses via [DevApi].
   void send({bool again = false}) {
     _lobby?.cancel();
     _clock?.cancel();
@@ -168,51 +181,91 @@ class GoyangCubit extends Cubit<GoyangState> {
         active: true,
         remaining: again && state.active
             ? state.remaining
-            : const Duration(minutes: 28, seconds: 45),
+            : const Duration(minutes: 30),
         responses: keep,
         sharePaid: again ? null : false,
       ),
     );
-    final queue = const [
-      LobbyResponse(
-        'Raka Pratama',
-        'RP',
-        LobbyTone.blue,
-        LobbyStatus.ikut,
-        note: 'Gas! 🏸🔥',
-      ),
-      LobbyResponse(
-        'Dinda Putri',
-        'DP',
-        LobbyTone.purple,
-        LobbyStatus.ikut,
-        note: '5 menit lagi sampai',
-      ),
-      LobbyResponse('Sisca Lestari', 'SL', LobbyTone.orange, LobbyStatus.nanti),
-      LobbyResponse('Andi', 'AN', LobbyTone.red, LobbyStatus.dilihat),
-    ].where((r) => !keep.any((k) => k.name == r.name)).toList();
-    var i = 0;
-    _lobby = Timer.periodic(const Duration(milliseconds: 1400), (t) {
-      if (i >= queue.length) return t.cancel();
-      emit(state.copyWith(responses: [...state.responses, queue[i++]]));
+    // Hardcoded demo friend responses disabled — syncs with DevApi lobby.
+    unawaited(_syncLobby(host));
+    _lobby = Timer.periodic(const Duration(seconds: 5), (_) {
+      unawaited(_pollResponses(host));
     });
     _clock = Timer.periodic(const Duration(seconds: 1), (t) {
       final left = state.remaining - const Duration(seconds: 1);
       if (left <= Duration.zero) {
         t.cancel();
-        emit(state.copyWith(active: false, remaining: Duration.zero));
+        endLobby();
         return;
       }
       emit(state.copyWith(remaining: left));
     });
   }
 
+  Future<void> _syncLobby(LobbyResponse host) async {
+    final api = _api;
+    if (api == null || !api.isSignedIn) return;
+    try {
+      if (_lobbyId == null) {
+        final created = await api.createGoyangLobby({
+          'sport_id': state.invite.sportId,
+          'venue': state.invite.venue,
+          'audience': state.settings.audience.name,
+        });
+        _lobbyId = created['id'] as String;
+      }
+      await _pollResponses(host);
+    } on Object {
+      // Keep current state on transient network error.
+    }
+  }
+
+  Future<void> _pollResponses(LobbyResponse host) async {
+    final api = _api;
+    final id = _lobbyId;
+    if (api == null || !api.isSignedIn || id == null || isClosed) return;
+    try {
+      final rows = await api.goyangResponses(id);
+      final mapped = <LobbyResponse>[
+        host,
+        for (final r in rows)
+          if (r['user_id'] != api.currentUserId)
+            LobbyResponse(
+              r['name'] as String? ?? 'Teman',
+              r['initials'] as String? ?? 'T',
+              LobbyTone.blue,
+              LobbyStatus.values
+                      .where((v) => v.name == r['status'])
+                      .firstOrNull ??
+                  LobbyStatus.dilihat,
+              note: r['note'] as String? ?? '',
+            ),
+      ];
+      if (!isClosed) emit(state.copyWith(responses: mapped));
+    } on Object {
+      // Ignore transient poll errors.
+    }
+  }
+
   /// P5 QRIS payment confirmed for "Bagianmu".
-  void payShare() => emit(state.copyWith(sharePaid: true));
+  void payShare() {
+    emit(state.copyWith(sharePaid: true));
+    final api = _api;
+    final id = _lobbyId;
+    if (api != null && api.isSignedIn && id != null) {
+      unawaited(api.updateGoyangSharePaid(id, true));
+    }
+  }
 
   void endLobby() {
     _lobby?.cancel();
     _clock?.cancel();
+    final api = _api;
+    final id = _lobbyId;
+    _lobbyId = null;
+    if (api != null && api.isSignedIn && id != null) {
+      unawaited(api.endGoyangLobby(id));
+    }
     emit(state.copyWith(active: false));
   }
 

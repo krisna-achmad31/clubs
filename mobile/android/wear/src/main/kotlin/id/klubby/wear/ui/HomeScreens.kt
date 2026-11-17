@@ -29,6 +29,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import id.klubby.wear.data.WorkoutRecord
+import id.klubby.wear.link.PhoneLink
 import id.klubby.wear.model.WearSport
 import id.klubby.wear.model.WearSports
 import kotlinx.coroutines.delay
@@ -43,11 +44,10 @@ fun HomeScreen(
     unsynced: Int,
     phoneConnected: Boolean,
     phoneRecording: String?,
-    autoPause: Boolean,
     onSport: (WearSport) -> Unit,
     onUnsynced: () -> Unit,
     onPhoneSession: () -> Unit,
-    onToggleAutoPause: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val list = rememberScalingLazyListState()
     ScreenScaffold(scrollState = list) { padding ->
@@ -83,6 +83,15 @@ fun HomeScreen(
                 }
             }
             item {
+                Pill(onClick = onSettings) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚙", color = K.Muted, fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Pengaturan", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            }
+            item {
                 Text(
                     "Mulai rekam",
                     color = K.Muted,
@@ -97,18 +106,6 @@ fun HomeScreen(
                         Text(s.emoji, fontSize = 18.sp)
                         Spacer(Modifier.width(10.dp))
                         Text(s.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    }
-                }
-            }
-            item {
-                Pill(onClick = onToggleAutoPause, modifier = Modifier.padding(top = 8.dp)) {
-                    Column {
-                        Text("Auto-pause", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(
-                            if (autoPause) "Nyala · lari & sepeda" else "Mati",
-                            color = if (autoPause) K.Green else K.Muted,
-                            fontSize = 12.sp,
-                        )
                     }
                 }
             }
@@ -145,41 +142,52 @@ fun CountdownScreen(sport: WearSport, onGo: () -> Unit) {
 }
 
 /**
- * First run: the watch has no Klubby account until the phone app tells it
- * which one it is signed in to. Recording still works; workouts wait on the
- * watch and go to the phone once linked.
+ * First run handshake: the watch shows a 6-digit code, the phone app shows the
+ * same code and the user taps Hubungkan there. Recording still works unlinked;
+ * workouts wait on the watch until an account is linked.
  */
 @Composable
-fun LinkAccountScreen(phoneConnected: Boolean, onCheck: () -> Unit, onSkip: () -> Unit) {
-    var checking by remember { mutableIntStateOf(0) }
-    LaunchedEffect(checking) {
-        if (checking > 0) {
-            delay(4000)
-            checking = 0
-        }
-    }
+fun LinkAccountScreen(
+    phoneConnected: Boolean,
+    pairing: PhoneLink.Pairing,
+    onPair: () -> Unit,
+    onSkip: () -> Unit,
+) {
     val list = rememberScalingLazyListState()
     ScreenScaffold(scrollState = list) { padding ->
         ScalingLazyColumn(state = list, contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Hubungkan akun", color = K.Primary, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp) }
+            if (pairing is PhoneLink.Pairing.Waiting) {
+                item {
+                    Text(
+                        pairing.code.chunked(3).joinToString(" "),
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 30.sp,
+                    )
+                }
+            }
             item {
                 Text(
                     when {
-                        checking > 0 -> "Mencari akun di HP…"
-                        phoneConnected -> "Buka Klubby di HP. Jam memakai akun yang sama dengan HP."
-                        else -> "HP tidak terjangkau. Dekatkan HP & nyalakan Bluetooth."
+                        !phoneConnected -> "HP tidak terjangkau. Dekatkan HP & nyalakan Bluetooth."
+                        pairing is PhoneLink.Pairing.Waiting -> "Buka Klubby di HP, cocokkan kode, lalu ketuk Hubungkan."
+                        pairing is PhoneLink.Pairing.Denied -> "Ditolak di HP. Coba lagi?"
+                        else -> "Login di aplikasi Klubby HP dulu, lalu hubungkan jam ini."
                     },
-                    color = Color.White,
+                    color = if (pairing is PhoneLink.Pairing.Denied) K.Orange else Color.White,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
-                ChunkyButton("Cek lagi", K.Primary, K.PrimaryDark) {
-                    checking++
-                    onCheck()
-                }
+                ChunkyButton(
+                    if (pairing is PhoneLink.Pairing.Waiting) "Kirim ulang" else "Hubungkan",
+                    K.Primary,
+                    K.PrimaryDark,
+                    onClick = onPair,
+                )
             }
             item { ChunkyButton("Rekam dulu", K.Surface, K.SurfaceDark, onClick = onSkip) }
             item {

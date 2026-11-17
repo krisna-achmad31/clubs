@@ -278,7 +278,7 @@ fun SummaryScreen(r: WorkoutRecord, onSave: () -> Unit, onDiscard: () -> Unit) {
 
 /** After Save: shows the upload state until the phone acknowledges it. */
 @Composable
-fun SavedScreen(synced: Boolean, phoneConnected: Boolean, onDone: () -> Unit) {
+fun SavedScreen(synced: Boolean, phoneConnected: Boolean, linked: Boolean, onDone: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -288,6 +288,7 @@ fun SavedScreen(synced: Boolean, phoneConnected: Boolean, onDone: () -> Unit) {
         Text(
             when {
                 synced -> "Masuk ke Klubby! Streak & XP terhitung."
+                !linked -> "Tersimpan di jam. Hubungkan akun di Pengaturan untuk mengirim."
                 phoneConnected -> "Mengirim ke HP… Buka Klubby di HP bila lama."
                 else -> "Tersimpan di jam. Terkirim otomatis saat HP terhubung."
             },

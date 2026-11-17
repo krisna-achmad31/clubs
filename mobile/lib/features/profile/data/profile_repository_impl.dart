@@ -2,153 +2,115 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/backend/dev_api.dart';
 import '../../../core/entities/mascot.dart';
 import '../../../core/entities/sport.dart';
+import '../domain/entities/stamp_entry.dart';
 import '../domain/entities/user_profile.dart';
 import '../domain/repositories/profile_repository.dart';
 
-/// Mock profile store seeded with the design's demo user (Budi Santoso).
-/// The whole profile persists as JSON on-device; swap for an API later.
+/// Profile store synced with Supabase via [DevApi] and cached in [SharedPreferences].
 class ProfileRepositoryImpl implements ProfileRepository {
-  ProfileRepositoryImpl(this._prefs);
+  ProfileRepositoryImpl(this._prefs, [this._api]);
 
   final SharedPreferences _prefs;
+  final DevApi? _api;
   UserProfile? _cache;
 
   static const _kOnboarded = 'onboarded';
   static const _kProfile = 'profile';
 
-  /// Authored demo history, not an inference about a real user's workouts.
-  static const _demoSportSessions = {
-    'badminton': 48,
-    'lari': 33,
-    'padel': 21,
-    'renang': 14,
-    'futsal': 9,
-    'sepeda': 6,
-    'bela_diri': 1,
-  };
-
-  static final seed = UserProfile(
-    name: 'Budi Santoso',
-    username: 'budismash',
-    phone: '+62 812 3456 2210',
-    sports: [
-      UserSport(
-        Sports.badminton,
-        level: SkillLevel.menengah,
-        positions: const ['Ganda belakang'],
-      ),
-      UserSport(Sports.padel, level: SkillLevel.pemula),
-      UserSport(Sports.futsal),
-    ],
-    activeSportId: 'badminton',
-    streak: 13,
-    bestStreak: 21,
-    xp: 2120,
-    freezes: 1,
-    gems: 1250,
-    stamps: 23,
-    saldo: 35000,
-    following: 24,
-    followers: 31,
-    joined: DateTime(2026, 3, 2),
-    adopted: const {
-      Animal.ciko: 48,
-      Animal.kiki: 33,
-      Animal.pandu: 21,
-      Animal.otto: 14,
-      Animal.koko: 9,
-      Animal.rubi: 6,
-      Animal.tara: 1,
-    },
-    verifiedSportSessions: _demoSportSessions,
-    lastActive: DateTime.now().subtract(const Duration(days: 1)),
-    owned: const {'stiker_hewan'},
+  static const empty = UserProfile(
+    name: '',
+    username: '',
+    phone: '',
+    area: '',
   );
+
+  /// Kept as an alias to [empty] for test compatibility; hardcoded demo seed is disabled.
+  static const seed = empty;
 
   @override
   Future<UserProfile> load() async {
-    if (_cache != null) {
-      final migrated = _restoreDemoBreakdown(_cache!);
-      if (migrated != _cache) await save(migrated);
-      return _cache!;
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      try {
+        final row = await api.fullProfile();
+        final sportRows = await api.userSports();
+        final profile = _fromApiRow(row, sportRows);
+        _cache = profile;
+        await _prefs.setString(_kProfile, jsonEncode(profile.toJson()));
+        return profile;
+      } on Object {
+        // Fall through to local cache when offline.
+      }
     }
+    if (_cache != null) return _cache!;
     final raw = _prefs.getString(_kProfile);
     if (raw != null) {
       try {
-        final profile = UserProfile.fromJson(
+        return _cache = UserProfile.fromJson(
           (jsonDecode(raw) as Map).cast<String, Object?>(),
         );
-        final migrated = _restoreDemoBreakdown(profile);
-        if (migrated != profile) {
-          await _prefs.setString(_kProfile, jsonEncode(migrated.toJson()));
-        }
-        return _cache = migrated;
       } on Object {
-        // Corrupt or older format: fall back to the seed below.
+        // Corrupt cache: return empty profile.
       }
     }
-    return _cache = seed;
-  }
-
-  UserProfile _restoreDemoBreakdown(UserProfile profile) {
-    final joined = profile.joined;
-    if (profile.username != seed.username ||
-        profile.phone != seed.phone ||
-        joined == null ||
-        joined.year != 2026 ||
-        joined.month != 3 ||
-        joined.day != 2) {
-      return profile;
-    }
-    final sessions = Map<String, int>.of(profile.verifiedSportSessions);
-    var changed = false;
-    for (final animal in seed.adopted.keys) {
-      final baseline = _demoSportSessions.entries
-          .where((e) => Sports.byId(e.key).animal == animal)
-          .toList();
-      final baselineTotal = baseline.fold(0, (sum, e) => sum + e.value);
-      final total = profile.adopted[animal];
-      // Restore only the exact missing authored baseline. Existing known
-      // sessions (including other sports in that family) are preserved.
-      if (total != null &&
-          total - profile.knownSessionsForAnimal(animal) == baselineTotal) {
-        for (final entry in baseline) {
-          sessions.update(
-            entry.key,
-            (count) => count + entry.value,
-            ifAbsent: () => entry.value,
-          );
-        }
-        changed = true;
-      }
-    }
-    // Takraw moved from Ciko to Koko. The earlier authored demo split Ciko's 48
-    // sessions into badminton 36 + takraw 12; fold that exact fixture back
-    // into badminton so Ciko and Koko totals stay consistent.
-    if (profile.adopted[Animal.ciko] == 48 &&
-        profile.adopted[Animal.koko] == 9 &&
-        sessions['badminton'] == 36 &&
-        sessions['takraw'] == 12) {
-      sessions['badminton'] = 48;
-      sessions.remove('takraw');
-      changed = true;
-    }
-    return changed
-        ? profile.copyWith(verifiedSportSessions: sessions)
-        : profile;
+    return _cache = empty;
   }
 
   @override
   Future<void> save(UserProfile p) async {
     _cache = p;
     await _prefs.setString(_kProfile, jsonEncode(p.toJson()));
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      await api.saveFullProfile(
+        {
+          'name': p.name,
+          'username': p.username,
+          'phone': p.phone,
+          'gender': p.gender.name,
+          'avatar': p.avatar.name,
+          'area': p.area,
+          'radius_km': p.radiusKm,
+          'active_sport_id': p.activeSportId,
+          'streak': p.streak,
+          'best_streak': p.bestStreak,
+          'xp': p.xp,
+          'freezes': p.freezes,
+          'max_freezes': p.maxFreezes,
+          'gems': p.gems,
+          'stamps': p.stamps,
+          'saldo': p.saldo,
+          'following': p.following,
+          'followers': p.followers,
+          'last_active': p.lastActive?.toUtc().toIso8601String(),
+          'adopted': {for (final e in p.adopted.entries) e.key.name: e.value},
+          'verified_sport_sessions': p.verifiedSportSessions,
+          'owned': p.owned.toList(),
+          'photo_path': p.photoPath,
+          'avatar_bg': p.avatarBg,
+          'accessory': p.accessory,
+          'settings': p.settings,
+          'stamp_history': [for (final s in p.stampHistory) s.toJson()],
+        },
+        [
+          for (final u in p.sports)
+            {
+              'sport_id': u.sport.id,
+              'level': (u.level ?? SkillLevel.pemula).name,
+              'positions': u.positions,
+            },
+        ],
+      );
+    }
   }
 
   @override
   Future<void> clear() async {
     _cache = null;
+    _api?.signOut();
     await Future.wait([
       _prefs.remove(_kProfile),
       _prefs.setBool(_kOnboarded, false),
@@ -160,4 +122,55 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<void> setOnboarded(bool value) => _prefs.setBool(_kOnboarded, value);
+
+  static UserProfile _fromApiRow(ApiRow j, List<ApiRow> sportRows) {
+    T? byName<T extends Enum>(List<T> values, Object? name) =>
+        values.where((v) => v.name == name).firstOrNull;
+    DateTime? date(Object? v) => v is String ? DateTime.tryParse(v) : null;
+    return UserProfile(
+      name: j['name'] as String? ?? '',
+      username: j['username'] as String? ?? '',
+      phone: j['phone'] as String? ?? '',
+      gender: byName(Gender.values, j['gender']) ?? Gender.rahasia,
+      avatar: byName(ProfileAvatar.values, j['avatar']) ?? ProfileAvatar.kapi,
+      area: j['area'] as String? ?? '',
+      radiusKm: (j['radius_km'] as num?)?.toInt() ?? 10,
+      sports: [
+        for (final s in sportRows)
+          UserSport(
+            Sports.byId(s['sport_id'] as String),
+            level: byName(SkillLevel.values, s['level']),
+            positions: (s['positions'] as List? ?? const []).cast<String>(),
+          ),
+      ],
+      activeSportId: j['active_sport_id'] as String? ?? 'badminton',
+      streak: (j['streak'] as num?)?.toInt() ?? 0,
+      bestStreak: (j['best_streak'] as num?)?.toInt() ?? 0,
+      xp: (j['xp'] as num?)?.toInt() ?? 0,
+      freezes: (j['freezes'] as num?)?.toInt() ?? 0,
+      maxFreezes: (j['max_freezes'] as num?)?.toInt() ?? 2,
+      gems: (j['gems'] as num?)?.toInt() ?? 0,
+      stamps: (j['stamps'] as num?)?.toInt() ?? 0,
+      saldo: (j['saldo'] as num?)?.toInt() ?? 0,
+      following: (j['following'] as num?)?.toInt() ?? 0,
+      followers: (j['followers'] as num?)?.toInt() ?? 0,
+      joined: date(j['joined']),
+      adopted: {
+        for (final e in (j['adopted'] as Map? ?? const {}).entries)
+          ?byName(Animal.values, e.key): (e.value as num).toInt(),
+      },
+      verifiedSportSessions: (j['verified_sport_sessions'] as Map? ?? const {})
+          .map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+      lastActive: date(j['last_active']),
+      owned: {...(j['owned'] as List? ?? const []).cast<String>()},
+      photoPath: j['photo_path'] as String?,
+      avatarBg: (j['avatar_bg'] as num?)?.toInt(),
+      accessory: j['accessory'] as String?,
+      settings: (j['settings'] as Map? ?? const {}).cast<String, Object>(),
+      stampHistory: [
+        for (final entry in j['stamp_history'] as List? ?? const [])
+          StampEntry.fromJson((entry as Map).cast<String, dynamic>()),
+      ],
+    );
+  }
 }

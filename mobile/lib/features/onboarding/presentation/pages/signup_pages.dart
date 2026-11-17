@@ -2,20 +2,26 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/router/routes.dart';
+import '../../../../core/app_data.dart';
+import '../../../../core/backend/dev_api.dart';
 import '../../../../core/di/injector.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../club/domain/repositories/club_repository.dart';
 import '../../../club/presentation/cubit/clubs_cubit.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../../profile/domain/entities/user_profile.dart';
+import '../../../profile/domain/repositories/profile_repository.dart';
 import '../../../session/presentation/cubit/sessions_cubit.dart';
 import '../../../profile/presentation/cubit/me_cubit.dart';
 import '../cubit/onboarding_cubit.dart';
@@ -29,9 +35,13 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
+  static Future<void>? _googleInitialization;
   late final _phone = TextEditingController(
     text: context.read<OnboardingCubit>().state.phone,
   );
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _busy = false;
   late final _terms = TapGestureRecognizer()
     ..onTap = () => _legal(
       'Ketentuan',
@@ -43,15 +53,14 @@ class _SignupPageState extends State<SignupPage> {
       'Versi demo menyimpan profil, foto, dan pengaturan hanya di perangkat ini. Lokasimu dipakai untuk mencari klub terdekat dan tidak ditampilkan ke orang lain. Data klub dan pembayaran adalah contoh.',
     );
 
-  /// Which social button is busy, if any.
-  String? _social;
-
   bool get _login =>
       GoRouterState.of(context).uri.queryParameters['mode'] == 'login';
 
   @override
   void dispose() {
     _phone.dispose();
+    _email.dispose();
+    _password.dispose();
     _terms.dispose();
     _privacy.dispose();
     super.dispose();
@@ -78,33 +87,182 @@ class _SignupPageState extends State<SignupPage> {
     context.push(R.otp);
   }
 
-  /// Demo social sign-in: short loading state, then the same next step as OTP.
   Future<void> _socialSignIn(String provider) async {
-    if (_social != null) return;
-    final c = context.read<OnboardingCubit>();
-    final login = _login;
-    c.setLogin(login);
-    setState(() => _social = provider);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _social = null);
-    if (login) {
-      final me = sl<MeCubit>();
-      me.completeOnboarding(
-        name: me.state.name,
-        username: me.state.username,
-        phone: me.state.phone,
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] $provider: starting browser login');
+      }
+      final uri = sl<DevApi>().startOAuth(provider);
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] $provider: browser launched=$ok');
+      }
+      if (!ok && mounted) {
+        toast(context, 'Tidak dapat membuka browser untuk login $provider.');
+      }
+    } on DevApiException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] $provider: failed status=${e.status}');
+      }
+      if (mounted) {
+        toast(context, 'Login $provider gagal (kode ${e.status}).');
+      }
+    } on Object catch (error) {
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] $provider: failed ${error.runtimeType}');
+      }
+      if (mounted) toast(context, 'Gagal memulai login $provider.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _signInGoogle() async {
+    if (_busy) return;
+    if (kDebugMode) debugPrint('[Klubby Auth] google: start native sign-in');
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return toast(context, 'Google Sign-In tersedia di Android dan iOS.');
+    }
+    if (Platform.isIOS && AppData.googleIosClientId.isEmpty) {
+      if (kDebugMode) debugPrint('[Klubby Auth] google: missing iOS client ID');
+      return toast(context, 'Google Sign-In belum dikonfigurasi untuk iOS.');
+    }
+    setState(() => _busy = true);
+    try {
+      final google = GoogleSignIn.instance;
+      try {
+        await (_googleInitialization ??= google.initialize(
+          serverClientId: AppData.googleWebClientId,
+          clientId: Platform.isIOS ? AppData.googleIosClientId : null,
+        ));
+      } on Object {
+        _googleInitialization = null;
+        rethrow;
+      }
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] google: opening account picker');
+      }
+      final account = await google.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        if (kDebugMode) debugPrint('[Klubby Auth] google: ID token missing');
+        if (mounted) toast(context, 'Google tidak mengirim token login.');
+        return;
+      }
+      const scopes = ['email', 'profile'];
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] google: account selected, requesting scopes');
+      }
+      final authorization =
+          await account.authorizationClient.authorizationForScopes(scopes) ??
+          await account.authorizationClient.authorizeScopes(scopes);
+      if (kDebugMode) {
+        debugPrint(
+          '[Klubby Auth] google: exchanging tokens for Supabase session',
+        );
+      }
+      await sl<DevApi>().signInWithGoogleToken(
+        idToken: idToken,
+        accessToken: authorization.accessToken,
       );
-      context.go(R.feed);
-    } else {
-      unawaited(_startFreshAccount());
-      context.push(R.about);
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] google: Supabase session accepted');
+      }
+      if (!mounted) return;
+      context.read<OnboardingCubit>().setEmail(account.email);
+      final onboarded = await sl<ProfileRepository>().isOnboarded();
+      await reloadAllAppData();
+      if (mounted) {
+        final route = onboarded ? R.feed : R.about;
+        if (kDebugMode) {
+          debugPrint('[Klubby Auth] google: navigating to $route');
+        }
+        context.go(route);
+      }
+    } on GoogleSignInException catch (error) {
+      if (kDebugMode) debugPrint('[Klubby Auth] google: ${error.code.name}');
+      if (mounted && error.code != GoogleSignInExceptionCode.canceled) {
+        toast(context, 'Google tidak bisa masuk. Coba lagi.');
+      }
+    } on DevApiException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Klubby Auth] google: Supabase failed status=${error.status}',
+        );
+      }
+      if (mounted) {
+        toast(
+          context,
+          'Supabase menolak login Google (kode ${error.status}).',
+        );
+      }
+    } on Object catch (error) {
+      if (kDebugMode) {
+        debugPrint('[Klubby Auth] google: failed ${error.runtimeType}');
+      }
+      if (mounted) toast(context, 'Login Google gagal. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _emailSignIn() async {
+    if (_busy) return;
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (!email.contains('@') || !email.contains('.')) {
+      return toast(context, 'Masukkan alamat email yang valid');
+    }
+    if (password.length < 6) {
+      return toast(context, 'Kata sandi minimal 6 karakter');
+    }
+    setState(() => _busy = true);
+    try {
+      final api = sl<DevApi>();
+      final c = context.read<OnboardingCubit>();
+      c.setLogin(_login);
+      c.setEmail(email);
+      if (_login) {
+        await api.signIn(email, password);
+        await reloadAllAppData();
+        if (!mounted) return;
+        context.go(R.feed);
+      } else {
+        final signedIn = await api.signUp(email, password);
+        if (!mounted) return;
+        if (!signedIn) {
+          toast(
+            context,
+            'Pendaftaran belum menghasilkan sesi. Hubungi admin Klubby.',
+          );
+          return;
+        }
+        await reloadAllAppData();
+        if (!mounted) return;
+        context.push(R.about);
+      }
+    } on DevApiException catch (e) {
+      if (mounted) {
+        toast(context, switch (e.status) {
+          400 => 'Email atau kata sandi tidak valid.',
+          422 =>
+            'Periksa email dan kata sandi. Jika sudah punya akun, pilih Masuk.',
+          _ => 'Gagal terhubung ke server (kode ${e.status}).',
+        });
+      }
+    } on Object {
+      if (mounted) toast(context, 'Gagal terhubung ke server.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final login = _login;
+    final authStatus = GoRouterState.of(context).uri.queryParameters['auth'];
     final isIos = Theme.of(context).platform == TargetPlatform.iOS;
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
     return KPage(
@@ -116,52 +274,90 @@ class _SignupPageState extends State<SignupPage> {
       ),
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
       children: [
+        if (authStatus == 'callback-failed')
+          KBanner.info(
+            'Sesi dari tautan tidak dapat dibuka. Masuk lagi setelah email terkonfirmasi.',
+          ),
         MascotSays(
           animal: Animal.kiki,
           size: 96,
           bg: AppColors.primaryL,
           text: login
-              ? 'Halo lagi! Masuk pakai nomor WhatsApp-mu ya.'
+              ? 'Halo lagi! Masuk untuk lanjut main bareng.'
               : 'Daftar sekali, langsung bisa ikut mabar & kumpulin stamp!',
         ),
+        if (AppData.phoneOtpEnabled) ...[
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const FieldLabel('NOMOR WHATSAPP'),
+              const SizedBox(height: 8),
+              KInput(
+                controller: _phone,
+                hint: '0812 3456 2210',
+                icon: LucideIcons.phone,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(15),
+                ],
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Kami kirim kode OTP lewat WhatsApp. Nomor ini juga dipakai untuk RSVP dari link grup.',
+                style: AppText.custom(
+                  13,
+                  w: FontWeight.w700,
+                  c: AppColors.muted,
+                  h: 1.35,
+                ),
+              ),
+            ],
+          ),
+          KBanner.info(
+            'Mode demo: kode OTP tidak benar-benar dikirim. Masukkan 6 angka apa saja selain 000000.',
+          ),
+          KButton('KIRIM KODE OTP', onTap: digits.length >= 9 ? _send : null),
+          const OrDivider(),
+        ],
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const FieldLabel('NOMOR WHATSAPP'),
+            const FieldLabel('EMAIL'),
             const SizedBox(height: 8),
             KInput(
-              controller: _phone,
-              hint: '0812 3456 2210',
-              icon: LucideIcons.phone,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(15),
-              ],
+              controller: _email,
+              hint: 'nama@email.com',
+              icon: LucideIcons.mail,
+              keyboardType: TextInputType.emailAddress,
               onChanged: (_) => setState(() {}),
             ),
+            const SizedBox(height: 12),
+            const FieldLabel('KATA SANDI'),
             const SizedBox(height: 8),
-            Text(
-              'Kami kirim kode OTP lewat WhatsApp. Nomor ini juga dipakai untuk RSVP dari link grup.',
-              style: AppText.custom(
-                13,
-                w: FontWeight.w700,
-                c: AppColors.muted,
-                h: 1.35,
-              ),
+            KInput(
+              controller: _password,
+              hint: 'Minimal 6 karakter',
+              icon: LucideIcons.lock,
+              obscureText: true,
+              onChanged: (_) => setState(() {}),
             ),
           ],
         ),
-        KBanner.info(
-          'Mode demo: kode OTP tidak benar-benar dikirim. Masukkan 6 angka apa saja selain 000000.',
+        KButton(
+          login ? 'MASUK DENGAN EMAIL' : 'DAFTAR DENGAN EMAIL',
+          onTap:
+              !_busy && _email.text.contains('@') && _password.text.length >= 6
+              ? _emailSignIn
+              : null,
         ),
-        KButton('KIRIM KODE OTP', onTap: digits.length >= 9 ? _send : null),
         const OrDivider(),
         _SocialButton(
           label: login ? 'MASUK DENGAN GOOGLE' : 'LANJUT DENGAN GOOGLE',
           leading: const _GoogleMark(),
-          loading: _social == 'google',
-          onTap: () => _socialSignIn('google'),
+          loading: _busy,
+          onTap: _signInGoogle,
         ),
         if (isIos)
           _SocialButton(
@@ -171,7 +367,7 @@ class _SignupPageState extends State<SignupPage> {
               size: 20,
               color: AppColors.ink,
             ),
-            loading: _social == 'apple',
+            loading: _busy,
             onTap: () => _socialSignIn('apple'),
           ),
         const SizedBox(height: 12),
@@ -622,35 +818,29 @@ class _AboutPageState extends State<AboutPage> {
             onChanged: c.setUsername,
           ),
         ),
-        _Field(
-          'EMAIL (OPSIONAL)',
-          KInput(
-            hint: 'budi@email.com',
-            icon: LucideIcons.mail,
-            keyboardType: TextInputType.emailAddress,
-            initialValue: d.email,
-            onChanged: c.setEmail,
+        if (d.email.isEmpty)
+          _Field(
+            'EMAIL (OPSIONAL)',
+            KInput(
+              hint: 'budi@email.com',
+              icon: LucideIcons.mail,
+              keyboardType: TextInputType.emailAddress,
+              initialValue: d.email,
+              onChanged: c.setEmail,
+            ),
           ),
-        ),
         _Field(
           'JENIS KELAMIN (UNTUK MABAR KHUSUS)',
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               for (final (g, l) in [
                 (Gender.lakiLaki, 'Laki-laki'),
                 (Gender.perempuan, 'Perempuan'),
                 (Gender.rahasia, 'Rahasia'),
-              ]) ...[
-                Expanded(
-                  child: KChip(
-                    l,
-                    selected: d.gender == g,
-                    expand: true,
-                    onTap: () => c.setGender(g),
-                  ),
-                ),
-                if (g != Gender.rahasia) const SizedBox(width: 8),
-              ],
+              ])
+                KChip(l, selected: d.gender == g, onTap: () => c.setGender(g)),
             ],
           ),
         ),
@@ -726,7 +916,7 @@ class LocationPage extends StatelessWidget {
           ],
         ),
         KButton(
-          'PAKAI LOKASI SEKARANG',
+          'LOKASI SAAT INI',
           icon: LucideIcons.locateFixed,
           loading: d.locating,
           onTap: () async {

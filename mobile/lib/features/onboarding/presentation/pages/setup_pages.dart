@@ -769,14 +769,15 @@ class WatchPage extends StatelessWidget {
                 ),
               KRow(
                 title: 'Strava',
-                subtitle: 'Impor lari & gowes',
+                subtitle:
+                    'Lewat ${isIos ? 'Apple Health' : 'Health Connect'} · aktifkan di Strava',
                 icon: LucideIcons.activity,
                 iconBg: AppColors.orangeL,
                 iconFg: AppColors.orange,
-                trailing: const KPill(
-                  'BELUM TERSEDIA',
-                  bg: AppColors.soft,
-                  fg: AppColors.muted,
+                trailing: KPill(
+                  w.healthConnected ? 'SIAP' : 'LEWAT HEALTH',
+                  bg: w.healthConnected ? AppColors.greenL : AppColors.soft,
+                  fg: w.healthConnected ? AppColors.greenD : AppColors.muted,
                 ),
               ),
             ],

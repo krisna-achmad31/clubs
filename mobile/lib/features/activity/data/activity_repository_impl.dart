@@ -1,17 +1,45 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/widgets/flat_map.dart';
+import '../../../core/backend/dev_api.dart';
 import '../../profile/domain/usecases/streak_rules.dart';
 import '../domain/entities/activity.dart';
 import '../domain/repositories/activity_repository.dart';
 
 class ActivityRepositoryImpl implements ActivityRepository {
-  ActivityRepositoryImpl([this._preferences]);
+  ActivityRepositoryImpl([this._preferences, this._api]);
   SharedPreferences? _preferences;
+  final DevApi? _api;
   Future<void>? _loading;
+
+  final _items = <Activity>[
+    // Hardcoded demo seed disabled — data now comes from DevApi.
+    // Activity(id: 'gbk', ...),
+  ];
+
   Future<void> _load() async {
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      try {
+        final rows = await api.activitiesFull();
+        final myId = api.currentUserId;
+        final synced = <Activity>[
+          for (final r in rows)
+            if (r['user_id'] == myId) _fromApiRow(r),
+        ];
+        _items
+          ..clear()
+          ..addAll(synced);
+        if (_preferences != null) {
+          await _persist();
+        }
+        return;
+      } on Object {
+        // Fall through to local cache when offline.
+      }
+    }
     final prefs = _preferences ??= await SharedPreferences.getInstance();
     final raw = prefs.getString('activities');
     if (raw == null) return;
@@ -23,35 +51,21 @@ class ActivityRepositoryImpl implements ActivityRepository {
         ..clear()
         ..addAll(items);
     } on Object {
-      /* Preserve the demo seed when an older record cannot be read. */
+      // Ignore corrupt cache.
     }
   }
 
   Future<void> _ensureLoaded() => _loading ??= _load();
+
   Future<void> _persist() async {
-    final ok = await _preferences!.setString(
+    final prefs = _preferences;
+    if (prefs == null) return;
+    final ok = await prefs.setString(
       'activities',
       jsonEncode(_items.map((a) => a.toJson()).toList()),
     );
     if (!ok) throw StateError('Activity could not be saved');
   }
-
-  final _items = <Activity>[
-    Activity(
-      id: 'gbk',
-      published: false,
-      sportId: 'lari',
-      title: 'Lari Pagi GBK',
-      start: DateTime.now().copyWith(hour: 6, minute: 12),
-      duration: const Duration(minutes: 32, seconds: 10),
-      source: ActivitySource.gps,
-      distanceKm: 5.24,
-      avgHr: 152,
-      route: FlatMap.demoRoute,
-      splits: const [382, 365, 358, 374],
-      clubName: 'Klub Lari Santai GBK',
-    ),
-  ];
 
   @override
   Future<List<Activity>> recent() async {
@@ -65,6 +79,28 @@ class ActivityRepositoryImpl implements ActivityRepository {
     _items.removeWhere((old) => old.id == a.id);
     _items.insert(0, a);
     await _persist();
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      await api.saveActivityFull({
+        'id': a.id,
+        'sport_id': a.sportId,
+        'title': a.title,
+        'occurred_at': a.start.toUtc().toIso8601String(),
+        'duration_seconds': a.duration.inSeconds.clamp(1, 86400),
+        'visibility': switch (a.privacy) {
+          Privacy.publik => 'public',
+          Privacy.klub => 'club',
+          Privacy.pengikut => 'private',
+        },
+        'note': a.note,
+        'distance_km': a.distanceKm,
+        'avg_hr': a.avgHr,
+        'route': [
+          for (final p in a.route) {'dx': p.dx, 'dy': p.dy},
+        ],
+        'splits': a.splits,
+      });
+    }
   }
 
   @override
@@ -74,6 +110,18 @@ class ActivityRepositoryImpl implements ActivityRepository {
     if (i < 0) return;
     _items[i] = a;
     await _persist();
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      await api.updateActivityFull(a.id, {
+        'title': a.title,
+        'note': a.note,
+        'visibility': switch (a.privacy) {
+          Privacy.publik => 'public',
+          Privacy.klub => 'club',
+          Privacy.pengikut => 'private',
+        },
+      });
+    }
   }
 
   @override
@@ -81,6 +129,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
     await _ensureLoaded();
     _items.removeWhere((a) => a.id == id);
     await _persist();
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      await api.deleteActivity(id);
+    }
   }
 
   @override
@@ -100,8 +152,6 @@ class ActivityRepositoryImpl implements ActivityRepository {
         uri.pathSegments.isEmpty) {
       throw const CheckInException(CheckInError.unknownCode);
     }
-    // The host QR rotates every 30 s (`klubby://checkin/<id>/<window>`):
-    // accept the current or the previous window only.
     if (uri.pathSegments.length > 1) {
       final window = int.tryParse(uri.pathSegments[1]);
       final now = DateTime.now().millisecondsSinceEpoch ~/ 30000;
@@ -110,5 +160,41 @@ class ActivityRepositoryImpl implements ActivityRepository {
       }
     }
     return uri.pathSegments.first;
+  }
+
+  static Activity _fromApiRow(ApiRow r) {
+    final vis = r['visibility'] as String? ?? 'private';
+    final privacy = switch (vis) {
+      'public' => Privacy.publik,
+      'club' => Privacy.klub,
+      _ => Privacy.pengikut,
+    };
+    final src = ActivitySource.values
+            .where((v) => v.name == r['source'])
+            .firstOrNull ??
+        ActivitySource.manual;
+    final clubMap = r['clubs'] as Map?;
+    return Activity(
+      id: r['id'] as String,
+      sportId: r['sport_id'] as String,
+      title: r['title'] as String,
+      start: DateTime.parse(r['occurred_at'] as String).toLocal(),
+      duration: Duration(seconds: (r['duration_seconds'] as num).toInt()),
+      source: src,
+      distanceKm: (r['distance_km'] as num?)?.toDouble() ?? 0,
+      avgHr: (r['avg_hr'] as num?)?.toInt(),
+      route: [
+        for (final p in (r['route'] as List? ?? const []))
+          Offset(
+            ((p as Map)['dx'] as num).toDouble(),
+            (p['dy'] as num).toDouble(),
+          ),
+      ],
+      splits: (r['splits'] as List? ?? const []).cast<int>(),
+      privacy: privacy,
+      note: r['note'] as String? ?? '',
+      clubName: clubMap?['name'] as String?,
+      published: vis != 'private',
+    );
   }
 }

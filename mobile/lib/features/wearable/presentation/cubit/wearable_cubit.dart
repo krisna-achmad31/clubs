@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/health_service.dart';
 import '../../../../core/services/watch_bridge.dart';
@@ -18,7 +19,15 @@ class WearableState extends Equatable {
     this.lastWorkout,
     this.lastSync,
     this.busy = false,
+    this.watchLinked = false,
+    this.pairRequest,
   });
+
+  /// The user confirmed a watch on this phone (code handshake).
+  final bool watchLinked;
+
+  /// A watch is waiting for the user to confirm its code.
+  final WatchPairRequest? pairRequest;
 
   final bool healthAvailable;
   final bool healthConnected;
@@ -54,6 +63,9 @@ class WearableState extends Equatable {
     WorkoutRecord? lastWorkout,
     DateTime? lastSync,
     bool? busy,
+    bool? watchLinked,
+    WatchPairRequest? pairRequest,
+    bool clearPairRequest = false,
   }) => WearableState(
     healthAvailable: healthAvailable ?? this.healthAvailable,
     healthConnected: healthConnected ?? this.healthConnected,
@@ -64,6 +76,8 @@ class WearableState extends Equatable {
     lastWorkout: lastWorkout ?? this.lastWorkout,
     lastSync: lastSync ?? this.lastSync,
     busy: busy ?? this.busy,
+    watchLinked: watchLinked ?? this.watchLinked,
+    pairRequest: clearPairRequest ? null : pairRequest ?? this.pairRequest,
   );
 
   @override
@@ -77,6 +91,8 @@ class WearableState extends Equatable {
     lastWorkout,
     lastSync,
     busy,
+    watchLinked,
+    pairRequest,
   ];
 }
 
@@ -84,8 +100,40 @@ class WearableState extends Equatable {
 /// Watch data arrives either live over [WatchBridge] (Apple Watch / Wear OS
 /// companion) or after the fact through Health Connect / HealthKit.
 class WearableCubit extends Cubit<WearableState> {
-  WearableCubit(this._health, this._watch, {this.onWorkout})
-    : super(const WearableState());
+  WearableCubit(this._health, this._watch, {this.onWorkout, this.prefs})
+    : super(WearableState(watchLinked: prefs?.getBool(_linkedKey) ?? false));
+
+  static const _linkedKey = 'watch_linked';
+
+  /// Remembers whether a watch was confirmed; null in tests.
+  final SharedPreferences? prefs;
+
+  void _setLinked(bool v) {
+    prefs?.setBool(_linkedKey, v);
+    emit(state.copyWith(watchLinked: v));
+  }
+
+  /// User confirmed the code shown on the watch.
+  Future<void> acceptPair() async {
+    final r = state.pairRequest;
+    if (r == null) return;
+    emit(state.copyWith(clearPairRequest: true));
+    _setLinked(true);
+    await _watch.pairOk(r.code);
+  }
+
+  Future<void> denyPair() async {
+    final r = state.pairRequest;
+    if (r == null) return;
+    emit(state.copyWith(clearPairRequest: true));
+    await _watch.pairDenied(r.code);
+  }
+
+  /// Disconnect the watch from this phone.
+  Future<void> unpairWatch() async {
+    _setLinked(false);
+    await _watch.unpair();
+  }
 
   final HealthService _health;
   final WatchBridge _watch;
@@ -123,7 +171,7 @@ class WearableCubit extends Cubit<WearableState> {
       );
       if (paired) {
         _listen();
-        if (reachable) await _watch.hello();
+        if (reachable && state.watchLinked) await _watch.hello();
       }
       if (connected) await sync();
     } on Exception {
@@ -137,7 +185,14 @@ class WearableCubit extends Cubit<WearableState> {
         case WatchHeartRate(:final bpm):
           emit(state.copyWith(bpm: bpm));
         case WatchWhoAmI():
-          unawaited(_watch.hello());
+          unawaited(state.watchLinked ? _watch.hello() : _watch.notPaired());
+        case WatchPairRequest():
+          emit(state.copyWith(pairRequest: e));
+        case WatchUnpair():
+          _setLinked(false);
+        case WatchWorkout() when !state.watchLinked:
+          // Not confirmed on this phone: no import and no ack, the watch keeps it.
+          break;
         case WatchWorkout(:final otherAccount) when otherAccount:
           // Linked to someone else: no import and no ack, the watch keeps it.
           break;
