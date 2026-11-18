@@ -6,9 +6,121 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:klubby/core/backend/dev_api.dart';
 import 'package:klubby/core/app_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('an expired saved session is rejected before the request', () async {
+    final payload = base64Url.encode(utf8.encode('{"exp":1}'));
+    SharedPreferences.setMockInitialValues({
+      'dev_api_token': 'header.$payload.signature',
+      'dev_api_user_id': 'expired-account',
+    });
+    final api = DevApi(
+      MockClient((_) async => throw StateError('Expired session was sent')),
+      'sb_publishable_test',
+      prefs: await SharedPreferences.getInstance(),
+    );
+    addTearDown(api.close);
+    expect(api.isSignedIn, isFalse);
+    await expectLater(
+      api.createClubFull({'name': 'Klub Uji'}),
+      throwsA(isA<DevApiException>().having((e) => e.status, 'status', 401)),
+    );
+  });
+
+  test('activity saves and edits use the same server UUID', () async {
+    final paths = <String>[];
+    final savedIds = <String>[];
+    final api = DevApi(
+      MockClient((request) async {
+        if (request.url.path == '/auth/v1/token') {
+          return http.Response(
+            '{"access_token":"session","user":{"id":"runner"}}',
+            200,
+          );
+        }
+        expect(request.url.path, '/rest/v1/activities');
+        if (request.method == 'POST') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['distance_km'], 5.25);
+          expect(request.headers['Prefer'], 'resolution=ignore-duplicates');
+          savedIds.add(body['id'] as String);
+        } else {
+          paths.add(request.url.queryParameters['id']!);
+        }
+        return http.Response('', 204);
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    addTearDown(api.close);
+    await api.signIn('runner@example.test', 'password');
+    const localId = 'gps_123';
+    const activity = {'id': localId, 'distance_km': 5.25};
+    await api.saveActivityFull(activity);
+    await api.saveActivityFull(activity);
+    await api.updateActivityFull(localId, {'title': 'Edited run'});
+    await api.deleteActivity(localId);
+    final id = savedIds.first;
+    expect(id, matches(r'^[a-f0-9-]{36}$'));
+    expect(savedIds, [id, id]);
+    expect(paths, ['eq.$id', 'eq.$id']);
+  });
+
+  test('people search and follow use authenticated Dev RPCs', () async {
+    final calls = <String>[];
+    final api = DevApi(
+      MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/auth/v1/token') {
+          return http.Response(
+            '{"access_token":"session","user":{"id":"me"}}',
+            200,
+          );
+        }
+        expect(request.headers['Content-Profile'], 'klubby_dev');
+        expect(request.headers['Authorization'], 'Bearer session');
+        calls.add(path);
+        switch (path) {
+          case '/rest/v1/rpc/find_people':
+            expect(jsonDecode(request.body), {
+              'p_mode': 'search',
+              'p_query': '@raka',
+              'p_offset': 0,
+            });
+            return http.Response(
+              '[{"id":"raka","name":"Raka Pratama","username":"raka",'
+              '"avatar":null,"is_following":false}]',
+              200,
+            );
+          case '/rest/v1/rpc/set_user_follow':
+            expect(jsonDecode(request.body), {
+              'p_user_id': 'raka',
+              'p_follow': true,
+            });
+        }
+        return http.Response('', 204);
+      }),
+      'sb_publishable_test',
+      mode: AppMode.DEV,
+    );
+    addTearDown(api.close);
+    await api.signIn('test@example.test', 'password');
+    final people = await api.findPeople('search', '@raka', 0);
+    final person = people.single;
+    expect(person.name, 'Raka Pratama');
+    expect(person.username, 'raka');
+    expect(person.avatar, isNull);
+    expect(person.isFollowing, isFalse);
+    await api.setUserFollow(person.id, true);
+    expect(calls, [
+      '/rest/v1/rpc/provision_dev_profile',
+      '/rest/v1/rpc/find_people',
+      '/rest/v1/rpc/set_user_follow',
+    ]);
+  });
+
   test('signup accepts the immediate Supabase session', () async {
     final api = DevApi(
       MockClient((request) async {

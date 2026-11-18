@@ -15,6 +15,7 @@ abstract interface class ClubRepository {
     required String sportId,
     required String area,
     required ClubPrivacy privacy,
+    ({double lat, double lng})? areaCenter,
     String? logoPath,
     PayoutAccount? payout,
   });

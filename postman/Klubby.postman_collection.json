@@ -1,0 +1,1461 @@
+{
+ "info": {
+  "name": "Klubby API",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+  "description": "Pilih environment Klubby Dev atau Klubby Live. Auth dipakai bersama. Request mutasi mengubah data pada schema aktif. Endpoint lanjutan bergantung pada migrasi yang terpasang. Lihat postman/README.md."
+ },
+ "auth": {
+  "type": "bearer",
+  "bearer": [
+   {
+    "key": "token",
+    "value": "{{access_token}}",
+    "type": "string"
+   }
+  ]
+ },
+ "item": [
+  {
+   "name": "Auth",
+   "item": [
+    {
+     "name": "Login email",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/auth/v1/token?grant_type=password",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "auth": {
+       "type": "noauth"
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data.access_token && data.refresh_token && data.user?.id) {",
+         "    pm.environment.set(\"access_token\", data.access_token);",
+         "    pm.environment.set(\"refresh_token\", data.refresh_token);",
+         "    pm.environment.set(\"user_id\", data.user.id);",
+         "  }",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Daftar akun",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/auth/v1/signup",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "auth": {
+       "type": "noauth"
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data.access_token && data.refresh_token && data.user?.id) {",
+         "    pm.environment.set(\"access_token\", data.access_token);",
+         "    pm.environment.set(\"refresh_token\", data.refresh_token);",
+         "    pm.environment.set(\"user_id\", data.user.id);",
+         "  }",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Refresh sesi",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/auth/v1/token?grant_type=refresh_token",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "auth": {
+       "type": "noauth"
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data.access_token && data.refresh_token && data.user?.id) {",
+         "    pm.environment.set(\"access_token\", data.access_token);",
+         "    pm.environment.set(\"refresh_token\", data.refresh_token);",
+         "    pm.environment.set(\"user_id\", data.user.id);",
+         "  }",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Login dengan token Google",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/auth/v1/token?grant_type=id_token",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"provider\": \"google\",\n  \"id_token\": \"{{google_id_token}}\",\n  \"access_token\": \"{{google_access_token}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "auth": {
+       "type": "noauth"
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data.access_token && data.refresh_token && data.user?.id) {",
+         "    pm.environment.set(\"access_token\", data.access_token);",
+         "    pm.environment.set(\"refresh_token\", data.refresh_token);",
+         "    pm.environment.set(\"user_id\", data.user.id);",
+         "  }",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cek sesi",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       }
+      ],
+      "url": "{{base_url}}/auth/v1/user"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Profil",
+   "item": [
+    {
+     "name": "Siapkan profil (Dev saja)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/provision_dev_profile",
+      "body": {
+       "mode": "raw",
+       "raw": "{}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Profil saya",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/users?select=*&id=eq.{{user_id}}"
+     }
+    },
+    {
+     "name": "Edit profil",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/users?id=eq.{{user_id}}",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Tester Postman\",\n  \"area\": \"Jakarta\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Olahraga saya",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/user_sports?user_id=eq.{{user_id}}"
+     }
+    },
+    {
+     "name": "Gear saya",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/user_gear?user_id=eq.{{user_id}}"
+     }
+    },
+    {
+     "name": "Tambah gear",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/user_gear",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Raket uji\",\n  \"kind\": \"raket\",\n  \"sport_id\": \"badminton\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "Klub",
+   "item": [
+    {
+     "name": "Daftar klub",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/clubs?limit=20"
+     }
+    },
+    {
+     "name": "Buat klub",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "key": "Prefer",
+        "value": "return=representation"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/clubs",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"created_by\": \"{{user_id}}\",\n  \"name\": \"Klub uji Postman\",\n  \"sport_id\": \"badminton\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data[0]?.id) pm.environment.set(\"club_id\", data[0].id);",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cari klub sekitar",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/discover_clubs",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_lat\": -6.2,\n  \"p_lon\": 106.8,\n  \"p_radius_km\": 10\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Gabung klub",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/join_club",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_club_id\": \"{{club_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Setujui anggota",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/approve_club_member",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_club_id\": \"{{club_id}}\",\n  \"p_user_id\": \"{{member_user_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Daftar anggota",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_members?club_id=eq.{{club_id}}"
+     }
+    },
+    {
+     "name": "Chat klub",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_messages?club_id=eq.{{club_id}}&order=created_at.desc&limit=50"
+     }
+    },
+    {
+     "name": "Kirim chat",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_messages",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"club_id\": \"{{club_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"body\": \"Pesan uji Postman\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Kas klub",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_kas_entries?club_id=eq.{{club_id}}"
+     }
+    },
+    {
+     "name": "Catat kas",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_kas_entries",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"club_id\": \"{{club_id}}\",\n  \"title\": \"Setoran uji\",\n  \"amount\": 10000,\n  \"is_income\": true\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Undangan saya",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_invites?invited_user_id=eq.{{user_id}}"
+     }
+    },
+    {
+     "name": "Kirim undangan",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/club_invites",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"club_id\": \"{{club_id}}\",\n  \"invited_user_id\": \"{{member_user_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "Mabar dan pembayaran manual",
+   "item": [
+    {
+     "name": "Daftar sesi",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/mabar_sessions?order=starts_at.asc&limit=20"
+     }
+    },
+    {
+     "name": "Buat sesi",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "key": "Prefer",
+        "value": "return=representation"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/mabar_sessions",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"host_id\": \"{{user_id}}\",\n  \"club_id\": \"{{club_id}}\",\n  \"title\": \"Mabar uji\",\n  \"sport_id\": \"badminton\",\n  \"starts_at\": \"{{starts_at}}\",\n  \"ends_at\": \"{{ends_at}}\",\n  \"venue\": \"GOR uji\",\n  \"fee\": 0,\n  \"slots\": 12,\n  \"qris\": false\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data[0]?.id) pm.environment.set(\"session_id\", data[0].id);",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Peserta sesi",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/session_participants?session_id=eq.{{session_id}}"
+     }
+    },
+    {
+     "name": "RSVP",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/rsvp_mabar",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_session_id\": \"{{session_id}}\",\n  \"p_via\": \"APP\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Batalkan RSVP",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/cancel_mabar_rsvp",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_session_id\": \"{{session_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Simpan path QR statik",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/set_mabar_payment_qr",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_session_id\": \"{{session_id}}\",\n  \"p_path\": \"{{object_path}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Laporkan pembayaran",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/report_mabar_payment",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_session_id\": \"{{session_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Pembayaran menunggu pemeriksaan",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/session_participants?select=id,name,payment_reported_at&session_id=eq.{{session_id}}&payment_reported_at=not.is.null&status=eq.menunggu&cancelled_at=is.null"
+     }
+    },
+    {
+     "name": "Setujui pembayaran",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/review_mabar_payment",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_session_id\": \"{{session_id}}\",\n  \"p_participant_id\": \"{{participant_id}}\",\n  \"p_approved\": true\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Buat URL QR sementara",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/storage/v1/object/sign/{{club_logo_bucket}}/{{object_path}}",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"expiresIn\": 120\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "Notifikasi",
+   "item": [
+    {
+     "name": "Inbox",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/notifications?select=id,kind,payload,created_at,read_at&order=created_at.desc,id.desc&limit=50"
+     }
+    },
+    {
+     "name": "Tandai dibaca (RPC Dev)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/mark_notifications_read",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_ids\": [\n    \"{{notification_id}}\"\n  ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Tandai dibaca (REST Live)",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/notifications?id=eq.{{notification_id}}&read_at=is.null",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"read_at\": \"{{$isoTimestamp}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Daftarkan token FCM",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/register_fcm_token",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_token\": \"{{fcm_token}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Hapus token FCM",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/unregister_fcm_token",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_token\": \"{{fcm_token}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "Aktivitas dan feed",
+   "item": [
+    {
+     "name": "Feed aktivitas",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activities?order=occurred_at.desc&limit=20"
+     }
+    },
+    {
+     "name": "Catat aktivitas",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "key": "Prefer",
+        "value": "return=representation"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activities",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"sport_id\": \"badminton\",\n  \"title\": \"Aktivitas uji\",\n  \"occurred_at\": \"{{$isoTimestamp}}\",\n  \"duration_seconds\": 1800,\n  \"visibility\": \"public\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data[0]?.id) pm.environment.set(\"activity_id\", data[0].id);",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Reaksi",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activity_reactions?activity_id=eq.{{activity_id}}"
+     }
+    },
+    {
+     "name": "Tambah reaksi",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activity_reactions",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"activity_id\": \"{{activity_id}}\",\n  \"emoji\": \"👍\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Komentar",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activity_comments?activity_id=eq.{{activity_id}}"
+     }
+    },
+    {
+     "name": "Tambah komentar",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/activity_comments",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"activity_id\": \"{{activity_id}}\",\n  \"author_name\": \"Tester Postman\",\n  \"body\": \"Komentar uji\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "Liga dan turnamen",
+   "item": [
+    {
+     "name": "Klasemen klub",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/get_league_standings",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_club_id\": \"{{club_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    },
+    {
+     "name": "Turnamen saya",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/tournaments?host_id=eq.{{user_id}}"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Goyang dan Shop",
+   "item": [
+    {
+     "name": "Lobi aktif",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/goyang_lobbies?active=eq.true"
+     }
+    },
+    {
+     "name": "Buat lobi",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "key": "Prefer",
+        "value": "return=representation"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/goyang_lobbies",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"sport_id\": \"badminton\",\n  \"venue\": \"GOR uji\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "if (pm.response.code >= 200 && pm.response.code < 300) {",
+         "  const data = pm.response.json();",
+         "  if (data[0]?.id) pm.environment.set(\"lobby_id\", data[0].id);",
+         "}"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Respons lobi",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/goyang_responses?lobby_id=eq.{{lobby_id}}"
+     }
+    },
+    {
+     "name": "Produk",
+     "request": {
+      "method": "GET",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Accept-Profile",
+        "value": "{{api_schema}}"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/shop_products?available=eq.true"
+     }
+    },
+    {
+     "name": "Beli item",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "apikey",
+        "value": "{{publishable_key}}"
+       },
+       {
+        "key": "Content-Profile",
+        "value": "{{api_schema}}"
+       },
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": "{{base_url}}/rest/v1/rpc/buy_shop_item",
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"p_product_id\": \"{{product_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

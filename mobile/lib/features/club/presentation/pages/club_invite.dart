@@ -89,10 +89,16 @@ class _InviteViewState extends State<_InviteView> {
   }
 
   Future<void> _add(KlubbyUser user) async {
-    await context.read<ClubsCubit>().addMember(widget.club.id, user);
-    if (!mounted) return;
-    setState(() => _added++);
-    toast(context, '${user.name} masuk ${widget.club.name} 🎉');
+    try {
+      await context.read<ClubsCubit>().addMember(widget.club.id, user);
+      if (!mounted) return;
+      setState(() => _added++);
+      toast(context, '${user.name} masuk ${widget.club.name} 🎉');
+    } on Object catch (error) {
+      if (mounted) {
+        toast(context, apiFeedback(error, fallback: 'Anggota gagal ditambahkan.'));
+      }
+    }
   }
 
   String get _message =>
@@ -119,7 +125,13 @@ class _InviteViewState extends State<_InviteView> {
   Future<void> _searchManual() async {
     final raw = _manual.text.trim();
     if (raw.isEmpty) return;
-    final users = await context.read<ClubsCubit>().findUsers([raw]);
+    final List<KlubbyUser> users;
+    try {
+      users = await context.read<ClubsCubit>().findUsers([raw]);
+    } on Object catch (error) {
+      if (mounted) toast(context, apiFeedback(error, fallback: 'Pencarian anggota gagal.'));
+      return;
+    }
     if (!mounted) return;
     final digits = normalizePhone(raw);
     final isNumber = !raw.startsWith('@') && digits.length >= 9;
@@ -402,7 +414,13 @@ class _PickMembersSheetState extends State<_PickMembersSheet> {
   Future<void> _search() async {
     final raw = _query.text.trim();
     if (raw.isEmpty) return;
-    final users = await context.read<ClubsCubit>().findUsers([raw]);
+    final List<KlubbyUser> users;
+    try {
+      users = await context.read<ClubsCubit>().findUsers([raw]);
+    } on Object catch (error) {
+      if (mounted) toast(context, apiFeedback(error, fallback: 'Pencarian anggota gagal.'));
+      return;
+    }
     if (mounted) {
       _show(
         users,
@@ -431,7 +449,7 @@ class _PickMembersSheetState extends State<_PickMembersSheet> {
       if (mounted) {
         _show(
           users,
-          'Belum ada kontakmu yang terdeteksi di Klubby (pencocokan masih demo).',
+          'Belum ada kontakmu yang ditemukan di Klubby.',
         );
       }
     } catch (_) {

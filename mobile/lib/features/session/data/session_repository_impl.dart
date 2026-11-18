@@ -75,10 +75,14 @@ class SessionRepositoryImpl implements SessionRepository {
 
   @override
   Future<MabarSession> byId(String id) async {
-    if (!_byId.containsKey(id)) await _sync();
-    final found = _byId[id];
-    if (found == null) throw StateError('Session $id not found');
-    return found;
+    final cached = _byId[id];
+    if (cached != null) return cached;
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      final row = (await api.sessionsFull(id: id)).firstOrNull;
+      if (row != null) return _byId[id] = _fromApiRow(row);
+    }
+    throw const DevApiException(404, userMessage: 'Mabar sudah tidak tersedia.');
   }
 
   @override

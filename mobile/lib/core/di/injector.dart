@@ -34,6 +34,7 @@ import '../../features/wearable/presentation/cubit/wearable_cubit.dart';
 import '../services/contacts_service.dart';
 import '../services/health_service.dart';
 import '../services/location_service.dart';
+import '../services/area_directory.dart';
 import '../services/notification_service.dart';
 import '../services/permission_service.dart';
 import '../services/watch_bridge.dart';
@@ -51,6 +52,10 @@ Future<void> configureDependencies() async {
     // Platform services
     ..registerLazySingleton(PermissionService.new)
     ..registerLazySingleton(LocationService.new)
+    ..registerLazySingleton(
+      () => AreaDirectory(http.Client()),
+      dispose: (directory) => directory.close(),
+    )
     ..registerLazySingleton(NotificationService.new)
     ..registerLazySingleton(HealthService.new)
     ..registerLazySingleton(WatchBridge.new)

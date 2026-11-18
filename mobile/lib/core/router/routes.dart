@@ -7,6 +7,7 @@ abstract final class R {
   static const intro = '/intro';
   static const welcome = '/welcome';
   static const signup = '/signup';
+  static const expiredSession = '/signup?mode=login&auth=session-expired';
   static const otp = '/signup/otp';
   static const about = '/signup/about';
   static const location = '/signup/location';
@@ -21,6 +22,9 @@ abstract final class R {
   static const clubs = '/klub';
   static const league = '/liga';
   static const profile = '/profil';
+  static const peopleSearch = '/profil/cari-pengguna';
+  static const following = '/profil/mengikuti';
+  static const followers = '/profil/pengikut';
 
   // Feed (J)
   static String post(String id) => '/post/$id';

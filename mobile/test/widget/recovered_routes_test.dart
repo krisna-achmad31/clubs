@@ -12,6 +12,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_fonts/src/google_fonts_base.dart' as font_base;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:klubby/core/app_data.dart';
+import 'package:klubby/core/backend/dev_api.dart';
+import 'package:klubby/core/services/area_directory.dart';
 import 'package:klubby/core/widgets/widgets.dart';
 
 import '../support/fake_location_platform.dart';
@@ -21,6 +26,8 @@ import 'package:klubby/core/router/routes.dart';
 import 'package:klubby/features/activity/presentation/pages/activity_pages.dart';
 import 'package:klubby/features/club/presentation/cubit/clubs_cubit.dart';
 import 'package:klubby/features/club/presentation/pages/club_pages.dart';
+import 'package:klubby/features/club/data/club_repository_impl.dart';
+import 'package:klubby/features/club/domain/entities/club.dart';
 import 'package:klubby/features/feed/presentation/cubit/feed_cubit.dart';
 import 'package:klubby/features/feed/presentation/pages/feed_pages.dart';
 import 'package:klubby/features/activity/presentation/widgets/activity_data_sections.dart';
@@ -39,6 +46,7 @@ import 'package:klubby/features/tournament/domain/entities/tournament.dart';
 import 'package:klubby/features/league/presentation/cubit/league_cubit.dart';
 import 'package:klubby/features/profile/presentation/cubit/me_cubit.dart';
 import 'package:klubby/features/profile/presentation/pages/profile_pages.dart';
+import 'package:klubby/features/profile/presentation/pages/people_page.dart';
 import 'package:klubby/features/profile/presentation/pages/streak_pages.dart';
 import 'package:klubby/features/session/presentation/cubit/sessions_cubit.dart';
 import 'package:klubby/features/shop/presentation/pages/misc_pages.dart';
@@ -117,7 +125,11 @@ void main() {
     await sl.reset();
   });
 
-  Future<void> mount(WidgetTester tester, Widget page) async {
+  Future<void> mount(
+    WidgetTester tester,
+    Widget page, {
+    ClubsCubit? clubsCubit,
+  }) async {
     tester.view.physicalSize = const Size(320, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -126,6 +138,15 @@ void main() {
       routes: [
         GoRoute(path: '/', builder: (_, _) => page),
         GoRoute(path: R.geng, builder: (_, _) => const GengPage()),
+        GoRoute(
+          path: R.newClub,
+          pageBuilder: (_, state) =>
+              MaterialPage<Club>(key: state.pageKey, child: const NewClubPage()),
+        ),
+        GoRoute(
+          path: R.peopleSearch,
+          builder: (_, _) => const PeoplePage(PeopleMode.search),
+        ),
         GoRoute(path: R.done, builder: (_, _) => const DonePage()),
         GoRoute(
           path: '/post/:id',
@@ -146,7 +167,7 @@ void main() {
       MultiBlocProvider(
         providers: [
           BlocProvider.value(value: sl<MeCubit>()),
-          BlocProvider.value(value: sl<ClubsCubit>()),
+          BlocProvider.value(value: clubsCubit ?? sl<ClubsCubit>()),
           BlocProvider.value(value: sl<SessionsCubit>()),
           BlocProvider.value(value: sl<FeedCubit>()),
           BlocProvider.value(value: sl<LeagueCubit>()),
@@ -176,6 +197,319 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('Profil can search, follow and unfollow at 320px', (tester) async {
+    var following = false;
+    final api = DevApi(
+      MockClient((request) async {
+        switch (request.url.path) {
+          case '/auth/v1/token':
+            return http.Response(
+              '{"access_token":"test-session","user":{"id":"me"}}',
+              200,
+            );
+          case '/rest/v1/rpc/find_people':
+            expect(jsonDecode(request.body)['p_query'], '@raka');
+            return http.Response(jsonEncode([
+              {
+                'id': 'raka',
+                'name': 'Raka Pratama',
+                'username': 'raka',
+                'avatar': 'kapi',
+                'is_following': following,
+              },
+            ]), 200);
+          case '/rest/v1/rpc/set_user_follow':
+            following = jsonDecode(request.body)['p_follow'] as bool;
+            return http.Response('', 204);
+          default:
+            throw StateError('Unexpected request ${request.url.path}');
+        }
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+
+    await mount(tester, const ProfilePage());
+    await tester.tap(find.text('CARI PENGGUNA'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.enterText(find.byType(TextFormField), '@raka');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('Raka Pratama'), findsOneWidget);
+    await tester.tap(find.text('Ikuti'));
+    await tester.pumpAndSettle();
+    expect(following, isTrue);
+    await tester.tap(find.text('Berhenti ikuti'));
+    await tester.pumpAndSettle();
+    expect(following, isFalse);
+    expect(find.text('Ikuti'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Tantangan loads, joins, reloads and leaves through the API', (
+    tester,
+  ) async {
+    var joined = false;
+    final api = DevApi(
+      MockClient((request) async {
+        switch (request.url.path) {
+          case '/auth/v1/token':
+            return http.Response(
+              '{"access_token":"test-session","user":{"id":"me"}}',
+              200,
+            );
+          case '/rest/v1/rpc/provision_dev_profile':
+            return http.Response('', 204);
+        }
+        expect(request.headers['Content-Profile'], 'klubby_dev');
+        expect(request.headers['Authorization'], 'Bearer test-session');
+        switch (request.url.path) {
+          case '/rest/v1/rpc/list_challenges':
+            return http.Response(jsonEncode([
+              {
+                'id': 'run',
+                'title': 'Lari 50 km',
+                'description': 'Lari setelah bergabung.',
+                'kind': 'pribadi',
+                'sport_id': 'lari',
+                'goal': 50,
+                'unit': 'km',
+                'joined': joined,
+                'progress': joined ? 2.25 : 0,
+                'completed': false,
+              },
+            ]), 200);
+          case '/rest/v1/rpc/set_challenge_membership':
+            final payload = jsonDecode(request.body) as Map<String, dynamic>;
+            expect(payload['p_challenge_id'], 'run');
+            joined = payload['p_join'] as bool;
+            return http.Response('', 204);
+          default:
+            throw StateError('Unexpected request ${request.url.path}');
+        }
+      }),
+      'sb_publishable_test',
+      mode: AppMode.DEV,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+
+    await mount(tester, const ChallengesPage());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GABUNG'));
+    await tester.pumpAndSettle();
+    expect(joined, isTrue);
+    expect(find.text('2,25/50 km'), findsOneWidget);
+    await tester.tap(find.text('Lari 50 km'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lari setelah bergabung.'), findsOneWidget);
+    final leave = find.text('KELUAR TANTANGAN');
+    await tester.ensureVisible(leave);
+    await tester.pumpAndSettle();
+    await tester.tap(leave);
+    await tester.pumpAndSettle();
+    expect(joined, isFalse);
+    expect(find.text('GABUNG'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Buat Klub shows backend errors and returns the saved club', (
+    tester,
+  ) async {
+    var attempts = 0;
+    final club = {
+      'id': 'saved-club',
+      'created_by': 'me',
+      'name': 'Klub Uji',
+      'sport_id': 'badminton',
+      'privacy': 'publik',
+      'code': 'ABC123',
+      'club_payout_accounts': null,
+    };
+    final api = DevApi(
+      MockClient((request) async {
+        switch (request.url.path) {
+          case '/auth/v1/token':
+            return http.Response(
+              '{"access_token":"test-session","user":{"id":"me"}}',
+              200,
+            );
+          case '/rest/v1/rpc/provision_dev_profile':
+            return http.Response('', 204);
+          case '/rest/v1/rpc/create_club_full':
+            expect(request.headers['Content-Profile'], 'klubby_dev');
+            expect(jsonDecode(request.body)['p_club']['name'], 'Klub Uji');
+            if (++attempts == 1) {
+              return http.Response(
+                '{"code":"PT400","message":"Pilih area klub dulu."}',
+                400,
+              );
+            }
+            return http.Response(jsonEncode(club), 200);
+          case '/rest/v1/clubs':
+            return http.Response(jsonEncode([club]), 200);
+          case '/rest/v1/club_members':
+            return http.Response(
+              '[{"club_id":"saved-club","role":"admin","status":"active"}]',
+              200,
+            );
+          case '/rest/v1/club_invites':
+            return http.Response('[]', 200);
+          default:
+            throw StateError('Unexpected request ${request.url.path}');
+        }
+      }),
+      'sb_publishable_test',
+      mode: AppMode.DEV,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    final cubit = ClubsCubit(ClubRepositoryImpl(null, api));
+    addTearDown(cubit.close);
+    addTearDown(api.close);
+
+    Club? saved;
+    await mount(
+      tester,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () async => saved = await context.push<Club>(R.newClub),
+          child: const Text('Buka formulir klub'),
+        ),
+      ),
+      clubsCubit: cubit,
+    );
+    await tester.tap(find.text('Buka formulir klub'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'Klub Uji');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('BUAT KLUB'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pilih area klub dulu.'), findsOneWidget);
+    expect(saved, isNull);
+
+    await tester.tap(find.text('BUAT KLUB'));
+    await tester.pumpAndSettle();
+    expect(find.text('Klub berhasil dibuat.'), findsOneWidget);
+    expect(saved?.code, 'ABC123');
+    expect(cubit.state.mine.single.id, 'saved-club');
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Jelajahi renders server results and refreshes join status', (
+    tester,
+  ) async {
+    var joined = false;
+    final api = DevApi(
+      MockClient((request) async {
+        switch (request.url.path) {
+          case '/auth/v1/token':
+            return http.Response(
+              '{"access_token":"test-session","user":{"id":"me"}}',
+              200,
+            );
+          case '/rest/v1/rpc/provision_dev_profile':
+            return http.Response('', 204);
+        }
+        expect(request.headers['Content-Profile'], 'klubby_dev');
+        expect(request.headers['Authorization'], 'Bearer test-session');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        switch (request.url.path) {
+          case '/rest/v1/rpc/join_club':
+            expect(body['p_club_id'], 'club');
+            joined = true;
+            return http.Response('', 204);
+          case '/rest/v1/rpc/explore_results':
+            expect(body['p_offset'], 0);
+            final kind = body['p_kind'];
+            final row = switch (kind) {
+              'club' => {
+                'id': 'club',
+                'title': 'Klub API',
+                'subtitle': '',
+                'distance_km': 2.4,
+                'sport_id': 'badminton',
+                'total': 9,
+                'slots': 2,
+                'status': joined ? 'pending' : 'persetujuan',
+              },
+              'mabar' => {
+                'id': 'mabar',
+                'title': 'Mabar API',
+                'subtitle': 'GOR Uji',
+                'total': 3,
+                'slots': 8,
+                'session_id': 'mabar',
+              },
+              'tournament' => {
+                'id': 'tournament',
+                'title': 'Turnamen API',
+                'subtitle': 'americano',
+                'status': 'finished',
+              },
+              'venue' => {
+                'id': 'mabar',
+                'title': 'Venue API',
+                'subtitle': 'Lihat Mabar di venue ini',
+                'session_id': 'mabar',
+              },
+              'people' => {
+                'id': 'person',
+                'title': 'Nama API',
+                'subtitle': 'user_api',
+                'status': 'available',
+              },
+              _ => throw StateError('Unexpected explore kind $kind'),
+            };
+            if (kind == 'people') expect(body['p_query'], '@user_api');
+            return http.Response(jsonEncode([row]), 200);
+          default:
+            throw StateError('Unexpected request ${request.url.path}');
+        }
+      }),
+      'sb_publishable_test',
+      mode: AppMode.DEV,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+
+    await mount(tester, const ExplorePage());
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2,4 km dari pusat area'), findsOneWidget);
+    expect(find.textContaining('9 anggota'), findsOneWidget);
+    await tester.tap(find.text('MINTA'));
+    await tester.pumpAndSettle();
+    expect(find.text('MENUNGGU'), findsOneWidget);
+    expect(find.text('Permintaan bergabung dikirim.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    for (final (tab, title) in [
+      ('Mabar', 'Mabar API'),
+      ('Turnamen', 'Turnamen API'),
+      ('Venue', 'Venue API'),
+    ]) {
+      await tester.tap(find.text(tab));
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsOneWidget);
+    }
+    await tester.tap(find.text('Orang'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ketik minimal 2'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), '@user_api');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('Nama API'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Buat Klub stacks full-width sport and area fields', (
@@ -527,18 +861,51 @@ void main() {
     tester,
   ) async {
     final original = GeolocatorPlatform.instance;
-    GeolocatorPlatform.instance = FakeLocationPlatform();
+    GeolocatorPlatform.instance = FakeLocationPlatform()
+      ..position = testPosition(lat: -7.566, lng: 110.825);
     addTearDown(() => GeolocatorPlatform.instance = original);
+    Map<String, Object> district(String code, String name, String city) => {
+      'attributes': {
+        'KDCPUM': code,
+        'WADMKC': name,
+        'WADMKK': city,
+        'WADMPR': 'Jawa Tengah',
+      },
+      'geometry': {
+        'rings': [
+          [
+            [110.81, -7.57],
+            [110.84, -7.57],
+            [110.84, -7.55],
+            [110.81, -7.57],
+          ],
+        ],
+      },
+    };
+    final current = district('33.72.05', 'Banjarsari', 'Kota Surakarta');
+    final nearby = district('33.72.02', 'Jebres', 'Kota Surakarta');
+    final directory = AreaDirectory(
+      MockClient((request) async {
+        final query = request.url.queryParameters;
+        expect(request.url.host, 'geoservices.big.go.id');
+        expect(query['geometry'], '110.82500,-7.56600');
+        return http.Response(jsonEncode({
+          'features': query['distance'] != null ? [nearby, current] : [current],
+        }), 200);
+      }),
+    );
+    await sl.unregister<AreaDirectory>();
+    sl.registerSingleton<AreaDirectory>(directory, dispose: (d) => d.close());
     await mount(tester, const NewClubPage());
     await tester.tap(find.byType(KField).at(1));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PAKAI LOKASI SEKARANG'));
-    await tester.pumpAndSettle();
     expect(find.text('Pilih area'), findsOneWidget);
     expect(
-      find.textContaining('Perkiraan area terdekat: Cilandak'),
+      find.textContaining('Lokasi terdeteksi: Banjarsari, Kota Surakarta'),
       findsOneWidget,
     );
+    expect(find.text('KECAMATAN SEKITAR'), findsOneWidget);
+    expect(find.text('Jebres'), findsOneWidget);
     await Scrollable.ensureVisible(
       tester.element(find.text('PAKAI AREA INI')),
       alignment: .5,
@@ -547,7 +914,7 @@ void main() {
     await tester.tap(find.text('PAKAI AREA INI'));
     await tester.pumpAndSettle();
     expect(find.text('Pilih area'), findsNothing);
-    expect(find.text('Cilandak, Jakarta Selatan'), findsOneWidget);
+    expect(find.text('Banjarsari, Kota Surakarta'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 3));

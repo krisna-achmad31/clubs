@@ -721,7 +721,6 @@ class _GoyangBarengPageState extends State<GoyangBarengPage> {
                   value: _following,
                   onChanged: (v) {
                     final me = context.read<MeCubit>();
-                    me.setFollowing(v);
                     me.setSetting('follow_goyang_raka', v);
                     setState(() => _following = v);
                   },

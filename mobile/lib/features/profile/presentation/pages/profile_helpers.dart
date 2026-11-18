@@ -42,6 +42,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
+      onRefresh: context.read<MeCubit>().load,
       children: [
         Row(
           children: [
@@ -72,11 +73,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       KLink(
                         '${p.following} Mengikuti',
-                        onTap: () => _people(context, 'Mengikuti'),
+                        onTap: () => context.push(R.following),
                       ),
                       KLink(
                         '${p.followers} Pengikut',
-                        onTap: () => _people(context, 'Pengikut'),
+                        onTap: () => context.push(R.followers),
                       ),
                     ],
                   ),
@@ -84,6 +85,12 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ],
+        ),
+        KButton(
+          'Cari pengguna',
+          icon: LucideIcons.search,
+          kind: BtnKind.secondary,
+          onTap: () => context.push(R.peopleSearch),
         ),
         // Tabs switch the content below in place; they never push a route.
         KSegmented(
@@ -229,25 +236,6 @@ class _ProfilePageState extends State<ProfilePage> {
       style: AppText.bodySm(),
     ),
   ];
-
-  void _people(BuildContext context, String title) => showKSheet<void>(
-    context,
-    (ctx) => KSheet(
-      children: [
-        Text(title, style: AppText.title()),
-        KBanner.info(
-          'Daftar contoh di perangkat. Sinkronisasi pengikut belum tersedia.',
-        ),
-        for (final name in ['Raka Pratama', 'Dinda Putri', 'Sisca Lestari'])
-          KRow(
-            title: name,
-            icon: LucideIcons.user,
-            onTap: () =>
-                showUserSheet(ctx, name: name, subtitle: 'Profil contoh'),
-          ),
-      ],
-    ),
-  );
 }
 
 /// Six latest sessions as stamps; empty slots stay locked.

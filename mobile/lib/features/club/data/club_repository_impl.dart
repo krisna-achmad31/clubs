@@ -113,10 +113,23 @@ class ClubRepositoryImpl implements ClubRepository {
 
   @override
   Future<Club> byId(String id) async {
-    if (!_byId.containsKey(id)) await _syncClubs();
-    final found = _byId[id];
-    if (found == null) throw StateError('Club $id not found');
-    return found;
+    final cached = _byId[id];
+    if (cached != null) return cached;
+    final api = _api;
+    if (api != null && api.isSignedIn) {
+      final row = (await api.clubsFull(id: id)).firstOrNull;
+      if (row != null) {
+        final member = (await api.memberships())
+            .where((m) => m['club_id'] == id && m['status'] == 'active')
+            .firstOrNull;
+        return _byId[id] = _fromApiRow(
+          row,
+          memberCount: row['member_count'] as int? ?? 1,
+          isAdmin: member?['role'] == 'admin' || row['created_by'] == api.currentUserId,
+        );
+      }
+    }
+    throw const DevApiException(404, userMessage: 'Klub sudah tidak tersedia.');
   }
 
   @override
@@ -153,16 +166,15 @@ class ClubRepositoryImpl implements ClubRepository {
     required String sportId,
     required String area,
     required ClubPrivacy privacy,
+    ({double lat, double lng})? areaCenter,
     String? logoPath,
     PayoutAccount? payout,
   }) async {
     final api = _api;
     if (api == null || !api.isSignedIn) {
-      throw StateError('Login required to create a club');
+      throw const DevApiException(401);
     }
     final sport = Sports.byId(sportId);
-    final code =
-        '${name.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase().padRight(4, 'X').substring(0, 4)}01';
     final row = await api.createClubFull({
       'name': name,
       'sport_id': sportId,
@@ -170,13 +182,14 @@ class ClubRepositoryImpl implements ClubRepository {
       'color': AppColors.primary.toARGB32(),
       'emoji': sport.emoji,
       'area': area,
+      if (areaCenter != null) 'area_lat': areaCenter.lat,
+      if (areaCenter != null) 'area_lng': areaCenter.lng,
       'privacy': privacy.name,
-      'code': code,
       'logo_path': logoPath,
-      if (payout != null) ...{
-        'payout_provider': payout.provider,
-        'payout_number': payout.number,
-        'payout_holder': payout.holder,
+      if (payout != null) 'payout': {
+        'provider': payout.provider,
+        'number': payout.number,
+        'holder': payout.holder,
       },
     });
     final club = _fromApiRow(row, memberCount: 1, isAdmin: true);
@@ -198,7 +211,14 @@ class ClubRepositoryImpl implements ClubRepository {
   Future<List<KlubbyUser>> findUsers(Iterable<String> phonesOrUsernames) async {
     final api = _api;
     if (api == null || !api.isSignedIn) return const [];
-    final terms = phonesOrUsernames.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final terms = phonesOrUsernames
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .map((value) => RegExp(r'^[+0-9 ()-]{9,}$').hasMatch(value)
+            ? waNumber(value)
+            : value)
+        .toSet()
+        .toList();
     if (terms.isEmpty) return const [];
     final rows = await api.findUsers(terms);
     return [
@@ -214,9 +234,11 @@ class ClubRepositoryImpl implements ClubRepository {
   @override
   Future<void> addMember(String clubId, KlubbyUser user) async {
     final api = _api;
-    if (api == null || !api.isSignedIn) return;
-    final rows = await api.findUsers([user.username]);
-    if (rows.isEmpty) return;
+    if (api == null || !api.isSignedIn) throw const DevApiException(401);
+    final rows = await api.findUsers(['@${user.username}']);
+    if (rows.isEmpty) {
+      throw const DevApiException(404, userMessage: 'Akun anggota sudah tidak tersedia.');
+    }
     await api.addClubMember(clubId, rows.first['id'] as String);
     await _syncClubs();
   }
@@ -225,10 +247,10 @@ class ClubRepositoryImpl implements ClubRepository {
   Future<void> setPayout(String clubId, PayoutAccount payout) async {
     final api = _api;
     if (api != null && api.isSignedIn) {
-      await api.updateClub(clubId, {
-        'payout_provider': payout.provider,
-        'payout_number': payout.number,
-        'payout_holder': payout.holder,
+      await api.saveClubPayout(clubId, {
+        'provider': payout.provider,
+        'number': payout.number,
+        'holder': payout.holder,
       });
     }
     final c = _byId[clubId];
@@ -378,9 +400,7 @@ class ClubRepositoryImpl implements ClubRepository {
     required int memberCount,
     required bool isAdmin,
   }) {
-    final payoutProvider = r['payout_provider'] as String?;
-    final payoutNumber = r['payout_number'] as String?;
-    final payoutHolder = r['payout_holder'] as String?;
+    final payout = r['club_payout_accounts'] as Map<String, dynamic>?;
     final colorVal = (r['color'] as num?)?.toInt();
     return Club(
       id: r['id'] as String,
@@ -399,11 +419,11 @@ class ClubRepositoryImpl implements ClubRepository {
       sessionsPerWeek: (r['sessions_per_week'] as num?)?.toInt() ?? 0,
       note: r['note'] as String? ?? '',
       logoPath: r['logo_path'] as String?,
-      payout: (payoutProvider != null && payoutNumber != null && payoutHolder != null)
+      payout: payout != null
           ? PayoutAccount(
-              provider: payoutProvider,
-              number: payoutNumber,
-              holder: payoutHolder,
+              provider: payout['provider'] as String,
+              number: payout['number'] as String,
+              holder: payout['holder'] as String,
             )
           : null,
       admin: isAdmin,

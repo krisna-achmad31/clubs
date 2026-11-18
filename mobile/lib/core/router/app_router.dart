@@ -21,12 +21,14 @@ import '../../features/onboarding/presentation/pages/welcome_pages.dart';
 import '../../features/profile/presentation/cubit/me_cubit.dart';
 import '../../features/wearable/presentation/cubit/wearable_cubit.dart';
 import '../../features/profile/presentation/pages/profile_pages.dart';
+import '../../features/profile/presentation/pages/people_page.dart';
 import '../../features/profile/presentation/pages/streak_pages.dart';
 import '../../features/session/presentation/pages/host_pages.dart';
 import '../../features/session/presentation/pages/session_pages.dart';
 import '../../features/shop/presentation/pages/misc_pages.dart';
 import '../../features/tournament/presentation/pages/tournament_pages.dart';
 import '../../features/club/domain/repositories/club_repository.dart';
+import '../../features/club/domain/entities/club.dart';
 import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../di/injector.dart';
 import '../backend/dev_api.dart';
@@ -37,8 +39,8 @@ import '../widgets/widgets.dart';
 import 'routes.dart';
 
 /// Slide-up + fade, springy enough to feel playful without costing frames.
-CustomTransitionPage<void> _page(GoRouterState s, Widget child) =>
-    CustomTransitionPage<void>(
+CustomTransitionPage<T> _page<T>(GoRouterState s, Widget child) =>
+    CustomTransitionPage<T>(
       key: s.pageKey,
       child: child,
       transitionDuration: Motion.base,
@@ -59,7 +61,7 @@ CustomTransitionPage<void> _page(GoRouterState s, Widget child) =>
     );
 
 GoRoute _r(String path, Widget Function(GoRouterState s) build) =>
-    GoRoute(path: path, pageBuilder: (_, s) => _page(s, build(s)));
+    GoRoute(path: path, pageBuilder: (_, s) => _page<void>(s, build(s)));
 
 String _id(GoRouterState s) => s.pathParameters['id']!;
 
@@ -83,6 +85,7 @@ FutureOr<String?> _deepLink(GoRouterState s) {
   if (!custom && !shared) return null;
   // A link must not skip onboarding for a user who has not finished it.
   if (_onboarded != true) return _afterOnboarding(s);
+  if (!sl<DevApi>().isSignedIn) return R.expiredSession;
   if (segs.length == 2 && segs[0] == 'p') return R.post(segs[1]);
   if (segs.length == 2 && segs[0] == 'k') return _clubByCode(segs[1]);
   return custom ? '/${segs.join('/')}' : null;
@@ -191,7 +194,10 @@ GoRouter buildRouter() => GoRouter(
 
     // B · clubs
     _r(R.explore, (_) => const ExplorePage()),
-    _r(R.newClub, (_) => const NewClubPage()),
+    GoRoute(
+      path: R.newClub,
+      pageBuilder: (_, s) => _page<Club>(s, const NewClubPage()),
+    ),
     _r('/club/:id', (s) => ClubPage(id: _id(s))),
     _r('/club/:id/chat', (s) => ClubChatPage(id: _id(s))),
     _r('/club/:id/kas', (s) => KasPage(id: _id(s))),
@@ -261,6 +267,9 @@ GoRouter buildRouter() => GoRouter(
     ),
 
     // M · profile
+    _r(R.peopleSearch, (_) => const PeoplePage(PeopleMode.search)),
+    _r(R.following, (_) => const PeoplePage(PeopleMode.following)),
+    _r(R.followers, (_) => const PeoplePage(PeopleMode.followers)),
     _r(R.avatar, (_) => const AvatarPage()),
     _r(R.settings, (_) => const SettingsPage()),
     _r(R.privacy, (_) => const PrivacyPage()),

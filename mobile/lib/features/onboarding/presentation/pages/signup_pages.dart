@@ -274,6 +274,8 @@ class _SignupPageState extends State<SignupPage> {
       ),
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
       children: [
+        if (authStatus == 'session-expired')
+          KBanner.info('Sesi berakhir. Masuk lagi untuk melanjutkan.'),
         if (authStatus == 'callback-failed')
           KBanner.info(
             'Sesi dari tautan tidak dapat dibuka. Masuk lagi setelah email terkonfirmasi.',

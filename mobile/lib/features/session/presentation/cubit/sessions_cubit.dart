@@ -59,6 +59,14 @@ class SessionsCubit extends Cubit<SessionsState> {
     );
   }
 
+  Future<void> ensureAvailable(String id) async {
+    if (state[id] != null) return;
+    final session = await _repo.byId(id);
+    if (!isClosed) {
+      emit(state.copyWith(sessions: {...state.sessions, id: session}));
+    }
+  }
+
   void _rsvp(String id, Rsvp r) {
     emit(state.copyWith(rsvps: {...state.rsvps, id: r}));
     _repo.saveRsvps(state.rsvps);

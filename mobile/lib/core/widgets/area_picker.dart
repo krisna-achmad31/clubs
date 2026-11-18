@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../di/injector.dart';
+import '../services/area_directory.dart';
 import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import 'basics.dart';
 import 'chunky.dart';
+import 'page.dart';
 
 /// A kecamatan the user can pick for clubs, mabar and "near me".
 class Area {
@@ -107,14 +111,24 @@ abstract final class Areas {
   }
 }
 
-/// Sheet: GPS → nearest kecamatan, or search the list, or use what was typed.
-/// Returns the picked label ("Kebayoran Baru, Jakarta Selatan").
-Future<String?> showAreaPicker(BuildContext context, {String? current}) =>
-    showKSheet<String>(context, (_) => _AreaSheet(current: current));
+class AreaSelection {
+  const AreaSelection(this.label, {this.center, this.origin});
+
+  final String label;
+  final GeoPoint? center;
+  final GeoPoint? origin;
+}
+
+Future<AreaSelection?> showAreaSelection(
+  BuildContext context, {
+  String? current,
+}) => showKSheet<AreaSelection>(context, (_) => _AreaSheet(current: current));
+
+Future<String?> showAreaPicker(BuildContext context, {String? current}) async =>
+    (await showAreaSelection(context, current: current))?.label;
 
 class _AreaSheet extends StatefulWidget {
   const _AreaSheet({this.current});
-
   final String? current;
 
   @override
@@ -122,40 +136,94 @@ class _AreaSheet extends StatefulWidget {
 }
 
 class _AreaSheetState extends State<_AreaSheet> {
-  final _location = LocationService();
-  String _q = '';
+  final _location = sl<LocationService>();
+  final _directory = sl<AreaDirectory>();
+  String _query = '';
   bool _locating = false;
-  String? _error;
-  Area? _suggestion;
+  bool _searching = false;
+  bool _selecting = false;
+  String? _locationError;
+  String? _searchError;
+  District? _current;
+  GeoPoint? _origin;
+  List<District> _nearby = [];
+  List<District> _matches = [];
+  Timer? _debounce;
 
-  Future<void> _locate() async {
+  @override
+  void initState() {
+    super.initState();
+    _locate(requestPermission: false);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _locate({bool requestPermission = true}) async {
     if (_locating) return;
     setState(() {
       _locating = true;
-      _error = null;
-      _suggestion = null;
+      _locationError = null;
     });
     try {
-      final p = await _location.current();
+      final position = await _location.current(
+        requestPermission: requestPermission,
+      );
       if (!mounted) return;
-      final area = p == null ? null : Areas.nearby(p.lat, p.lng);
+      if (position == null) {
+        if (requestPermission) {
+          setState(() => _locationError = _location.failureMessage);
+        }
+        return;
+      }
+      final result = await _directory.near(position);
+      if (!mounted) return;
       setState(() {
-        _suggestion = area;
-        _error = p == null
-            ? _location.failureMessage
-            : area == null
-            ? 'Lokasi terbaca, tetapi area ini belum ada di daftar. Cari atau ketik kecamatanmu.'
-            : null;
+        _origin = position;
+        _current = result.current;
+        _nearby = result.nearby;
+        if (result.current == null) {
+          _locationError = 'Kecamatan untuk titik GPS ini belum ditemukan. Pilih area terdekat atau cari manual.';
+        }
       });
     } on Exception {
       if (mounted) {
         setState(
-          () => _error = 'Lokasi belum bisa dibaca. Coba lagi atau pilih area secara manual.',
+          () => _locationError = 'Data wilayah belum bisa dimuat. Coba lagi atau ketik area secara manual.',
         );
       }
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+  }
+
+  void _search(String input) {
+    _debounce?.cancel();
+    final query = input.trim();
+    setState(() {
+      _query = query;
+      _matches = [];
+      _searchError = null;
+      _searching = query.length >= 2;
+    });
+    if (!_searching) return;
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final results = await _directory.search(query);
+        if (mounted && query == _query) setState(() => _matches = results);
+      } on Exception {
+        if (mounted && query == _query) {
+          setState(
+            () => _searchError = 'Pencarian area belum bisa dimuat. Coba lagi.',
+          );
+        }
+      } finally {
+        if (mounted && query == _query) setState(() => _searching = false);
+      }
+    });
   }
 
   Future<void> _openSettings() async {
@@ -165,81 +233,124 @@ class _AreaSheetState extends State<_AreaSheet> {
           : await _location.openSettings();
       if (mounted && !opened) {
         setState(
-          () => _error = 'Pengaturan tidak bisa dibuka. Buka pengaturan lokasi perangkat secara manual.',
+          () => _locationError =
+              'Buka pengaturan perangkat untuk mengaktifkan lokasi.',
         );
       }
     } on Exception {
       if (mounted) {
         setState(
-          () => _error = 'Buka pengaturan perangkat untuk mengaktifkan GPS dan izin lokasi Klubby.',
+          () => _locationError =
+              'Buka pengaturan perangkat untuk mengaktifkan lokasi.',
         );
       }
     }
   }
 
+  Future<void> _select(District district, {bool useGps = false}) async {
+    if (_selecting) return;
+    var center = district.center;
+    if (center == null) {
+      setState(() => _selecting = true);
+      try {
+        center = await _directory.centerFor(district);
+      } on Exception {
+        // The name remains usable even when the reference point is unavailable.
+      } finally {
+        if (mounted) setState(() => _selecting = false);
+      }
+    }
+    if (!mounted) return;
+    if (center == null && !useGps) {
+      toast(context, 'Area dipilih. Titik pusat kecamatan belum tersedia.');
+    }
+    Navigator.pop(
+      context,
+      AreaSelection(
+        district.label,
+        center: center,
+        origin: useGps ? _origin : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final q = _q.trim().toLowerCase();
-    final list = q.isEmpty
-        ? Areas.all
-        : Areas.all.where((a) => a.label.toLowerCase().contains(q)).toList();
-    final selected = widget.current == null
-        ? null
-        : Areas.find(widget.current!);
+    final list = _query.isEmpty ? _nearby : _matches;
+    final currentLabel = widget.current?.trim().toLowerCase();
     return KSheet(
+      maxHeightFactor: .8,
       children: [
         Text('Pilih area', style: AppText.title()),
         KButton(
-          'PAKAI LOKASI SEKARANG',
+          'Pakai lokasi sekarang',
           icon: LucideIcons.locateFixed,
           loading: _locating,
-          onTap: _locating ? null : _locate,
+          onTap: _locating ? null : () => _locate(),
         ),
-        if (_error != null) KBanner.error(_error!),
-        if (_error != null &&
+        if (_locationError != null) KBanner.error(_locationError!),
+        if (_locationError != null &&
             (_location.issue == LocationIssue.serviceDisabled ||
                 _location.issue == LocationIssue.permissionDeniedForever))
           KButton.secondary(
-            'BUKA PENGATURAN',
+            'Buka pengaturan',
             icon: LucideIcons.settings,
             onTap: _openSettings,
           ),
-        if (_suggestion case final area?) ...[
-          KBanner.info(
-            'Perkiraan area terdekat: ${area.label}. Pastikan kecamatannya sesuai; daftar area belum lengkap.',
-          ),
-          KButton(
-            'PAKAI AREA INI',
+        if (_current case final district?) ...[
+          KBanner.info('Lokasi terdeteksi: ${district.label}.'),
+          KButton.secondary(
+            'Pakai area ini',
             icon: LucideIcons.check,
-            onTap: () => Navigator.pop(context, area.label),
+            onTap: () => _select(district, useGps: true),
           ),
         ],
         KInput(
           hint: 'Cari kecamatan atau kota',
           icon: LucideIcons.search,
           iconColor: AppColors.faint,
-          onChanged: (v) => setState(() => _q = v),
+          onChanged: _search,
         ),
-        if (list.isEmpty && q.length >= 3)
+        if (_searching || _selecting) const LinearProgressIndicator(),
+        if (_searchError != null) ...[
+          Text(_searchError!, style: AppText.bodySm()),
+          KLink('Coba lagi', onTap: () => _search(_query)),
+        ],
+        if (_query.isEmpty && _nearby.isNotEmpty)
+          const FieldLabel('KECAMATAN SEKITAR'),
+        if (_query.isEmpty && _nearby.isEmpty && !_locating)
+          Text(
+            'Gunakan GPS atau cari nama kecamatan atau kota.',
+            style: AppText.bodySm(),
+          ),
+        if (list.isEmpty && _query.length >= 3 && !_searching)
           KRow(
             icon: LucideIcons.plus,
-            title: 'Pakai "${_q.trim()}"',
-            subtitle: 'Area belum ada di daftar',
-            onTap: () => Navigator.pop(context, _q.trim()),
+            title: 'Pakai "$_query"',
+            subtitle: 'Masukkan area secara manual',
+            onTap: () => Navigator.pop(context, AreaSelection(_query)),
           ),
-        for (final a in list)
+        for (final district in list)
           KRow(
             icon: LucideIcons.mapPin,
-            iconBg: a == selected ? AppColors.primary : AppColors.primaryL,
-            iconFg: a == selected ? AppColors.white : AppColors.primary,
-            title: a.name,
-            subtitle: a.city,
-            trailing: a == selected
-                ? const Icon(LucideIcons.check, color: AppColors.primary)
-                : null,
+            iconBg: district.label.toLowerCase() == currentLabel
+                ? AppColors.primary
+                : AppColors.primaryL,
+            iconFg: district.label.toLowerCase() == currentLabel
+                ? AppColors.white
+                : AppColors.primary,
+            title: district.name,
+            subtitle: [
+              district.city,
+              district.province,
+            ].where((s) => s.isNotEmpty).join(' · '),
             padding: const EdgeInsets.symmetric(vertical: 6),
-            onTap: () => Navigator.pop(context, a.label),
+            onTap: () => _select(district),
           ),
+        Text(
+          'Data batas wilayah: Badan Informasi Geospasial.',
+          style: AppText.bodySm(),
+        ),
       ],
     );
   }

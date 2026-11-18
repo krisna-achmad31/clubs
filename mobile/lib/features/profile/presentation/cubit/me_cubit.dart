@@ -92,12 +92,6 @@ class MeCubit extends Cubit<UserProfile> {
     );
   }
 
-  void setFollowing(bool follow) => _set(
-    state.copyWith(
-      following: (state.following + (follow ? 1 : -1)).clamp(0, 1 << 30),
-    ),
-  );
-
   /// M2 Cairkan saldo. Returns false when the balance is too low.
   bool withdraw(int amount) {
     if (amount <= 0 || amount > state.saldo) return false;

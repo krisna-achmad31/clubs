@@ -11,9 +11,94 @@ import '../app_data.dart';
 
 typedef ApiRow = Map<String, dynamic>;
 
+class ExploreResult {
+  ExploreResult.fromJson(ApiRow json)
+    : id = json['id'] as String,
+      title = json['title'] as String,
+      subtitle = json['subtitle'] as String,
+      sportId = json['sport_id'] as String?,
+      area = json['area'] as String?,
+      distanceKm = (json['distance_km'] as num?)?.toDouble(),
+      total = json['total'] as int?,
+      slots = json['slots'] as int?,
+      fee = json['fee'] as int?,
+      status = json['status'] as String?,
+      sessionId = json['session_id'] as String?,
+      startsAt = DateTime.tryParse(json['starts_at'] as String? ?? '')?.toLocal();
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final String? sportId;
+  final String? area;
+  final double? distanceKm;
+  final int? total;
+  final int? slots;
+  final int? fee;
+  final String? status;
+  final String? sessionId;
+  final DateTime? startsAt;
+}
+
+class ChallengeResult {
+  ChallengeResult.fromJson(ApiRow json)
+    : id = json['id'] as String,
+      title = json['title'] as String,
+      description = json['description'] as String,
+      kind = json['kind'] as String,
+      sportId = json['sport_id'] as String,
+      goal = json['goal'] as int,
+      unit = json['unit'] as String,
+      joined = json['joined'] as bool,
+      progress = (json['progress'] as num).toDouble(),
+      completed = json['completed'] as bool;
+
+  final String id;
+  final String title;
+  final String description;
+  final String kind;
+  final String sportId;
+  final int goal;
+  final String unit;
+  final bool joined;
+  final double progress;
+  final bool completed;
+}
+
+class PeopleResult {
+  PeopleResult.fromJson(ApiRow json)
+    : id = json['id'] as String,
+      name = json['name'] as String,
+      username = json['username'] as String,
+      avatar = json['avatar'] as String?,
+      isFollowing = json['is_following'] as bool;
+
+  final String id;
+  final String name;
+  final String username;
+  final String? avatar;
+  final bool isFollowing;
+}
+
 class DevApiException implements Exception {
-  const DevApiException(this.status);
+  const DevApiException(this.status, {this.code, this.userMessage});
   final int status;
+  final String? code;
+  final String? userMessage;
+}
+
+String apiFeedback(Object error, {required String fallback}) {
+  if (error is TimeoutException) return 'Server terlalu lama merespons. Coba lagi.';
+  if (error is http.ClientException) return 'Koneksi terputus. Cek internet lalu coba lagi.';
+  if (error is! DevApiException) return fallback;
+  return error.userMessage ?? switch (error.status) {
+    401 => 'Sesi berakhir. Masuk ulang lalu coba lagi.',
+    403 => 'Kamu tidak punya izin untuk tindakan ini.',
+    409 => 'Data bentrok dengan perubahan lain. Muat ulang lalu coba lagi.',
+    429 => 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
+    >= 500 => 'Server sedang bermasalah. Coba lagi nanti.',
+    _ => fallback,
+  };
 }
 
 /// The Dev build always targets its own schema; no request falls back to Prod.
@@ -37,11 +122,28 @@ class DevApi {
   final SharedPreferences? _prefs;
   String? _accessToken;
   String? _userId;
-  bool get isSignedIn => _accessToken != null && _userId != null;
+  bool get isSignedIn {
+    final token = _accessToken;
+    return token != null && _userId != null && !_jwtExpired(token);
+  }
   String? get currentUserId => _userId;
   static final oauthCallback = Uri.parse('klubby://auth-callback');
   String? _oauthVerifier;
   String get _signupVerifierKey => 'klubby_signup_verifier_${mode.name}';
+
+  static bool _jwtExpired(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return false;
+    try {
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      final exp = payload is Map ? payload['exp'] : null;
+      return exp is num && DateTime.now().millisecondsSinceEpoch >= exp * 1000;
+    } on FormatException {
+      return false;
+    }
+  }
 
   static String _newVerifier() {
     final random = Random.secure();
@@ -254,6 +356,29 @@ class DevApi {
     await _rpc('join_club', {'p_club_id': id});
   }
 
+  Future<List<ExploreResult>> explore({
+    required String kind,
+    required String query,
+    required String? sport,
+    required String? area,
+    required double? lat,
+    required double? lon,
+    required int offset,
+    required List<String> matchingSports,
+  }) async {
+    final rows = await _rpc('explore_results', {
+      'p_kind': kind,
+      'p_query': query,
+      'p_sport': sport,
+      'p_area': area,
+      'p_lat': lat,
+      'p_lon': lon,
+      'p_offset': offset,
+      'p_matching_sports': matchingSports,
+    }) as List;
+    return rows.cast<ApiRow>().map(ExploreResult.fromJson).toList();
+  }
+
   Future<List<ApiRow>> chat(String id) => _list('club_messages', {
     'select': 'id,user_id,body,created_at',
     'club_id': 'eq.$id',
@@ -384,8 +509,48 @@ class DevApi {
     });
   }
 
-  Future<ApiRow> fullProfile() async =>
-      (await _list('users', {'select': '*', 'id': 'eq.$_userId'})).single;
+  Future<ApiRow> fullProfile() async {
+    final profile = (await _list('users', {
+      'select': '*',
+      'id': 'eq.$_userId',
+    })).single;
+    try {
+      final counts = await _rpc('my_follow_counts', {}) as ApiRow;
+      return {...profile, ...counts};
+    } on DevApiException catch (error) {
+      if (error.status != 404) rethrow;
+      return profile;
+    }
+  }
+
+  Future<List<PeopleResult>> findPeople(
+    String mode,
+    String query,
+    int offset,
+  ) async {
+    final rows = await _rpc('find_people', {
+      'p_mode': mode,
+      'p_query': query,
+      'p_offset': offset,
+    }) as List;
+    return rows.cast<ApiRow>().map(PeopleResult.fromJson).toList();
+  }
+
+  Future<void> setUserFollow(String id, bool follow) async {
+    await _rpc('set_user_follow', {'p_user_id': id, 'p_follow': follow});
+  }
+
+  Future<List<ChallengeResult>> challenges() async {
+    final rows = await _rpc('list_challenges', {}) as List;
+    return rows.cast<ApiRow>().map(ChallengeResult.fromJson).toList();
+  }
+
+  Future<void> setChallengeMembership(String id, bool join) async {
+    await _rpc('set_challenge_membership', {
+      'p_challenge_id': id,
+      'p_join': join,
+    });
+  }
 
   Future<List<ApiRow>> userSports() => _list('user_sports', {
     'select': 'sport_id,level,positions',
@@ -416,13 +581,17 @@ class DevApi {
   }
 
   Future<List<ApiRow>> findUsers(List<String> terms) async {
-    if (terms.isEmpty) return const [];
-    final escaped = terms.map((t) => '"${t.replaceAll('"', '')}"').join(',');
-    return _list('users', {
-      'select': 'id,name,username,phone,avatar',
-      'or': '(username.in.($escaped),phone.in.($escaped))',
-      'limit': '50',
-    });
+    final users = <String, ApiRow>{};
+    for (var offset = 0; offset < terms.length; offset += 100) {
+      final rows = await _rpc('find_club_users', {
+        'p_terms': terms.skip(offset).take(100).toList(),
+      }) as List;
+      for (final row in rows.cast<ApiRow>()) {
+        final id = row['id'] as String;
+        if (!users.containsKey(id) || row['phone'] != '') users[id] = row;
+      }
+    }
+    return users.values.toList();
   }
 
   Future<List<ApiRow>> gear() => _list('user_gear', {
@@ -448,10 +617,11 @@ class DevApi {
     }
   }
 
-  Future<List<ApiRow>> clubsFull() => _list('clubs', const {
-    'select': 'id,created_by,name,sport_id,initials,color,emoji,area,schedule,note,logo_path,privacy,pinned_note,pro,code,sessions_per_week,payout_provider,payout_number,payout_holder',
+  Future<List<ApiRow>> clubsFull({String? id}) => _list('clubs', {
+    'select': 'id,created_by,name,sport_id,initials,color,emoji,area,schedule,note,logo_path,privacy,pinned_note,pro,code,sessions_per_week,club_payout_accounts(provider,number,holder)',
     'order': 'name',
     'limit': '100',
+    if (id != null) 'id': 'eq.$id',
   });
 
   Future<List<ApiRow>> clubMemberCounts() => _list('club_members', const {
@@ -460,14 +630,16 @@ class DevApi {
     'limit': '1000',
   });
 
-  Future<ApiRow> createClubFull(ApiRow body) async {
-    final rows = await _requestRaw(
+  Future<ApiRow> createClubFull(ApiRow body) async =>
+      await _rpc('create_club_full', {'p_club': body}) as ApiRow;
+
+  Future<void> saveClubPayout(String clubId, ApiRow payout) async {
+    await _requestRaw(
       'POST',
-      '/rest/v1/clubs',
-      headers: const {'Prefer': 'return=representation'},
-      body: {'created_by': _userId, ...body},
-    ) as List;
-    return (rows.first as Map).cast<String, dynamic>();
+      '/rest/v1/club_payout_accounts',
+      headers: const {'Prefer': 'resolution=merge-duplicates'},
+      body: {'club_id': clubId, ...payout},
+    );
   }
 
   Future<void> updateClub(String id, ApiRow fields) => _request(
@@ -483,16 +655,9 @@ class DevApi {
     query: {'club_id': 'eq.$clubId', 'user_id': 'eq.$_userId'},
   );
 
-  Future<void> addClubMember(String clubId, String userId) => _request(
-    'POST',
-    '/rest/v1/club_members',
-    body: {
-      'club_id': clubId,
-      'user_id': userId,
-      'role': 'member',
-      'status': 'active',
-    },
-  );
+  Future<void> addClubMember(String clubId, String userId) async {
+    await _rpc('add_club_member', {'p_club_id': clubId, 'p_user_id': userId});
+  }
 
   Future<List<ApiRow>> clubInvites() => _list('club_invites', {
     'select': 'id,club_id,status,clubs(name,sport_id,emoji,area)',
@@ -546,10 +711,11 @@ class DevApi {
     return (rows.first as Map).cast<String, dynamic>();
   }
 
-  Future<List<ApiRow>> sessionsFull() => _list('mabar_sessions', {
-    'select': '*,clubs(name,emoji,payout_provider,payout_number,payout_holder),session_participants(*)',
+  Future<List<ApiRow>> sessionsFull({String? id}) => _list('mabar_sessions', {
+    'select': '*,clubs(name,emoji),session_participants(*)',
     'order': 'starts_at',
     'limit': '100',
+    if (id != null) 'id': 'eq.$id',
   });
 
   Future<ApiRow> createSessionFull(ApiRow body) async {
@@ -575,27 +741,44 @@ class DevApi {
     'limit': '100',
   });
 
-  Future<ApiRow> saveActivityFull(ApiRow body) async {
-    final rows = await _requestRaw(
+  static final _uuid = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
+  String _remoteActivityId(String id) {
+    if (_uuid.hasMatch(id)) return id;
+    // Use the same UUID for retries and edits. QR activity IDs can be shared
+    // by people attending the same session, so scope the hash to the account.
+    final hex = sha256.convert(utf8.encode('activity:$_userId:$id')).toString();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '8${hex.substring(13, 16)}-8${hex.substring(17, 20)}-'
+        '${hex.substring(20, 32)}';
+  }
+
+  Future<void> saveActivityFull(ApiRow body) async {
+    await _requestRaw(
       'POST',
       '/rest/v1/activities',
       headers: const {
-        'Prefer': 'return=representation,resolution=merge-duplicates',
+        'Prefer': 'resolution=ignore-duplicates',
       },
-      body: body,
-    ) as List;
-    return (rows.first as Map).cast<String, dynamic>();
+      body: {...body, 'id': _remoteActivityId(body['id'] as String)},
+    );
   }
 
   Future<void> updateActivityFull(String id, ApiRow body) => _request(
     'PATCH',
     '/rest/v1/activities',
-    query: {'id': 'eq.$id'},
+    query: {'id': 'eq.${_remoteActivityId(id)}'},
     body: body,
   );
 
-  Future<void> deleteActivity(String id) =>
-      _request('DELETE', '/rest/v1/activities', query: {'id': 'eq.$id'});
+  Future<void> deleteActivity(String id) => _request(
+    'DELETE',
+    '/rest/v1/activities',
+    query: {'id': 'eq.${_remoteActivityId(id)}'},
+  );
 
   Future<List<ApiRow>> activityReactions(List<String> ids) async {
     if (ids.isEmpty) return const [];
@@ -768,7 +951,7 @@ class DevApi {
       throw const DevApiException(0);
     }
     final token = _accessToken;
-    if (dataApi && token == null) {
+    if (dataApi && !isSignedIn) {
       if (kDebugMode) {
         debugPrint('[Klubby API #$requestId] blocked: no session');
       }
@@ -816,7 +999,12 @@ class DevApi {
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw DevApiException(response.statusCode);
+      final error = _responseError(response);
+      if (dataApi && token == _accessToken && error.status == 401 &&
+          const {'PGRST301', 'PGRST303'}.contains(error.code)) {
+        signOut();
+      }
+      throw error;
     }
     if (response.bodyBytes.isEmpty) return null;
     try {
@@ -827,5 +1015,28 @@ class DevApi {
       }
       rethrow;
     }
+  }
+
+  static DevApiException _responseError(http.Response response) {
+    final status = response.statusCode;
+    try {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      if (body is Map<String, dynamic>) {
+        final code = body['code'];
+        final message = body['message'];
+        return DevApiException(
+          status,
+          code: code is String ? code : null,
+          userMessage: const {400, 401, 403, 404, 409}.contains(status) &&
+                  code == 'PT$status' && message is String &&
+                  message.trim().isNotEmpty && message.length <= 160
+              ? message.trim()
+              : null,
+        );
+      }
+    } on FormatException {
+      // Some upstream failures return plain text or an HTML error page.
+    }
+    return DevApiException(status);
   }
 }

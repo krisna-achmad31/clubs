@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injector.dart';
+import '../../../../core/backend/dev_api.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/services/contacts_service.dart';
 import '../../../../core/widgets/widgets.dart';
@@ -24,7 +25,7 @@ import '../../domain/entities/club.dart';
 import '../../domain/repositories/club_repository.dart';
 import '../cubit/club_chat_cubit.dart';
 import '../cubit/clubs_cubit.dart';
-import '../../../tournament/presentation/cubit/tournament_cubit.dart';
+export 'explore_page.dart';
 
 part 'club_actions.dart';
 part 'club_invite.dart';
@@ -290,82 +291,6 @@ class _InviteCard extends StatelessWidget {
               onTap: () => cubit.declineInvite(invite),
             ),
           ]),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExploreClubCard extends StatelessWidget {
-  const _ExploreClubCard({
-    required this.club,
-    required this.member,
-    required this.pending,
-  });
-
-  final Club club;
-  final bool member;
-  final bool pending;
-
-  @override
-  Widget build(BuildContext context) {
-    final hue = club.hue;
-    final stat = club.division != null
-        ? '${club.members} anggota · Divisi ${club.division}'
-        : '${club.members} anggota · ${club.sessionsPerWeek > 0 ? '${club.sessionsPerWeek} mabar/minggu' : (club.note.isEmpty ? 'aktif' : club.note)}';
-    return KCard(
-      onTap: () => context.push(R.club(club.id)),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: hue.base,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: lip(hue.dark, 4),
-            ),
-            child: Emo(club.emoji, size: 28),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  club.name,
-                  style: AppText.custom(17),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${club.sport.name} · ${Fmt.dec(club.distanceKm, 1)} km dari kamu',
-                  style: AppText.bodySm(),
-                ),
-                Text(
-                  stat,
-                  style: AppText.custom(12, w: FontWeight.w800, c: hue.base),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (member)
-            KTag(
-              'ANGGOTA',
-              bg: AppColors.bg,
-              fg: AppColors.faint,
-              border: AppColors.line,
-            )
-          else if (pending)
-            const KTag('MENUNGGU', bg: AppColors.purpleL, fg: AppColors.purple)
-          else
-            KMiniButton(
-              club.needsApproval ? 'MINTA' : 'GABUNG',
-              hue: club.needsApproval ? Hue.purple : null,
-              onTap: () => context.read<ClubsCubit>().join(club),
-            ),
         ],
       ),
     );
@@ -1380,6 +1305,7 @@ class _NewClubPageState extends State<NewClubPage> {
   bool _busy = false;
   String? _logo;
   late String _area = context.read<MeCubit>().state.area;
+  ({double lat, double lng})? _areaCenter;
   PayoutAccount? _payout;
 
   /// Klubby users picked in "Anggota awal"; they join when the club is made.
@@ -1398,28 +1324,46 @@ class _NewClubPageState extends State<NewClubPage> {
     }
     setState(() => _busy = true);
     final clubs = context.read<ClubsCubit>();
+    final members = List.of(_members);
+    late final Club club;
     try {
-      final c = await clubs.create(
+      club = await clubs.create(
         name: _name.text.trim(),
         sportId: _sport.id,
         area: _area,
         privacy: _privacy,
+        areaCenter: _areaCenter,
         logoPath: _logo,
         payout: _payout,
       );
-      for (final u in _members) {
-        await clubs.addMember(c.id, u);
-      }
-      if (!mounted) return;
-      // Callers decide what comes next: the Klub tab opens the new club,
-      // onboarding and the host form return to their own step.
-      context.canPop() ? context.pop(c) : context.go(R.club(c.id));
-    } catch (_) {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _busy = false);
-        toast(context, 'Klub belum tersimpan. Coba lagi.');
+        toast(context, apiFeedback(error, fallback: 'Klub belum tersimpan. Coba lagi.'));
+        if (error is DevApiException && error.status == 401 &&
+            !sl<DevApi>().isSignedIn) {
+          context.go(R.expiredSession);
+        }
+      }
+      return;
+    }
+    var failed = 0;
+    String? memberError;
+    for (final user in members) {
+      try {
+        await clubs.addMember(club.id, user);
+      } on Object catch (error) {
+        failed++;
+        memberError ??= apiFeedback(error, fallback: 'Coba undang ulang.');
       }
     }
+    if (!mounted) return;
+    toast(context, failed == 0
+        ? 'Klub berhasil dibuat.'
+        : 'Klub dibuat. $failed anggota gagal ditambahkan. $memberError');
+    // Callers decide what comes next: the Klub tab opens the new club,
+    // onboarding and the host form return to their own step.
+    context.canPop() ? context.pop(club) : context.go(R.club(club.id));
   }
 
   Future<void> _pickLogo() async {
@@ -1621,8 +1565,13 @@ class _NewClubPageState extends State<NewClubPage> {
                 size: 18,
               ),
               onTap: () async {
-                final a = await showAreaPicker(context, current: _area);
-                if (a != null && mounted) setState(() => _area = a);
+                final area = await showAreaSelection(context, current: _area);
+                if (area == null || !mounted) return;
+                final center = area.center;
+                setState(() {
+                  _area = area.label;
+                  _areaCenter = center == null ? null : (lat: center.lat, lng: center.lng);
+                });
               },
             ),
           ],

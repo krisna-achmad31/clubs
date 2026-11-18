@@ -44,14 +44,14 @@ class LocationService {
     _ => 'Lokasi belum terbaca. Coba di tempat terbuka atau pilih area secara manual.',
   };
 
-  Future<bool> ensureReady() async {
+  Future<bool> ensureReady({bool requestPermission = true}) async {
     issue = null;
     if (!await Geolocator.isLocationServiceEnabled()) {
       issue = LocationIssue.serviceDisabled;
       return false;
     }
     var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) {
+    if (p == LocationPermission.denied && requestPermission) {
       p = await Geolocator.requestPermission();
     }
     if (p == LocationPermission.whileInUse || p == LocationPermission.always) {
@@ -63,9 +63,9 @@ class LocationService {
     return false;
   }
 
-  Future<GeoPoint?> current() async {
+  Future<GeoPoint?> current({bool requestPermission = true}) async {
     try {
-      if (!await ensureReady()) return null;
+      if (!await ensureReady(requestPermission: requestPermission)) return null;
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,

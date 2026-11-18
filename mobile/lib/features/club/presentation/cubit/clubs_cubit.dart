@@ -183,6 +183,7 @@ class ClubsCubit extends Cubit<ClubsState> {
     required String sportId,
     required String area,
     required ClubPrivacy privacy,
+    ({double lat, double lng})? areaCenter,
     String? logoPath,
     PayoutAccount? payout,
   }) async {
@@ -191,6 +192,7 @@ class ClubsCubit extends Cubit<ClubsState> {
       sportId: sportId,
       area: area,
       privacy: privacy,
+      areaCenter: areaCenter,
       logoPath: logoPath,
       payout: payout,
     );

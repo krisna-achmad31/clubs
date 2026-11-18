@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/di/injector.dart';
+import '../../../../core/backend/dev_api.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../profile/domain/repositories/profile_repository.dart';
@@ -31,7 +32,14 @@ class _SplashPageState extends State<SplashPage>
   Future<void> _route() async {
     final onboarded = await sl<ProfileRepository>().isOnboarded();
     await Future<void>.delayed(const Duration(milliseconds: 1900));
-    if (mounted) context.go(onboarded ? R.feed : R.intro);
+    if (!mounted) return;
+    context.go(
+      !onboarded
+          ? R.intro
+          : sl<DevApi>().isSignedIn
+          ? R.feed
+          : R.expiredSession,
+    );
   }
 
   @override

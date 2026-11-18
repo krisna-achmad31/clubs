@@ -8,9 +8,10 @@ import 'package:klubby/features/activity/presentation/cubit/recorder_cubit.dart'
 class _Location extends LocationService {
   final points = StreamController<GeoPoint>.broadcast(sync: true);
   @override
-  Future<bool> ensureReady() async => true;
+  Future<bool> ensureReady({bool requestPermission = true}) async => true;
   @override
-  Future<GeoPoint?> current() async => const GeoPoint(-6.2, 106.8, accuracy: 5);
+  Future<GeoPoint?> current({bool requestPermission = true}) async =>
+      const GeoPoint(-6.2, 106.8, accuracy: 5);
   @override
   Stream<GeoPoint> track() => points.stream;
   @override

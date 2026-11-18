@@ -1,5 +1,16 @@
 # Changelog
 
+## 18 November 2026 (1.4.0+5)
+achmad_yukrisna
+
+- Jelajahi: pencarian klub dan mabar melalui API dengan filter olahraga, area, jarak, serta pembaruan status setelah bergabung.
+- Profil: pencarian pengguna, follow/unfollow, jumlah pengikut dan mengikuti, serta halaman tantangan dengan progres dan keanggotaan tersimpan melalui API.
+- Klub: pembuatan klub melalui RPC, pencarian anggota awal berdasarkan username atau nomor HP, pengelolaan rekening pencairan terpisah, dan pesan hasil tindakan dari API.
+- Area: pencarian kecamatan dan kota menggunakan data Badan Informasi Geospasial, deteksi wilayah dari GPS, pilihan kecamatan sekitar, dan penyimpanan koordinat area klub.
+- Autentikasi: sesi tersimpan yang kedaluwarsa ditolak sebelum permintaan API; pesan kegagalan jaringan, izin, dan server ditampilkan kepada pengguna.
+- Backend: migrasi follow pengguna, tantangan, pembuatan klub, hasil Jelajahi, dan lokasi area klub; generator bundle Dev mendukung pembaruan tiap migrasi.
+- Postman: collection API serta environment Dev dan Live untuk pengujian autentikasi dan fitur aplikasi.
+
 ## 17 November 2026 (1.3.0+4)
 achmad_yukrisna
 

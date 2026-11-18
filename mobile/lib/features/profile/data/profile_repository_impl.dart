@@ -83,8 +83,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
           'gems': p.gems,
           'stamps': p.stamps,
           'saldo': p.saldo,
-          'following': p.following,
-          'followers': p.followers,
           'last_active': p.lastActive?.toUtc().toIso8601String(),
           'adopted': {for (final e in p.adopted.entries) e.key.name: e.value},
           'verified_sport_sessions': p.verifiedSportSessions,

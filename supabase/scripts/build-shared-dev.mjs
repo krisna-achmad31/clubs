@@ -2,7 +2,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const [, , destination, mode] = process.argv;
 if (!destination) throw new Error('Pass an output path for the SQL bundle');
-if (mode && mode !== '--upgrade-core') throw new Error('Unknown bundle mode');
+if (mode && !['--upgrade-core', '--upgrade-follows', '--upgrade-challenges', '--upgrade-clubs', '--upgrade-explore', '--upgrade-club-area'].includes(mode)) {
+  throw new Error('Unknown bundle mode');
+}
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/^\uFEFF/, '');
 const versions = [
   '20261116000100_klubby_core.sql',
@@ -55,6 +57,17 @@ const parts = versions.map((version, i) => {
     .replace('create policy klubby_club_logos', 'create policy klubby_dev_club_logos')
     .replace('create policy klubby_payment_qr_read', 'create policy klubby_dev_payment_qr_read');
 });
+
+const follows = read('migrations/20261117000100_user_follows.sql')
+  .replaceAll('public.', 'klubby_dev.');
+const challenges = read('migrations/20261117000200_challenges.sql')
+  .replaceAll('public.', 'klubby_dev.');
+const clubs = read('migrations/20261117000300_create_club.sql')
+  .replaceAll('public.', 'klubby_dev.');
+const explore = read('migrations/20261117000400_explore_results.sql')
+  .replaceAll('public.', 'klubby_dev.');
+const clubArea = read('migrations/20261117000500_club_area_location.sql')
+  .replaceAll('public.', 'klubby_dev.');
 
 const guard = `
 do $$
@@ -126,7 +139,14 @@ const upgrade = [
     using ((select klubby_dev.has_dev_access())) with check ((select klubby_dev.has_dev_access()));`,
   "notify pgrst, 'reload schema';",
 ];
-const contents = ['begin;', ...(mode ? upgrade : [foundation, ...parts, guard, fixture, smoke]), 'commit;'].join('\n');
+const bundle = mode === '--upgrade-follows' ? [follows]
+  : mode === '--upgrade-challenges' ? [challenges]
+  : mode === '--upgrade-clubs' ? [clubs]
+  : mode === '--upgrade-explore' ? [explore]
+  : mode === '--upgrade-club-area' ? [clubArea]
+  : mode === '--upgrade-core' ? upgrade
+  : [foundation, ...parts, follows, challenges, clubs, explore, clubArea, guard, fixture, smoke];
+const contents = ['begin;', ...bundle, 'commit;'].join('\n');
 if (/on auth\.users|insert into auth\.users|create table public\.|\uFFFD/i.test(contents)) {
   throw new Error('Unexpected shared Auth mutation, production DDL or invalid text in Dev bundle');
 }
