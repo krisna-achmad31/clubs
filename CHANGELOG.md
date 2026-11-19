@@ -1,5 +1,18 @@
 # Changelog
 
+## 19 November 2026 (1.4.1+6)
+achmad_yukrisna
+
+- Aktivitas: detail feed menampilkan rekaman lengkap yang tersedia; sumber smartwatch, perangkat, sensor, dan durasi tetap tersimpan setelah sinkronisasi atau restart. Data jeda yang tidak tersedia dijelaskan tanpa menampilkan pace jeda sebagai data terukur.
+- Turnamen: setup berada di bawah nama turnamen dengan label seragam; undian awal diacak, tombol Acak Lagi mempertahankan hasil pratinjau saat mulai, dan nama peserta bisa diedit tanpa kehilangan skor maupun arsip babak.
+- Klub: daftar anggota memakai data DB beserta peran Pemilik/Admin/Anggota. Admin dapat mengubah peran serta menyetujui atau menolak permintaan bergabung. Klub Publik langsung menerima anggota; klub Persetujuan menyimpan permintaan ke server.
+- Kas: pengaturan rekening serta pencatatan pemasukan, pengeluaran, dan penarikan tersimpan melalui API. Saldo mencakup seluruh riwayat; ringkasan bulanan mengikuti bulan transaksi. Akses tulis dibatasi untuk admin.
+- Chat: pesan baru memicu pembaruan melalui Supabase Realtime, pengumuman tersimpan di DB, dan kegagalan muat/kirim menyediakan tindakan coba lagi.
+- Akun dan tampilan: perbaikan pemulihan sesi, penyimpanan perubahan akun, validasi form, keadaan loading/kosong/error, serta ikon perasaan aktivitas dan referensi desain.
+- Backend Dev: migrasi metadata rekaman, kas, dan RPC pengelolaan anggota sudah diterapkan. Endpoint kas dan chat QA Test terverifikasi HTTP 200; transaksi serta izin diuji dengan rollback tanpa meninggalkan data uji.
+- Pengujian: regresi API, metadata smartwatch, stream chat, pengelolaan anggota/kas, undian turnamen, dan konsistensi label. Pengujian lintas iPhone dan Android dilanjutkan pada build Dev ini.
+- Validasi Dev: 29 tes integrasi terarah dan 40 pemeriksaan SQL lokal lulus. Full suite Flutter mencatat 179 lulus dan 73 gagal, termasuk tes lama yang masih bergantung pada fixture demo.
+
 ## 18 November 2026 (1.4.0+5)
 achmad_yukrisna
 

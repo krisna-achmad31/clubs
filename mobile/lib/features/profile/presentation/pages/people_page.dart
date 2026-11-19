@@ -36,8 +36,9 @@ class _PeoplePageState extends State<PeoplePage> {
   String _query = '';
   String? _savingId;
   int _offset = 0;
+  late PeopleMode _mode = widget.mode;
 
-  bool get _isSearch => widget.mode == PeopleMode.search;
+  bool get _isSearch => _mode == PeopleMode.search;
   bool get _queryReady => _query.replaceFirst(RegExp(r'^@+'), '').length >= 2;
 
   @override
@@ -53,7 +54,7 @@ class _PeoplePageState extends State<PeoplePage> {
   }
 
   void _load() {
-    _results = _api.findPeople(widget.mode.name, _query, _offset);
+    _results = _api.findPeople(_mode.name, _query, _offset);
   }
 
   void _onQueryChanged(String value) {
@@ -83,7 +84,7 @@ class _PeoplePageState extends State<PeoplePage> {
       await _api.setUserFollow(id, follow);
       if (mounted && _results != null) {
         setState(() {
-          if (!follow && widget.mode == PeopleMode.following) _offset = 0;
+          if (!follow && _mode == PeopleMode.following) _offset = 0;
           _load();
         });
       }
@@ -97,9 +98,19 @@ class _PeoplePageState extends State<PeoplePage> {
 
   @override
   Widget build(BuildContext context) => KPage(
-    header: KHeader(widget.mode.title),
+    header: KHeader(_isSearch ? 'Cari pengguna' : 'Teman main'),
     stagger: false,
     children: [
+      if (!_isSearch)
+        KSegmented(
+          items: const ['Pengikut', 'Mengikuti'],
+          index: _mode == PeopleMode.followers ? 0 : 1,
+          onChanged: (index) => setState(() {
+            _mode = index == 0 ? PeopleMode.followers : PeopleMode.following;
+            _offset = 0;
+            _load();
+          }),
+        ),
       if (_isSearch)
         KInput(
           hint: 'Nama atau username',
@@ -113,15 +124,19 @@ class _PeoplePageState extends State<PeoplePage> {
           future: _results,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const KContentState(
+                loading: true,
+                title: 'Mencari teman main',
+                message: 'Sebentar, daftar pengguna sedang dimuat.',
+              );
             }
             if (snapshot.hasError) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Gagal memuat pengguna.', style: AppText.bodySm()),
-                  KLink('Coba lagi', onTap: () => setState(_load)),
-                ],
+              return KContentState(
+                error: true,
+                title: 'Pengguna belum bisa dimuat',
+                message: 'Cek koneksi internet lalu coba lagi.',
+                action: 'Coba lagi',
+                onAction: () => setState(_load),
               );
             }
             final people = snapshot.requireData;
@@ -129,7 +144,12 @@ class _PeoplePageState extends State<PeoplePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (people.isEmpty)
-                  Text(widget.mode.emptyMessage, style: AppText.bodySm()),
+                  KContentState(
+                    title: _mode.emptyMessage,
+                    message: _isSearch
+                        ? 'Coba nama atau username lain.'
+                        : 'Cari teman olahraga dan mulai saling mengikuti.',
+                  ),
                 for (final person in people.take(_pageSize)) _personRow(person),
                 Wrap(
                   spacing: 16,
@@ -172,9 +192,8 @@ class _PeoplePageState extends State<PeoplePage> {
         child: Image.asset((avatar ?? ProfileAvatar.kapi).asset, width: 32),
       ),
       trailing: KMiniButton(
-        _savingId == id
-            ? 'Menyimpan…'
-            : (following ? 'Berhenti ikuti' : 'Ikuti'),
+        following ? 'Berhenti ikuti' : 'Ikuti',
+        loading: _savingId == id,
         onTap: _savingId == null ? () => _toggleFollow(id, !following) : null,
       ),
     );

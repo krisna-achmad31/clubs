@@ -7,6 +7,7 @@ import '../../../../core/services/health_service.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_analysis.dart';
+import '../../../profile/domain/usecases/streak_rules.dart';
 
 String _pace(double? seconds) => seconds == null
     ? '—'
@@ -39,13 +40,27 @@ class ActivityDataSections extends StatelessWidget {
             spacing: 12,
             children: [
               for (final (label, value) in [
-                ('Waktu bergerak', Fmt.clock(activity.duration)),
-                ('Total waktu', Fmt.clock(data.elapsed)),
+                (
+                  'Tanggal',
+                  activity.start.toLocal().toString().substring(0, 16),
+                ),
+                ('Olahraga', activity.sport.name),
+                (
+                  activity.source == ActivitySource.wearable &&
+                          activity.elapsedTime == null
+                      ? 'Durasi tercatat'
+                      : 'Waktu bergerak',
+                  Fmt.clock(activity.duration),
+                ),
+                if (activity.elapsedTime != null)
+                  ('Total waktu', Fmt.clock(data.elapsed)),
                 if (activity.score?.isNotEmpty == true)
                   ('Skor', activity.score!),
                 if (activity.sport.tracksDistance && activity.distanceKm > 0)
                   ('Pace rata-rata', _pace(data.averagePace)),
-                if (activity.sport.tracksDistance && activity.distanceKm > 0)
+                if (activity.sport.tracksDistance &&
+                    activity.distanceKm > 0 &&
+                    activity.elapsedTime != null)
                   ('Pace termasuk jeda', _pace(data.elapsedPace)),
                 if (activity.sport.tracksDistance && activity.distanceKm > 0)
                   ('Split tercepat', _pace(data.fastestSplit)),
@@ -66,6 +81,11 @@ class ActivityDataSections extends StatelessWidget {
             ],
           ),
         ),
+        if (activity.source == ActivitySource.wearable &&
+            activity.elapsedTime == null)
+          KBanner.info(
+            'Perangkat hanya mengirim durasi tercatat. Waktu bergerak dan jeda belum tersedia secara terpisah.',
+          ),
         if (activity.sport.tracksDistance ||
             data.series(ActivityMetric.elevation).isNotEmpty)
           ActivityMetricChart(
@@ -106,7 +126,8 @@ class ActivityDataSections extends StatelessWidget {
                 'Grafik pace memerlukan rangkaian titik GPS bertanggal waktu.',
             summaries: [
               ('Pace rata-rata', _pace(data.averagePace)),
-              ('Pace termasuk jeda', _pace(data.elapsedPace)),
+              if (activity.elapsedTime != null)
+                ('Pace termasuk jeda', _pace(data.elapsedPace)),
             ],
           ),
         if (activity.sport.tracksDistance ||

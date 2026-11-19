@@ -61,37 +61,78 @@ class TournamentNewPage extends StatelessWidget {
         onTap: state.error == null
             ? () => showKSheet<void>(
                 context,
-                (ctx) => KSheet(
-                  children: [
-                    Text('Pratinjau babak pertama', style: AppText.title()),
-                    for (final m in cubit.preview())
-                      KRow(
-                        title: 'Lapangan ${m.court}',
-                        subtitle: '${m.teamA} vs ${m.teamB}',
+                (ctx) => StatefulBuilder(
+                  builder: (ctx, set) => KSheet(
+                    children: [
+                      Text('Pratinjau Babak Pertama', style: AppText.title()),
+                      for (final m in cubit.preview())
+                        KRow(
+                          title: 'Lapangan ${m.court}',
+                          subtitle: '${m.teamA} vs ${m.teamB}',
+                        ),
+                      KButton.secondary(
+                        'ACAK LAGI',
+                        onTap: () => set(cubit.reshuffle),
                       ),
-                    KButton(
-                      'MULAI TURNAMEN',
-                      onTap: () {
-                        if (cubit.start()) {
-                          Navigator.pop(ctx);
-                          context.pushReplacement(R.tournamentLive);
-                        }
-                      },
-                    ),
-                  ],
+                      KButton(
+                        'MULAI TURNAMEN',
+                        onTap: () {
+                          if (cubit.start()) {
+                            Navigator.pop(ctx);
+                            context.pushReplacement(R.tournamentLive);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               )
             : null,
       ),
       children: [
-        const FieldLabel('NAMA TURNAMEN'),
+        Text('Nama Turnamen', style: AppText.custom(15)),
         KInput(
           initialValue: state.title,
           hint: '${state.format.label} Cup',
           onChanged: cubit.setTitle,
         ),
+        KRow(
+          title: 'Lapangan',
+          trailing: KStepper(
+            value: state.courts,
+            min: 1,
+            max: 8,
+            onChanged: cubit.setCourts,
+          ),
+        ),
+        Text('Poin Untuk Menang', style: AppText.custom(15)),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in [16, 21, 24, 32])
+              KChip(
+                '$p',
+                selected: state.points == p,
+                onTap: () => cubit.setPoints(p),
+              ),
+          ],
+        ),
+        KRow(
+          title: 'Jumlah Pemain',
+          trailing: KStepper(
+            value: state.players,
+            min: 4,
+            max: 48,
+            onChanged: cubit.setPlayers,
+          ),
+        ),
+        KButton.secondary(
+          'EDIT NAMA PESERTA',
+          onTap: () => showParticipantSheet(context),
+        ),
         KBanner.info(
-          'Turnamen lokal dengan nama peserta contoh. Skor belum disinkronkan ke akun pemain atau server.',
+          'Isi nama peserta lewat Edit Nama Peserta. Peserta belum ditautkan ke akun pemain.',
         ),
         for (final format in TournamentFormat.values)
           KChoice(
@@ -141,37 +182,6 @@ class TournamentNewPage extends StatelessWidget {
               ],
             ),
           ),
-        KRow(
-          title: 'Lapangan',
-          trailing: KStepper(
-            value: state.courts,
-            min: 1,
-            max: 8,
-            onChanged: cubit.setCourts,
-          ),
-        ),
-        const FieldLabel('POIN UNTUK MENANG'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final p in [16, 21, 24, 32])
-              KChip(
-                '$p',
-                selected: state.points == p,
-                onTap: () => cubit.setPoints(p),
-              ),
-          ],
-        ),
-        KRow(
-          title: 'Jumlah pemain contoh',
-          trailing: KStepper(
-            value: state.players,
-            min: 4,
-            max: 48,
-            onChanged: cubit.setPlayers,
-          ),
-        ),
         AnimatedSwitcher(
           duration: Motion.base,
           child: state.error == null
@@ -242,6 +252,10 @@ class TournamentLivePage extends StatelessWidget {
               onTap: () => showScoreSheet(context, next.court),
             ),
       children: [
+        KButton.secondary(
+          'EDIT NAMA PESERTA',
+          onTap: () => showParticipantSheet(context),
+        ),
         Text(
           'Babak ${state.round}/${state.rounds}${state.pastRound ? ' · arsip' : ''}',
           style: AppText.cardTitle(),
@@ -632,4 +646,53 @@ class _SaveResult extends StatelessWidget {
       },
     );
   }
+}
+
+Future<void> showParticipantSheet(BuildContext context) {
+  final cubit = context.read<TournamentCubit>();
+  return showKSheet<void>(
+    context,
+    (ctx) => StatefulBuilder(
+      builder: (ctx, set) => KSheet(
+        children: [
+          Text('Nama Peserta', style: AppText.title()),
+          Text(
+            'Nama bisa diubah saat turnamen berjalan. Skor tetap tersimpan.',
+            style: AppText.bodySm(),
+          ),
+          for (final name in cubit.participantNames)
+            KRow(
+              title: name,
+              trailing: const Icon(LucideIcons.pencil),
+              onTap: () async {
+                var updated = name;
+                await showKSheet<void>(
+                  ctx,
+                  (editContext) => KSheet(
+                    children: [
+                      Text('Edit Nama Peserta', style: AppText.title()),
+                      KInput(initialValue: name, onChanged: (v) => updated = v),
+                      KButton(
+                        'SIMPAN',
+                        onTap: () {
+                          if (cubit.renamePlayer(name, updated)) {
+                            Navigator.pop(editContext);
+                          } else {
+                            toast(
+                              editContext,
+                              'Nama harus unik, tidak kosong, dan tanpa &.',
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                );
+                if (ctx.mounted) set(() {});
+              },
+            ),
+        ],
+      ),
+    ),
+  );
 }

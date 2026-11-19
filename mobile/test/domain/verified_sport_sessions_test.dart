@@ -16,6 +16,8 @@ class _Profiles implements ProfileRepository {
   @override
   Future<void> save(UserProfile profile) async => value = profile;
   @override
+  Future<void> saveAccount(UserProfile profile) => save(profile);
+  @override
   Future<bool> isOnboarded() async => true;
   @override
   Future<void> setOnboarded(bool value) async {}

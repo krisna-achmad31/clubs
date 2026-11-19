@@ -11,6 +11,40 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   Future<List<Activity>>? _recent;
   int? _recentKey;
+  bool _syncingHealth = false;
+
+  Future<void> _syncHealthActivities() async {
+    if (_syncingHealth) return;
+    setState(() => _syncingHealth = true);
+    try {
+      final result = await sl<ActivityRepository>().syncHealthActivities();
+      if (!mounted) return;
+      await context.read<FeedCubit>().load();
+      if (!mounted) return;
+      setState(() {
+        _recent = null;
+        _recentKey = null;
+      });
+      final message = result.failed > 0
+          ? '${result.uploaded} berhasil, ${result.failed} belum tersinkron. Ketuk Sinkronkan untuk mencoba lagi.'
+          : result.uploaded > 0
+          ? '${result.uploaded} aktivitas Health berhasil disinkronkan.'
+          : 'Semua aktivitas Health sudah tersinkron.';
+      toast(context, message);
+    } on Object catch (error) {
+      if (mounted) {
+        toast(
+          context,
+          apiFeedback(
+            error,
+            fallback: 'Aktivitas belum tersinkron. Cek koneksi lalu coba lagi.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncingHealth = false);
+    }
+  }
 
   /// 0 Dashboard · 1 Stempel · 2 Tanding · 3 Gear.
   var _tab = 0;
@@ -31,83 +65,90 @@ class _ProfilePageState extends State<ProfilePage> {
     final joined = p.joined == null
         ? ''
         : ' · Gabung ${Fmt.months[p.joined!.month - 1]} ${p.joined!.year}';
-    return KPage(
-      header: KHeader(
-        'Profil',
-        leading: null,
-        actions: [
-          KIconButton(
-            LucideIcons.settings,
-            onTap: () => context.push(R.settings),
-          ),
-        ],
-      ),
-      onRefresh: context.read<MeCubit>().load,
-      children: [
-        Row(
-          children: [
-            Pressable(
-              onTap: () => context.push(R.avatar),
-              child: Hero(tag: 'me-avatar', child: ProfileAvatarView(p.avatar)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.name,
-                    style: AppText.h2(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '@${p.username}$joined',
-                    style: AppText.bodySm(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      KLink(
-                        '${p.following} Mengikuti',
-                        onTap: () => context.push(R.following),
-                      ),
-                      KLink(
-                        '${p.followers} Pengikut',
-                        onTap: () => context.push(R.followers),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+    return KLoadingOverlay(
+      loading: _syncingHealth,
+      message: 'Menyinkronkan aktivitas…',
+      child: KPage(
+        header: KHeader(
+          'Profil',
+          leading: null,
+          actions: [
+            KIconButton(
+              LucideIcons.settings,
+              onTap: () => context.push(R.settings),
             ),
           ],
         ),
-        KButton(
-          'Cari pengguna',
-          icon: LucideIcons.search,
-          kind: BtnKind.secondary,
-          onTap: () => context.push(R.peopleSearch),
-        ),
-        // Tabs switch the content below in place; they never push a route.
-        KSegmented(
-          items: const ['Dashboard', 'Stempel', 'Tanding', 'Gear'],
-          index: _tab,
-          fontSize: 13,
-          onChanged: (i) => setState(() => _tab = i),
-        ),
-        if (_tab == 1)
-          const StampsPage(embedded: true)
-        else if (_tab == 2)
-          const RatingPage(embedded: true)
-        else if (_tab == 3)
-          const GearPage(embedded: true)
-        else
-          ..._dashboard(context, p),
-      ],
+        onRefresh: context.read<MeCubit>().load,
+        children: [
+          Row(
+            children: [
+              Pressable(
+                onTap: () => context.push(R.avatar),
+                child: Hero(
+                  tag: 'me-avatar',
+                  child: ProfileAvatarView(p.avatar),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.name,
+                      style: AppText.h2(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '@${p.username}$joined',
+                      style: AppText.bodySm(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        KMiniButton(
+                          '${p.following} Mengikuti',
+                          onTap: () => context.push(R.following),
+                        ),
+                        KMiniButton(
+                          '${p.followers} Pengikut',
+                          onTap: () => context.push(R.followers),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          KButton(
+            'Cari pengguna',
+            icon: LucideIcons.search,
+            kind: BtnKind.secondary,
+            onTap: () => context.push(R.peopleSearch),
+          ),
+          // Tabs switch the content below in place; they never push a route.
+          KSegmented(
+            items: const ['Dashboard', 'Stempel', 'Tanding', 'Gear'],
+            index: _tab,
+            fontSize: 13,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
+          if (_tab == 1)
+            const StampsPage(embedded: true)
+          else if (_tab == 2)
+            const RatingPage(embedded: true)
+          else if (_tab == 3)
+            const GearPage(embedded: true)
+          else
+            ..._dashboard(context, p),
+        ],
+      ),
     );
   }
 
@@ -196,7 +237,11 @@ class _ProfilePageState extends State<ProfilePage> {
               onAction: () => context.push(R.stamps),
             ),
             _StampRow(stamps.take(6).toList(), activities: all),
-            const SectionTitle('Aktivitas minggu ini'),
+            SectionTitle(
+              'Aktivitas minggu ini',
+              action: 'SINKRONKAN',
+              onAction: _syncHealthActivities,
+            ),
             KCard(child: _WeekBars(all)),
             _MonthSplit(all),
           ],

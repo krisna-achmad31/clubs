@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const [, , destination, mode] = process.argv;
 if (!destination) throw new Error('Pass an output path for the SQL bundle');
-if (mode && !['--upgrade-core', '--upgrade-follows', '--upgrade-challenges', '--upgrade-clubs', '--upgrade-explore', '--upgrade-club-area'].includes(mode)) {
+if (mode && !['--upgrade-core', '--upgrade-follows', '--upgrade-challenges', '--upgrade-clubs', '--upgrade-explore', '--upgrade-club-area', '--upgrade-feed', '--upgrade-club-management'].includes(mode)) {
   throw new Error('Unknown bundle mode');
 }
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/^\uFEFF/, '');
@@ -139,13 +139,17 @@ const upgrade = [
     using ((select klubby_dev.has_dev_access())) with check ((select klubby_dev.has_dev_access()));`,
   "notify pgrst, 'reload schema';",
 ];
-const bundle = mode === '--upgrade-follows' ? [follows]
+const feedSupport = read('migrations/20261118000100_dev_feed_support.sql');
+const clubManagement = read('migrations/20261119005159_club_management_and_recording_metadata_dev.sql');
+const bundle = mode === '--upgrade-club-management' ? [clubManagement]
+  : mode === '--upgrade-feed' ? [feedSupport]
+  : mode === '--upgrade-follows' ? [follows]
   : mode === '--upgrade-challenges' ? [challenges]
   : mode === '--upgrade-clubs' ? [clubs]
   : mode === '--upgrade-explore' ? [explore]
   : mode === '--upgrade-club-area' ? [clubArea]
   : mode === '--upgrade-core' ? upgrade
-  : [foundation, ...parts, follows, challenges, clubs, explore, clubArea, guard, fixture, smoke];
+  : [foundation, ...parts, follows, challenges, clubs, explore, clubArea, feedSupport, clubManagement, guard, fixture, smoke];
 const contents = ['begin;', ...bundle, 'commit;'].join('\n');
 if (/on auth\.users|insert into auth\.users|create table public\.|\uFFFD/i.test(contents)) {
   throw new Error('Unexpected shared Auth mutation, production DDL or invalid text in Dev bundle');

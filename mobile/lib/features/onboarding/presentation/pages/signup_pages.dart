@@ -41,6 +41,9 @@ class _SignupPageState extends State<SignupPage> {
   );
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _form = GlobalKey<FormState>();
+  String? _formError;
+  String? _authAction;
   bool _busy = false;
   late final _terms = TapGestureRecognizer()
     ..onTap = () => _legal(
@@ -89,7 +92,10 @@ class _SignupPageState extends State<SignupPage> {
 
   Future<void> _socialSignIn(String provider) async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _authAction = provider;
+    });
     try {
       if (kDebugMode) {
         debugPrint('[Klubby Auth] $provider: starting browser login');
@@ -129,7 +135,10 @@ class _SignupPageState extends State<SignupPage> {
       if (kDebugMode) debugPrint('[Klubby Auth] google: missing iOS client ID');
       return toast(context, 'Google Sign-In belum dikonfigurasi untuk iOS.');
     }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _authAction = 'google';
+    });
     try {
       final google = GoogleSignIn.instance;
       try {
@@ -193,10 +202,7 @@ class _SignupPageState extends State<SignupPage> {
         );
       }
       if (mounted) {
-        toast(
-          context,
-          'Supabase menolak login Google (kode ${error.status}).',
-        );
+        toast(context, 'Supabase menolak login Google (kode ${error.status}).');
       }
     } on Object catch (error) {
       if (kDebugMode) {
@@ -212,13 +218,15 @@ class _SignupPageState extends State<SignupPage> {
     if (_busy) return;
     final email = _email.text.trim();
     final password = _password.text;
-    if (!email.contains('@') || !email.contains('.')) {
-      return toast(context, 'Masukkan alamat email yang valid');
+    if (!_form.currentState!.validate()) {
+      setState(() => _formError = 'Periksa email dan kata sandi di atas.');
+      return;
     }
-    if (password.length < 6) {
-      return toast(context, 'Kata sandi minimal 6 karakter');
-    }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _authAction = 'email';
+      _formError = null;
+    });
     try {
       final api = sl<DevApi>();
       final c = context.read<OnboardingCubit>();
@@ -245,15 +253,20 @@ class _SignupPageState extends State<SignupPage> {
       }
     } on DevApiException catch (e) {
       if (mounted) {
-        toast(context, switch (e.status) {
+        final message = switch (e.status) {
           400 => 'Email atau kata sandi tidak valid.',
           422 =>
             'Periksa email dan kata sandi. Jika sudah punya akun, pilih Masuk.',
           _ => 'Gagal terhubung ke server (kode ${e.status}).',
-        });
+        };
+        setState(() => _formError = message);
+        toast(context, message);
       }
     } on Object {
-      if (mounted) toast(context, 'Gagal terhubung ke server.');
+      if (mounted) {
+        setState(() => _formError = 'Gagal terhubung ke server. Coba lagi.');
+        toast(context, _formError!);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -265,140 +278,160 @@ class _SignupPageState extends State<SignupPage> {
     final authStatus = GoRouterState.of(context).uri.queryParameters['auth'];
     final isIos = Theme.of(context).platform == TargetPlatform.iOS;
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    return KPage(
-      header: KHeader(
-        login ? 'Masuk' : 'Buat akun',
-        leading: LucideIcons.x,
-        onLeading: () =>
-            context.canPop() ? context.pop() : context.go(R.welcome),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
-      children: [
-        if (authStatus == 'session-expired')
-          KBanner.info('Sesi berakhir. Masuk lagi untuk melanjutkan.'),
-        if (authStatus == 'callback-failed')
-          KBanner.info(
-            'Sesi dari tautan tidak dapat dibuka. Masuk lagi setelah email terkonfirmasi.',
-          ),
-        MascotSays(
-          animal: Animal.kiki,
-          size: 96,
-          bg: AppColors.primaryL,
-          text: login
-              ? 'Halo lagi! Masuk untuk lanjut main bareng.'
-              : 'Daftar sekali, langsung bisa ikut mabar & kumpulin stamp!',
+    return KLoadingOverlay(
+      loading: _busy,
+      message: _authAction == 'email'
+          ? (login ? 'Sedang masuk…' : 'Membuat akun…')
+          : 'Menghubungkan akun…',
+      child: KPage(
+        header: KHeader(
+          login ? 'Masuk' : 'Buat akun',
+          leading: LucideIcons.x,
+          onLeading: () =>
+              context.canPop() ? context.pop() : context.go(R.welcome),
         ),
-        if (AppData.phoneOtpEnabled) ...[
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const FieldLabel('NOMOR WHATSAPP'),
-              const SizedBox(height: 8),
-              KInput(
-                controller: _phone,
-                hint: '0812 3456 2210',
-                icon: LucideIcons.phone,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(15),
-                ],
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Kami kirim kode OTP lewat WhatsApp. Nomor ini juga dipakai untuk RSVP dari link grup.',
-                style: AppText.custom(
-                  13,
-                  w: FontWeight.w700,
-                  c: AppColors.muted,
-                  h: 1.35,
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+        children: [
+          if (authStatus == 'session-expired')
+            KBanner.info('Sesi berakhir. Masuk lagi untuk melanjutkan.'),
+          if (authStatus == 'callback-failed')
+            KBanner.info(
+              'Sesi dari tautan tidak dapat dibuka. Masuk lagi setelah email terkonfirmasi.',
+            ),
+          MascotSays(
+            animal: Animal.kiki,
+            size: 96,
+            bg: AppColors.primaryL,
+            text: login
+                ? 'Halo lagi! Masuk untuk lanjut main bareng.'
+                : 'Daftar sekali, langsung bisa ikut mabar & kumpulin stamp!',
+          ),
+          if (AppData.phoneOtpEnabled) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FieldLabel('NOMOR WHATSAPP'),
+                const SizedBox(height: 8),
+                KInput(
+                  controller: _phone,
+                  hint: '0812 3456 2210',
+                  icon: LucideIcons.phone,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(15),
+                  ],
+                  onChanged: (_) => setState(() {}),
                 ),
-              ),
-            ],
-          ),
-          KBanner.info(
-            'Mode demo: kode OTP tidak benar-benar dikirim. Masukkan 6 angka apa saja selain 000000.',
-          ),
-          KButton('KIRIM KODE OTP', onTap: digits.length >= 9 ? _send : null),
-          const OrDivider(),
-        ],
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const FieldLabel('EMAIL'),
-            const SizedBox(height: 8),
-            KInput(
-              controller: _email,
-              hint: 'nama@email.com',
-              icon: LucideIcons.mail,
-              keyboardType: TextInputType.emailAddress,
-              onChanged: (_) => setState(() {}),
+                const SizedBox(height: 8),
+                Text(
+                  'Kami kirim kode OTP lewat WhatsApp. Nomor ini juga dipakai untuk RSVP dari link grup.',
+                  style: AppText.custom(
+                    13,
+                    w: FontWeight.w700,
+                    c: AppColors.muted,
+                    h: 1.35,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            const FieldLabel('KATA SANDI'),
-            const SizedBox(height: 8),
-            KInput(
-              controller: _password,
-              hint: 'Minimal 6 karakter',
-              icon: LucideIcons.lock,
-              obscureText: true,
-              onChanged: (_) => setState(() {}),
+            KBanner.info(
+              'Mode demo: kode OTP tidak benar-benar dikirim. Masukkan 6 angka apa saja selain 000000.',
             ),
+            KButton('KIRIM KODE OTP', onTap: digits.length >= 9 ? _send : null),
+            const OrDivider(),
           ],
-        ),
-        KButton(
-          login ? 'MASUK DENGAN EMAIL' : 'DAFTAR DENGAN EMAIL',
-          onTap:
-              !_busy && _email.text.contains('@') && _password.text.length >= 6
-              ? _emailSignIn
-              : null,
-        ),
-        const OrDivider(),
-        _SocialButton(
-          label: login ? 'MASUK DENGAN GOOGLE' : 'LANJUT DENGAN GOOGLE',
-          leading: const _GoogleMark(),
-          loading: _busy,
-          onTap: _signInGoogle,
-        ),
-        if (isIos)
-          _SocialButton(
-            label: login ? 'MASUK DENGAN APPLE' : 'LANJUT DENGAN APPLE',
-            leading: const Icon(
-              LucideIcons.apple,
-              size: 20,
-              color: AppColors.ink,
+          Form(
+            key: _form,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FieldLabel('EMAIL'),
+                const SizedBox(height: 8),
+                KInput(
+                  controller: _email,
+                  hint: 'nama@email.com',
+                  icon: LucideIcons.mail,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) =>
+                      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                          .hasMatch(value?.trim() ?? '')
+                      ? null
+                      : 'Masukkan alamat email yang valid.',
+                  onChanged: (_) => setState(() => _formError = null),
+                ),
+                const SizedBox(height: 12),
+                const FieldLabel('KATA SANDI'),
+                const SizedBox(height: 8),
+                KInput(
+                  controller: _password,
+                  hint: 'Minimal 6 karakter',
+                  icon: LucideIcons.lock,
+                  obscureText: true,
+                  validator: (value) => (value?.length ?? 0) >= 6
+                      ? null
+                      : 'Kata sandi minimal 6 karakter.',
+                  onChanged: (_) => setState(() => _formError = null),
+                ),
+              ],
             ),
-            loading: _busy,
-            onTap: () => _socialSignIn('apple'),
           ),
-        const SizedBox(height: 12),
-        Text.rich(
-          TextSpan(
-            style: AppText.custom(12, w: FontWeight.w700, c: AppColors.faint),
-            children: [
-              TextSpan(
-                text: login
-                    ? 'Dengan masuk, kamu setuju dengan '
-                    : 'Dengan mendaftar, kamu setuju dengan ',
-              ),
-              TextSpan(
-                text: 'Ketentuan',
-                recognizer: _terms,
-                style: AppText.custom(12, c: AppColors.primary),
-              ),
-              const TextSpan(text: ' & '),
-              TextSpan(
-                text: 'Kebijakan Privasi',
-                recognizer: _privacy,
-                style: AppText.custom(12, c: AppColors.primary),
-              ),
-              const TextSpan(text: ' Klubby.'),
-            ],
+          if (_formError != null) KBanner.error(_formError!),
+          KButton(
+            login ? 'MASUK DENGAN EMAIL' : 'DAFTAR DENGAN EMAIL',
+            loading: _busy && _authAction == 'email',
+            onTap: _busy ? null : _emailSignIn,
           ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+          const OrDivider(),
+          _SocialButton(
+            label: login ? 'MASUK DENGAN GOOGLE' : 'LANJUT DENGAN GOOGLE',
+            leading: const _GoogleMark(),
+            loading: _busy && _authAction == 'google',
+            onTap: () {
+              if (!_busy) _signInGoogle();
+            },
+          ),
+          if (isIos)
+            _SocialButton(
+              label: login ? 'MASUK DENGAN APPLE' : 'LANJUT DENGAN APPLE',
+              leading: const Icon(
+                LucideIcons.apple,
+                size: 20,
+                color: AppColors.ink,
+              ),
+              loading: _busy && _authAction == 'apple',
+              onTap: () {
+                if (!_busy) _socialSignIn('apple');
+              },
+            ),
+          const SizedBox(height: 12),
+          Text.rich(
+            TextSpan(
+              style: AppText.custom(12, w: FontWeight.w700, c: AppColors.faint),
+              children: [
+                TextSpan(
+                  text: login
+                      ? 'Dengan masuk, kamu setuju dengan '
+                      : 'Dengan mendaftar, kamu setuju dengan ',
+                ),
+                TextSpan(
+                  text: 'Ketentuan',
+                  recognizer: _terms,
+                  style: AppText.custom(12, c: AppColors.primary),
+                ),
+                const TextSpan(text: ' & '),
+                TextSpan(
+                  text: 'Kebijakan Privasi',
+                  recognizer: _privacy,
+                  style: AppText.custom(12, c: AppColors.primary),
+                ),
+                const TextSpan(text: ' Klubby.'),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -431,27 +464,16 @@ class _SocialButton extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (loading)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: AppColors.primary,
-              ),
-            )
-          else ...[
-            leading,
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.button(AppColors.ink, 17),
-              ),
+          if (loading) const KLoading(size: 20) else leading,
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.button(AppColors.ink, 17),
             ),
-          ],
+          ),
         ],
       ),
     ),

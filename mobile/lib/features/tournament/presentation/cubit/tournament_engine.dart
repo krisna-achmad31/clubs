@@ -119,10 +119,73 @@ class TournamentCubit extends Cubit<TournamentState> {
   List<String> _queue = [];
   int _game = 0;
   int _stage = 1;
+  List<String>? _draw;
+  final Map<String, String> _names = {};
+  List<String> get participantNames =>
+      running ? state.standings.map((p) => p.name).toList() : _roster;
+  List<String> get _drawnRoster => _draw ??= (_roster..shuffle());
+  void reshuffle() {
+    if (running || state.error != null) return;
+    String signature() => preview().map((m) => '${m.teamA}|${m.teamB}').join();
+    final old = signature();
+    final names = [..._drawnRoster]..shuffle();
+    _draw = names;
+    if (signature() == old) _draw = [...names.skip(1), names.first];
+  }
+
+  bool renamePlayer(String old, String value) {
+    final name = value.trim();
+    if (name.isEmpty ||
+        name.contains('&') ||
+        participantNames.any(
+          (n) => n != old && n.toLowerCase() == name.toLowerCase(),
+        )) {
+      return false;
+    }
+    String rename(String n) => n == old ? name : n;
+    String team(String t) => t.split(' & ').map(rename).join(' & ');
+    List<CourtMatch> matches(List<CourtMatch> list) => [
+      for (final m in list)
+        CourtMatch(
+          court: m.court,
+          game: m.game,
+          teamA: team(m.teamA),
+          teamB: team(m.teamB),
+          scoreA: m.scoreA,
+          scoreB: m.scoreB,
+          done: m.done,
+        ),
+    ];
+    final slot =
+        _names.entries.where((e) => e.value == old).firstOrNull?.key ?? old;
+    _names[slot] = name;
+    if (_draw != null) _draw = _draw!.map(rename).toList();
+    for (final key in _history.keys.toList()) {
+      _history[key] = matches(_history[key]!);
+    }
+    _planned = _planned.map(matches).toList();
+    _queue = _queue.map(rename).toList();
+    _stageWinners = _stageWinners.map(rename).toList();
+    emit(
+      state.copyWith(
+        matches: matches(state.matches),
+        standings: [
+          for (final p in state.standings)
+            PlayerScore(rename(p.name), p.points, me: p.me),
+        ],
+        eliminated: {
+          for (final e in state.eliminated.entries) rename(e.key): e.value,
+        },
+      ),
+    );
+    return true;
+  }
+
   // Hardcoded demo player names disabled — use generic slots.
   List<String> get _roster => [
     for (var i = 0; i < state.players; i++)
-      i == 0 ? 'Kamu' : 'Pemain ${i + 1}',
+      _names[i == 0 ? 'Kamu' : 'Pemain ${i + 1}'] ??
+          (i == 0 ? 'Kamu' : 'Pemain ${i + 1}'),
   ];
 
   /// When the running tournament started; null before the first start.
@@ -145,7 +208,10 @@ class TournamentCubit extends Cubit<TournamentState> {
   }
 
   void setPlayers(int value) {
-    if (!running) emit(state.copyWith(players: value.clamp(2, 48)));
+    if (!running) {
+      _draw = null;
+      emit(state.copyWith(players: value.clamp(2, 48)));
+    }
   }
 
   void setTitle(String value) {
@@ -154,6 +220,7 @@ class TournamentCubit extends Cubit<TournamentState> {
 
   /// Ends the running tournament without a result, keeping its settings.
   void abandon() {
+    _draw = null;
     _history.clear();
     _planned = [];
     _queue = [];
@@ -213,6 +280,7 @@ class TournamentCubit extends Cubit<TournamentState> {
       'courts': s.courts,
       'points': s.points,
       'players': s.players,
+      'names': _names,
       'title': s.title,
       'round': s.round,
       'rounds': s.rounds,
@@ -252,6 +320,7 @@ class TournamentCubit extends Cubit<TournamentState> {
     if (raw == null) return;
     try {
       final j = jsonDecode(raw) as Map<String, Object?>;
+      _names.addAll(Map<String, String>.from(j['names'] as Map? ?? {}));
       _history
         ..clear()
         ..addAll({
@@ -381,14 +450,11 @@ class TournamentCubit extends Cubit<TournamentState> {
     final game = _game;
     _game = 0;
     try {
-      final names = _roster;
+      final names = _drawnRoster;
       return switch (state.format) {
         TournamentFormat.americano => _circle(names, doubles: true).first,
         TournamentFormat.roundRobin => _circle(names).first,
-        TournamentFormat.mexicano => _rankedDoubles(
-          1,
-          roster: [...names]..sort(),
-        ),
+        TournamentFormat.mexicano => _rankedDoubles(1, roster: names),
         _ => _batches([
           for (var i = 0; i + 1 < names.length; i += 2)
             (names[i], names[i + 1]),
@@ -401,7 +467,7 @@ class TournamentCubit extends Cubit<TournamentState> {
 
   bool start() {
     if (state.error != null) return false;
-    final names = _roster;
+    final names = _drawnRoster;
     _game = 0;
     startedAt = DateTime.now();
     _history.clear();
@@ -410,7 +476,10 @@ class TournamentCubit extends Cubit<TournamentState> {
     _stage = 1;
     emit(
       state.copyWith(
-        standings: [for (final n in names) PlayerScore(n, 0, me: n == 'Kamu')],
+        standings: [
+          for (final n in names)
+            PlayerScore(n, 0, me: n == (_names['Kamu'] ?? 'Kamu')),
+        ],
         finished: false,
         eliminated: {},
         conflicts: {},
@@ -422,7 +491,7 @@ class TournamentCubit extends Cubit<TournamentState> {
       TournamentFormat.americano => _circle(names, doubles: true),
       TournamentFormat.roundRobin => _circle(names),
       TournamentFormat.gugur => _elimination(names),
-      TournamentFormat.mexicano => [_rankedDoubles(1)],
+      TournamentFormat.mexicano => [_rankedDoubles(1, roster: names)],
       TournamentFormat.kingOfCourt => _batches([
         for (var i = 0; i + 1 < names.length; i += 2) (names[i], names[i + 1]),
       ]),

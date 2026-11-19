@@ -6,6 +6,7 @@ import '../../../core/router/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/format.dart';
 import '../../activity/domain/entities/activity.dart';
+import '../../activity/data/activity_repository_impl.dart';
 import '../../activity/domain/repositories/activity_repository.dart';
 import '../../profile/domain/repositories/profile_repository.dart';
 import '../domain/entities/feed_post.dart';
@@ -33,9 +34,13 @@ class FeedRepositoryImpl implements FeedRepository {
   // Hardcoded demo posts & notifications disabled — data now comes from DevApi.
   // final _posts = <FeedPost>[...];
 
-  Future<List<FeedPost>> _loadAllPosts() async {
+  Future<List<FeedPost>> _loadAllPosts({bool reportError = false}) async {
     final api = _api;
-    if (api == null || !api.isSignedIn) return const [];
+    if (api == null) return const [];
+    if (!api.isSignedIn) {
+      if (reportError) throw const DevApiException(401);
+      return const [];
+    }
     try {
       final rows = await api.activitiesFull();
       final ids = [for (final r in rows) r['id'] as String];
@@ -61,7 +66,9 @@ class FeedRepositoryImpl implements FeedRepository {
       final commentsByPost = <String, List<Comment>>{};
       for (final cr in commentRows) {
         final aid = cr['activity_id'] as String;
-        commentsByPost.putIfAbsent(aid, () => []).add(
+        commentsByPost
+            .putIfAbsent(aid, () => [])
+            .add(
               Comment(
                 author: cr['author_name'] as String? ?? 'Anggota',
                 emoji: cr['author_emoji'] as String? ?? '🐰',
@@ -73,6 +80,8 @@ class FeedRepositoryImpl implements FeedRepository {
             );
       }
 
+      final local = await _activities?.recent() ?? const <Activity>[];
+      final localById = {for (final a in local) api.remoteActivityId(a.id): a};
       final posts = <FeedPost>[];
       for (final r in rows) {
         final id = r['id'] as String;
@@ -93,15 +102,28 @@ class FeedRepositoryImpl implements FeedRepository {
 
         final stats = <PostStat>[
           if (distKm > 0)
-            PostStat('JARAK', '${distKm.toStringAsFixed(2)} km', AppColors.blue),
-          PostStat('WAKTU', Fmt.clock(Duration(seconds: durationSec)), AppColors.primary),
+            PostStat(
+              'JARAK',
+              '${distKm.toStringAsFixed(2)} km',
+              AppColors.blue,
+            ),
+          PostStat(
+            'WAKTU',
+            Fmt.clock(Duration(seconds: durationSec)),
+            AppColors.primary,
+          ),
           if (avgHr != null) PostStat('BPM', '$avgHr', AppColors.red),
         ];
 
         final rMap = reactsByPost[id] ?? const {};
         final reactions = [
           for (final e in rMap.entries)
-            Reaction(e.key, e.value.$1, Reaction.hueOf(e.key), mine: e.value.$2),
+            Reaction(
+              e.key,
+              e.value.$1,
+              Reaction.hueOf(e.key),
+              mine: e.value.$2,
+            ),
         ];
 
         posts.add(
@@ -110,7 +132,8 @@ class FeedRepositoryImpl implements FeedRepository {
             author: author,
             initials: author.isNotEmpty ? author[0].toUpperCase() : 'A',
             color: AppColors.primary,
-            meta: '${sport.name}${clubMap != null ? ' · ${clubMap['name']}' : ''}',
+            meta:
+                '${sport.name}${clubMap != null ? ' · ${clubMap['name']}' : ''}',
             title: r['title'] as String,
             sportId: sportId,
             club: clubMap?['name'] as String?,
@@ -122,6 +145,9 @@ class FeedRepositoryImpl implements FeedRepository {
             segmentId: r['segment_id'] as String?,
             publik: vis == 'public',
             circle: vis != 'public',
+            activity:
+                (mine ? localById[id] : null) ??
+                ActivityRepositoryImpl.fromApiRow(r),
             activityId: mine ? id : null,
             mine: mine,
           ),
@@ -132,13 +158,14 @@ class FeedRepositoryImpl implements FeedRepository {
         ..addAll(posts);
       return posts;
     } on Object {
+      if (reportError) rethrow;
       return _cache;
     }
   }
 
   @override
   Future<List<FeedPost>> feed({required bool publik}) async {
-    final all = await _loadAllPosts();
+    final all = await _loadAllPosts(reportError: true);
     return [
       for (final p in all)
         if (publik ? p.publik : p.circle) p,
@@ -168,7 +195,8 @@ class FeedRepositoryImpl implements FeedRepository {
     final api = _api;
     if (api == null || !api.isSignedIn) return;
     final idx = _cache.indexWhere((p) => p.id == postId);
-    final hasMine = idx >= 0 &&
+    final hasMine =
+        idx >= 0 &&
         _cache[idx].reactions.any((r) => r.emoji == emoji && r.mine);
     if (hasMine) {
       await api.removeReaction(postId, emoji);
@@ -282,7 +310,8 @@ class FeedRepositoryImpl implements FeedRepository {
       final rows = await api.notifications();
       final list = <AppNotification>[];
       for (final r in rows) {
-        final payload = (r['payload'] as Map? ?? const {}).cast<String, dynamic>();
+        final payload = (r['payload'] as Map? ?? const {})
+            .cast<String, dynamic>();
         final kindStr = r['kind'] as String? ?? '';
         final kind = switch (kindStr) {
           'waitlist_promoted' || 'session_cancelled' => NotifKind.slot,

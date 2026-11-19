@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/di/injector.dart';
+import '../../../../core/backend/dev_api.dart';
 import '../../../feed/presentation/cubit/feed_cubit.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/services/notification_service.dart';
@@ -1086,6 +1087,42 @@ class _AccountPageState extends State<AccountPage> {
   late final _username = TextEditingController(text: _me.state.username);
   late final _email = TextEditingController(text: _me.state.email);
   late Gender _gender = _me.state.gender;
+  bool _busy = false;
+  bool _loadingAccount = true;
+  bool _accountLoaded = false;
+  String? _errorMessage;
+  String _savedEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccount();
+  }
+
+  Future<void> _loadAccount() async {
+    setState(() {
+      _loadingAccount = true;
+      _errorMessage = null;
+    });
+    try {
+      final account = await sl<DevApi>().authAccount();
+      if (!mounted) return;
+      _savedEmail = account['email'] as String? ?? '';
+      _email.text = _savedEmail;
+      _accountLoaded = true;
+    } on Object catch (error) {
+      if (mounted) {
+        setState(
+          () => _errorMessage = apiFeedback(
+            error,
+            fallback: 'Data akun belum bisa dimuat. Coba lagi.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingAccount = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -1101,23 +1138,65 @@ class _AccountPageState extends State<AccountPage> {
       return 'Username 3–20 karakter: huruf kecil, angka, titik, _';
     }
     final e = _email.text.trim();
-    if (e.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(e)) {
+    if ((e.isNotEmpty || _savedEmail.isNotEmpty) &&
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(e)) {
       return 'Format email belum benar';
     }
     return null;
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_busy || _loadingAccount || !_accountLoaded) return;
+    if (!sl<DevApi>().isSignedIn) {
+      setState(
+        () => _errorMessage = 'Sesi berakhir. Masuk ulang lalu coba lagi.',
+      );
+      return;
+    }
     final err = _error;
-    if (err != null) return toast(context, err);
-    _me.updateAccount(
-      name: _name.text.trim(),
-      username: _username.text,
-      email: _email.text.trim(),
-      gender: _gender,
-    );
-    toast(context, 'Akun disimpan');
-    context.pop();
+    if (err != null) {
+      setState(() => _errorMessage = err);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    var profileSaved = false;
+    try {
+      await _me.updateAccount(
+        name: _name.text.trim(),
+        username: _username.text,
+        email: _savedEmail,
+        gender: _gender,
+      );
+      profileSaved = true;
+      final nextEmail = _email.text.trim();
+      var message = 'Akun disimpan';
+      if (nextEmail != _savedEmail) {
+        final account = await sl<DevApi>().updateAccountEmail(nextEmail);
+        _savedEmail = account['email'] as String? ?? _savedEmail;
+        message = _savedEmail == nextEmail ? 'Akun dan email disimpan' : 'Profil disimpan. Cek email untuk mengonfirmasi perubahan alamat.';
+      }
+      if (!mounted) return;
+      toast(context, message);
+      context.pop();
+    } on Object catch (error) {
+      if (mounted) {
+        final message = apiFeedback(
+          error,
+          fallback: 'Akun belum tersimpan. Coba lagi.',
+        );
+        setState(
+          () => _errorMessage = profileSaved
+              ? 'Profil sudah disimpan. Perubahan email belum berhasil. $message'
+              : message,
+        );
+        toast(context, _errorMessage!);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _confirmDelete() async {
@@ -1149,106 +1228,99 @@ class _AccountPageState extends State<AccountPage> {
   @override
   Widget build(BuildContext context) {
     final p = context.watch<MeCubit>().state;
-    return KPage(
-      header: const KHeader('Akun'),
-      bottom: KButton('SIMPAN', onTap: _save),
-      children: [
-        Center(
-          child: Column(
-            children: [
-              Pressable(
-                onTap: () => context.push(R.avatar),
-                child: ProfileAvatarView(p.avatar, size: 88),
-              ),
-              const SizedBox(height: 8),
-              KLink('Ganti avatar', onTap: () => context.push(R.avatar)),
-            ],
-          ),
+    return KLoadingOverlay(
+      loading: _loadingAccount || _busy,
+      message: _busy ? 'Menyimpan akun…' : 'Memuat akun…',
+      child: KPage(
+        header: const KHeader('Akun'),
+        bottom: KButton(
+          'SIMPAN',
+          loading: _busy,
+          onTap: _loadingAccount || !_accountLoaded ? null : _save,
         ),
-        _labeled(
-          'NAMA',
-          KInput(
-            controller: _name,
-            hint: 'Nama lengkap',
-            icon: LucideIcons.user,
-          ),
-        ),
-        _labeled(
-          'USERNAME',
-          KInput(
-            controller: _username,
-            hint: 'username',
-            icon: LucideIcons.atSign,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_.]')),
-              LengthLimitingTextInputFormatter(20),
-            ],
-          ),
-        ),
-        _labeled(
-          'EMAIL',
-          KInput(
-            controller: _email,
-            hint: 'nama@email.com',
-            icon: LucideIcons.mail,
-            keyboardType: TextInputType.emailAddress,
-          ),
-        ),
-        _labeled(
-          'NOMOR HP',
-          KField(
-            text: p.phone.isEmpty ? 'Belum ada' : p.phone,
-            icon: LucideIcons.phone,
-            trailing: const KPill(
-              'OTP',
-              bg: AppColors.primaryL,
-              fg: AppColors.primaryD,
-              icon: LucideIcons.check,
-            ),
-            onTap: () => showKSheet<void>(
-              context,
-              (ctx) => KSheet(
-                children: [
-                  Text('Ubah nomor HP', style: AppText.title()),
-                  KBanner.info(
-                    'Perubahan nomor memerlukan layanan OTP yang belum terhubung. Nomor akun tetap aman tersimpan.',
-                  ),
-                  KButton('TUTUP', onTap: () => Navigator.pop(ctx)),
-                ],
-              ),
-            ),
-          ),
-        ),
-        _labeled(
-          'JENIS KELAMIN',
-          Row(
-            children: [
-              for (final (g, l) in [
-                (Gender.lakiLaki, 'Laki-laki'),
-                (Gender.perempuan, 'Perempuan'),
-                (Gender.rahasia, 'Rahasia'),
-              ]) ...[
-                Expanded(
-                  child: KChip(
-                    l,
-                    selected: _gender == g,
-                    expand: true,
-                    onTap: () => setState(() => _gender = g),
-                  ),
+        children: [
+          if (_errorMessage != null) KBanner.error(_errorMessage!),
+          if (_errorMessage != null && !_accountLoaded)
+            KButton.secondary('Muat ulang akun', onTap: _loadAccount),
+          Center(
+            child: Column(
+              children: [
+                Pressable(
+                  onTap: () => context.push(R.avatar),
+                  child: ProfileAvatarView(p.avatar, size: 88),
                 ),
-                if (g != Gender.rahasia) const SizedBox(width: 8),
+                const SizedBox(height: 8),
+                KLink('Ganti avatar', onTap: () => context.push(R.avatar)),
               ],
-            ],
+            ),
           ),
-        ),
-        Center(
-          child: KLink(
-            'Hapus profil lokal',
-            color: AppColors.red,
-            onTap: _confirmDelete,
+          _labeled(
+            'NAMA',
+            KInput(
+              controller: _name,
+              hint: 'Nama lengkap',
+              icon: LucideIcons.user,
+            ),
           ),
-        ),
-      ],
+          _labeled(
+            'USERNAME',
+            KInput(
+              controller: _username,
+              hint: 'username',
+              icon: LucideIcons.atSign,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_.]')),
+                LengthLimitingTextInputFormatter(20),
+              ],
+            ),
+          ),
+          _labeled(
+            'EMAIL',
+            KInput(
+              controller: _email,
+              hint: 'nama@email.com',
+              icon: LucideIcons.mail,
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ),
+          _labeled(
+            'NOMOR HP',
+            KField(
+              text: p.phone.isEmpty ? 'Belum ada' : p.phone,
+              icon: LucideIcons.phone,
+            ),
+          ),
+          _labeled(
+            'JENIS KELAMIN',
+            Row(
+              children: [
+                for (final (g, l) in [
+                  (Gender.lakiLaki, 'Laki-laki'),
+                  (Gender.perempuan, 'Perempuan'),
+                  (Gender.rahasia, 'Rahasia'),
+                ]) ...[
+                  Expanded(
+                    child: KChip(
+                      l,
+                      selected: _gender == g,
+                      expand: true,
+                      onTap: () => setState(() => _gender = g),
+                    ),
+                  ),
+                  if (g != Gender.rahasia) const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+          Center(
+            child: KLink(
+              'Hapus profil lokal',
+              color: AppColors.red,
+              onTap: _confirmDelete,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

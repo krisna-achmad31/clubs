@@ -1,51 +1,154 @@
 part of 'club_pages.dart';
 
-List<String> _memberNames(BuildContext context, Club club) {
-  final me = context.read<MeCubit>().state.name;
-  const names = [
-    'Raka Pratama',
-    'Dinda Putri',
-    'Sisca Lestari',
-    'Rian Saputra',
-    'Andi',
-    'Bima',
-    'Ayu',
-    'Fajar',
-  ];
-  final added = club.addedMembers;
-  // Sample names fill the rest; skip anyone already added for real.
-  final pool = [
-    for (final n in names)
-      if (!added.contains(n)) n,
-  ];
-  return [
-    if (club.admin) me,
-    ...added,
-    for (var i = (club.admin ? 1 : 0) + added.length; i < club.members; i++)
-      '${pool[(i + club.id.length) % pool.length]}${i >= pool.length ? ' ${i + 1}' : ''}',
-  ];
-}
-
 void _members(BuildContext context, Club club) => showKSheet<void>(
   context,
   (ctx) => KSheet(
     children: [
       Text('Anggota ${club.name}', style: AppText.title()),
-      KBanner.info('Daftar anggota contoh berdasarkan jumlah anggota klub.'),
-      for (final name in _memberNames(context, club))
-        KRow(
-          title: name,
-          icon: LucideIcons.user,
-          onTap: () => showUserSheet(
-            ctx,
-            name: name,
-            subtitle: club.name,
-            sportId: club.sportId,
-          ),
-        ),
+      _ClubMemberList(club: club),
     ],
   ),
 );
+
+class _ClubMemberList extends StatefulWidget {
+  const _ClubMemberList({super.key, required this.club, this.pending = false});
+  final Club club;
+  final bool pending;
+  @override
+  State<_ClubMemberList> createState() => _ClubMemberListState();
+}
+
+class _ClubMemberListState extends State<_ClubMemberList> {
+  late Future<List<ClubMember>> _members = _load();
+  bool _busy = false;
+  Future<List<ClubMember>> _load() =>
+      sl<ClubRepository>().members(widget.club.id, pending: widget.pending);
+  Future<void> _action(ClubMember member, bool value) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final repo = sl<ClubRepository>();
+      if (widget.pending) {
+        await repo.reviewRequest(widget.club.id, member.userId, value);
+      } else {
+        await repo.setMemberAdmin(widget.club.id, member.userId, value);
+      }
+      if (!mounted) return;
+      await context.read<ClubsCubit>().load();
+      if (mounted) {
+        setState(() {
+          _members = _load();
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        toast(
+          context,
+          apiFeedback(error, fallback: 'Perubahan belum tersimpan. Coba lagi.'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<ClubMember>>(
+    future: _members,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Column(
+          children: [
+            KBanner.error('Daftar belum bisa dimuat.'),
+            KButton.secondary(
+              'COBA LAGI',
+              onTap: () => setState(() {
+                _members = _load();
+              }),
+            ),
+          ],
+        );
+      }
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (snapshot.data!.isEmpty) {
+        return KBanner.info(
+          widget.pending
+              ? 'Tidak ada permintaan bergabung.'
+              : 'Belum ada anggota.',
+        );
+      }
+      return Column(
+        children: [
+          for (final member in snapshot.data!)
+            Column(
+              children: [
+                KRow(
+                  title: member.name,
+                  subtitle: widget.pending
+                      ? 'Menunggu Persetujuan'
+                      : member.roleLabel,
+                  icon: member.role == 'admin'
+                      ? LucideIcons.shield
+                      : LucideIcons.user,
+                  onTap: () => showUserSheet(
+                    context,
+                    name: member.name,
+                    subtitle: member.roleLabel,
+                    sportId: widget.club.sportId,
+                  ),
+                ),
+                if (widget.club.admin && widget.pending)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: KButton.secondary(
+                          'TOLAK',
+                          onTap: _busy ? null : () => _action(member, false),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: KButton(
+                          'SETUJUI',
+                          onTap: _busy ? null : () => _action(member, true),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (widget.club.admin && !widget.pending && !member.owner)
+                  KMiniButton(
+                    member.role == 'admin'
+                        ? 'JADIKAN ANGGOTA'
+                        : 'JADIKAN ADMIN',
+                    onTap: _busy
+                        ? null
+                        : () async {
+                            final yes = await showConfirmSheet(
+                              context,
+                              title: member.role == 'admin'
+                                  ? 'Ubah Jadi Anggota?'
+                                  : 'Jadikan Admin?',
+                              body:
+                                  member.name +
+                                  (member.role == 'admin'
+                                      ? ' akan menjadi anggota biasa.'
+                                      : ' akan bisa mengelola anggota dan kas klub.'),
+                              confirm: 'UBAH PERAN',
+                            );
+                            if (yes) {
+                              await _action(member, member.role != 'admin');
+                            }
+                          },
+                  ),
+              ],
+            ),
+        ],
+      );
+    },
+  );
+}
 
 Future<void> _openMemberRoute(
   BuildContext context,
@@ -201,6 +304,7 @@ class _KasPageState extends State<KasPage> {
     Club club,
     KasSummary kas, {
     bool withdraw = false,
+    bool income = false,
   }) async {
     if (_busy) return;
     if (withdraw && club.payout == null) {
@@ -212,7 +316,7 @@ class _KasPageState extends State<KasPage> {
       return;
     }
     var amount = 0;
-    var category = 'Sewa GOR';
+    var category = income ? 'Iuran' : 'Sewa GOR';
     var note = '';
     final result = await showKSheet<(int, String, String)>(
       context,
@@ -220,12 +324,16 @@ class _KasPageState extends State<KasPage> {
         builder: (ctx, set) => KSheet(
           children: [
             Text(
-              withdraw ? 'Tarik dana demo' : 'Catat pengeluaran',
+              withdraw
+                  ? 'Catat Penarikan'
+                  : income
+                  ? 'Catat Pemasukan'
+                  : 'Catat Pengeluaran',
               style: AppText.title(),
             ),
             if (withdraw)
               KBanner.info(
-                'Tujuan ${club.payout!.masked}. Simulasi lokal; tidak ada transfer uang.',
+                'Tujuan ${club.payout!.masked}. Catatan ini tidak melakukan transfer uang.',
               ),
             KInput(
               hint: 'Jumlah rupiah',
@@ -238,7 +346,10 @@ class _KasPageState extends State<KasPage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final value in ['Sewa GOR', 'Kok/Bola', 'Lainnya'])
+                  for (final value
+                      in income
+                          ? ['Iuran', 'Donasi', 'Lainnya']
+                          : ['Sewa GOR', 'Kok/Bola', 'Lainnya'])
                     KChip(
                       value,
                       selected: category == value,
@@ -252,8 +363,15 @@ class _KasPageState extends State<KasPage> {
             ),
             Text('Saldo ${Fmt.rp(kas.balance)}', style: AppText.bodySm()),
             KButton(
-              withdraw ? 'KONFIRMASI SIMULASI' : 'SIMPAN PENGELUARAN',
-              onTap: amount > 0 && amount <= kas.balance
+              withdraw
+                  ? 'SIMPAN PENARIKAN'
+                  : income
+                  ? 'SIMPAN PEMASUKAN'
+                  : 'SIMPAN PENGELUARAN',
+              onTap:
+                  amount > 0 &&
+                      amount <= 2147483647 &&
+                      (income || amount <= kas.balance)
                   ? () => Navigator.pop(ctx, (amount, category, note))
                   : null,
             ),
@@ -267,6 +385,16 @@ class _KasPageState extends State<KasPage> {
     try {
       final updated = withdraw
           ? await cubit.withdraw(club.id, amount: result.$1, to: club.payout!)
+          : income
+          ? await sl<ClubRepository>().addKas(
+              club.id,
+              KasEntry(
+                title: result.$3.isEmpty ? result.$2 : result.$3,
+                sub: result.$2,
+                amount: result.$1,
+                kind: 'iuran',
+              ),
+            )
           : await cubit.addExpense(
               club.id,
               amount: result.$1,
@@ -338,11 +466,17 @@ class _KasPageState extends State<KasPage> {
                 ? null
                 : KActions([
                     KButton.secondary(
+                      'CATAT MASUK',
+                      onTap: _busy
+                          ? null
+                          : () => _movement(club, kas, income: true),
+                    ),
+                    KButton.secondary(
                       'CATAT KELUAR',
                       onTap: _busy ? null : () => _movement(club, kas),
                     ),
                     KButton(
-                      'TARIK DANA DEMO',
+                      'CATAT PENARIKAN',
                       onTap: _busy
                           ? null
                           : () => _movement(club, kas, withdraw: true),
@@ -358,10 +492,47 @@ class _KasPageState extends State<KasPage> {
                   ],
                 ),
               KBanner.info(
-                'Kas demo. Mutasi tersimpan selama sesi aplikasi ini, tanpa transaksi uang.',
+                'Catatan kas tersimpan untuk seluruh anggota. Hanya pemilik dan admin yang bisa mencatat mutasi.',
               ),
-              if (snapshot.hasError)
-                KBanner.error('Kas belum bisa dimuat. Kembali lalu coba lagi.'),
+              if (club.admin)
+                KButton.secondary(
+                  'PENGATURAN KAS',
+                  onTap: () async {
+                    final account = await showKSheet<PayoutAccount>(
+                      context,
+                      (_) => const _PayoutSheet(),
+                    );
+                    if (account == null || !context.mounted) return;
+                    try {
+                      await context.read<ClubsCubit>().setPayout(
+                        club.id,
+                        account,
+                      );
+                      if (context.mounted) {
+                        toast(context, 'Rekening kas tersimpan.');
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        toast(
+                          context,
+                          apiFeedback(
+                            error,
+                            fallback: 'Rekening belum tersimpan.',
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              if (snapshot.hasError) ...[
+                KBanner.error('Kas belum bisa dimuat.'),
+                KButton.secondary(
+                  'COBA LAGI',
+                  onTap: () => setState(() {
+                    _kas = sl<ClubRepository>().kas(widget.id);
+                  }),
+                ),
+              ],
               if (kas != null) ...[
                 Text(Fmt.rp(kas.balance), style: AppText.h1()),
                 Text(

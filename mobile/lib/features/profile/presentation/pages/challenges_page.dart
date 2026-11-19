@@ -96,61 +96,70 @@ class _ChallengesPageState extends State<ChallengesPage> {
       },
     );
     final explore = items.where((challenge) => !challenge.joined);
-    return KPage(
-      header: const KHeader('Tantangan'),
-      stagger: false,
-      onRefresh: busy ? null : _load,
-      children: [
-        if (_loading) const LinearProgressIndicator(),
-        if (_loadFailed) ...[
-          KBanner.info('Tantangan gagal dimuat.'),
-          KButton('Coba lagi', kind: BtnKind.secondary, onTap: _load),
-        ],
-        if (_items != null) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (i, label) in [
-                'Diikuti',
-                'Klub',
-                'Teman',
-                'Selesai',
-              ].indexed)
-                KChip(
-                  label,
-                  selected: _tab == i,
-                  onTap: () => setState(() => _tab = i),
+    return KLoadingOverlay(
+      loading: busy,
+      message: _saving ? 'Menyimpan pilihanmu…' : 'Memuat tantangan…',
+      child: KPage(
+        header: const KHeader('Tantangan'),
+        stagger: false,
+        onRefresh: busy ? null : _load,
+        children: [
+          if (_loadFailed && !_loading)
+            KContentState(
+              error: true,
+              title: 'Tantangan belum bisa dimuat',
+              message: 'Cek koneksi internet lalu coba lagi.',
+              action: 'Coba lagi',
+              onAction: _load,
+            ),
+          if (_items != null && !busy && !_loadFailed) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (i, label) in [
+                  'Diikuti',
+                  'Klub',
+                  'Teman',
+                  'Selesai',
+                ].indexed)
+                  KChip(
+                    label,
+                    selected: _tab == i,
+                    onTap: () => setState(() => _tab = i),
+                  ),
+              ],
+            ),
+            if (visible.isEmpty)
+              KContentState(
+                title: _tab == 3
+                    ? 'Belum ada tantangan selesai.'
+                    : 'Belum ada tantangan di sini.',
+                message: _tab == 3
+                    ? 'Selesaikan tantangan untuk melihat pencapaianmu.'
+                    : 'Pilih tantangan dan mulai bergerak bareng.',
+              ),
+            for (final challenge in visible)
+              _card(challenge, enabled: !busy && !_loadFailed),
+            if (_tab == 0 && explore.isNotEmpty) ...[
+              const SectionTitle('Jelajahi tantangan'),
+              for (final challenge in explore)
+                KRow(
+                  title: challenge.title,
+                  icon: LucideIcons.flag,
+                  trailing: KMiniButton(
+                    'GABUNG',
+                    hue: Hue.primary,
+                    onTap: busy || _loadFailed
+                        ? null
+                        : () => _setMembership(challenge),
+                  ),
+                  onTap: busy || _loadFailed ? null : () => _detail(challenge),
                 ),
             ],
-          ),
-          if (visible.isEmpty)
-            Text(
-              _tab == 3
-                  ? 'Belum ada tantangan selesai.'
-                  : 'Belum ada tantangan di sini.',
-              style: AppText.body(AppColors.muted),
-            ),
-          for (final challenge in visible)
-            _card(challenge, enabled: !busy && !_loadFailed),
-          if (_tab == 0 && explore.isNotEmpty) ...[
-            const SectionTitle('Jelajahi tantangan'),
-            for (final challenge in explore)
-              KRow(
-                title: challenge.title,
-                icon: LucideIcons.flag,
-                trailing: KMiniButton(
-                  'GABUNG',
-                  hue: Hue.primary,
-                  onTap: busy || _loadFailed
-                      ? null
-                      : () => _setMembership(challenge),
-                ),
-                onTap: busy || _loadFailed ? null : () => _detail(challenge),
-              ),
           ],
         ],
-      ],
+      ),
     );
   }
 

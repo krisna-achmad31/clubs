@@ -63,11 +63,11 @@ class ClubsCubit extends Cubit<ClubsState> {
   }
 
   Future<void> join(Club club) async {
+    await _repo.join(club.id);
     if (club.needsApproval) {
       emit(state.copyWith(pending: {...state.pending, club.id}));
       return;
     }
-    await _repo.join(club.id);
     await load();
   }
 

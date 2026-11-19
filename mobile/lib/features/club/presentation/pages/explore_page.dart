@@ -271,20 +271,22 @@ class _ExplorePageState extends State<ExplorePage> {
           future: _results,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const KContentState(
+                loading: true,
+                title: 'Mencari teman bergerak',
+                message: 'Sebentar, hasil Jelajahi sedang dimuat.',
+              );
             }
             if (snapshot.hasError) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    apiFeedback(
-                      snapshot.error!,
-                      fallback: 'Jelajahi gagal dimuat.',
-                    ),
-                  ),
-                  KLink('Coba lagi', onTap: _reload),
-                ],
+              return KContentState(
+                error: true,
+                title: 'Jelajahi belum bisa dimuat',
+                message: apiFeedback(
+                  snapshot.error!,
+                  fallback: 'Jelajahi gagal dimuat.',
+                ),
+                action: 'Coba lagi',
+                onAction: _reload,
               );
             }
             final results = snapshot.requireData;
@@ -292,11 +294,11 @@ class _ExplorePageState extends State<ExplorePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (results.isEmpty)
-                  Text(
-                    _tab == _ExploreTab.tournament
+                  KContentState(
+                    title: 'Belum ada hasil',
+                    message: _tab == _ExploreTab.tournament
                         ? 'Belum ada turnamen tersimpan di akunmu.'
                         : 'Belum ada hasil. Coba kata kunci atau olahraga lain.',
-                    style: AppText.bodySm(),
                   ),
                 for (final entry in results.take(_pageSize))
                   Padding(

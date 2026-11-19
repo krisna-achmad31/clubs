@@ -106,19 +106,21 @@ class MeCubit extends Cubit<UserProfile> {
   }
 
   /// M4a: phone changes go through OTP, so they are not edited here.
-  void updateAccount({
+  Future<void> updateAccount({
     required String name,
     required String username,
     required String email,
     required Gender gender,
-  }) => _set(
-    state.copyWith(
+  }) async {
+    final profile = state.copyWith(
       name: name,
       username: username,
       email: email,
       gender: gender,
-    ),
-  );
+    );
+    await _repo.saveAccount(profile);
+    if (!isClosed) emit(profile);
+  }
 
   void completeOnboarding({
     required String name,

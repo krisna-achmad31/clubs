@@ -257,29 +257,51 @@ class _ManualPageState extends State<ManualPage> {
         const FieldLabel('GIMANA RASANYA?'),
         Row(
           children: [
-            for (final (i, emoji) in [
-              '😵',
-              '😮‍💨',
-              '🙂',
-              '😄',
-              '🔥',
+            for (final (i, name) in [
+              'feel_exhausted',
+              'feel_tired',
+              'feel_okay',
+              'feel_happy',
+              'feel_fired_up',
             ].indexed) ...[
               if (i > 0) const SizedBox(width: 8),
               Expanded(
                 child: KChoice(
                   selected: _feel == i,
                   hue: Hue.yellow,
-                  height: 52,
+                  height: 56,
+                  padding: const EdgeInsets.all(4),
                   radius: 14,
                   onTap: () {
                     HapticFeedback.selectionClick();
                     setState(() => _feel = i);
                   },
                   child: AnimatedScale(
-                    scale: _feel == i ? 1.2 : 1,
+                    scale: _feel == i ? 1.08 : 1,
                     duration: Motion.base,
-                    curve: Motion.pop,
-                    child: Emo(emoji, size: 24),
+                    curve: Curves.easeOut,
+                    child: Semantics(
+                      label: const [
+                        'Capek banget',
+                        'Capek',
+                        'Biasa saja',
+                        'Senang',
+                        'Semangat',
+                      ][i],
+                      selected: _feel == i,
+                      excludeSemantics: true,
+                      child: SizedBox.square(
+                        dimension: 36,
+                        child: Center(
+                          child: Image.asset(
+                            'assets/icons/$name.png',
+                            width: 28,
+                            height: 28,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

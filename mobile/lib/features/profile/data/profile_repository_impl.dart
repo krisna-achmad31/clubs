@@ -20,12 +20,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
   static const _kOnboarded = 'onboarded';
   static const _kProfile = 'profile';
 
-  static const empty = UserProfile(
-    name: '',
-    username: '',
-    phone: '',
-    area: '',
-  );
+  static const empty = UserProfile(name: '', username: '', phone: '', area: '');
 
   /// Kept as an alias to [empty] for test compatibility; hardcoded demo seed is disabled.
   static const seed = empty;
@@ -106,9 +101,23 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<void> saveAccount(UserProfile profile) async {
+    final api = _api;
+    if (api != null) {
+      await api.updateAccountProfile({
+        'name': profile.name,
+        'username': profile.username,
+        'gender': profile.gender.name,
+      });
+    }
+    _cache = profile;
+    await _prefs.setString(_kProfile, jsonEncode(profile.toJson()));
+  }
+
+  @override
   Future<void> clear() async {
     _cache = null;
-    _api?.signOut();
+    await _api?.signOut();
     await Future.wait([
       _prefs.remove(_kProfile),
       _prefs.setBool(_kOnboarded, false),

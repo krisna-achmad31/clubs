@@ -67,6 +67,7 @@ class KInput extends StatelessWidget {
     this.inputFormatters,
     this.focused = false,
     this.obscureText = false,
+    this.validator,
   });
 
   final TextEditingController? controller;
@@ -83,9 +84,68 @@ class KInput extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final bool focused;
   final bool obscureText;
+  final FormFieldValidator<String>? validator;
 
   @override
   Widget build(BuildContext context) {
+    final validated = validator != null;
+    final outline = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: focused ? AppColors.primaryM : AppColors.line,
+        width: 2,
+      ),
+    );
+    final input = TextFormField(
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      controller: controller,
+      initialValue: controller == null ? initialValue : null,
+      readOnly: readOnly,
+      obscureText: obscureText,
+      onTap: onTap,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
+      style: AppText.custom(16, w: FontWeight.w800),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: validated,
+        fillColor: focused ? AppColors.primaryL : AppColors.soft,
+        border: validated ? outline : InputBorder.none,
+        enabledBorder: validated ? outline : null,
+        focusedBorder: validated ? outline : null,
+        errorBorder: validated ? outline : null,
+        focusedErrorBorder: validated ? outline : null,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: validated ? 14 : 0,
+          vertical: validated ? 15 : 11,
+        ),
+        prefixIcon: validated && icon != null
+            ? Padding(
+                padding: const EdgeInsets.only(left: 14, right: 10),
+                child: Icon(icon, size: 20, color: iconColor),
+              )
+            : null,
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 44,
+          minHeight: 48,
+        ),
+        suffixIcon: validated && trailing != null
+            ? Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: trailing,
+              )
+            : null,
+        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+        errorStyle: AppText.bodySm(AppColors.red),
+        errorMaxLines: 3,
+        hintText: hint,
+        hintStyle: AppText.custom(16, w: FontWeight.w800, c: AppColors.faint),
+      ),
+    );
+    if (validated) return input;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
@@ -108,31 +168,7 @@ class KInput extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              initialValue: controller == null ? initialValue : null,
-              readOnly: readOnly,
-              obscureText: obscureText,
-              onTap: onTap,
-              maxLines: maxLines,
-              keyboardType: keyboardType,
-              inputFormatters: inputFormatters,
-              onChanged: onChanged,
-              style: AppText.custom(16, w: FontWeight.w800),
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                hintText: hint,
-                hintStyle: AppText.custom(
-                  16,
-                  w: FontWeight.w800,
-                  c: AppColors.faint,
-                ),
-              ),
-            ),
-          ),
+          Expanded(child: input),
           ?trailing,
         ],
       ),

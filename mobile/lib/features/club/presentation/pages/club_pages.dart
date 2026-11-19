@@ -49,38 +49,87 @@ class ClubsPage extends StatelessWidget {
     final mine = context.watch<SessionsCubit>().state.mine;
     return KPage(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-      header: Row(
+      header: Column(
         children: [
-          Text('Klub', style: AppText.custom(26)),
-          const Spacer(),
-          KIconButton(
-            LucideIcons.search,
-            color: AppColors.faint,
-            size: 24,
-            onTap: () => context.push(R.explore),
+          Row(
+            children: [
+              Text('Klub', style: AppText.custom(26)),
+              const Spacer(),
+              KIconButton(
+                LucideIcons.search,
+                color: AppColors.faint,
+                size: 24,
+                onTap: () => context.push(R.explore),
+              ),
+              const SizedBox(width: 8),
+              KIconButton(
+                LucideIcons.plus,
+                color: AppColors.primary,
+                size: 26,
+                onTap: () => _createClub(context),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          KIconButton(
-            LucideIcons.plus,
-            color: AppColors.primary,
-            size: 26,
-            onTap: () => _createClub(context),
+          const SizedBox(height: 12),
+          Builder(
+            builder: (context) {
+              final actions = [
+                KButton.secondary(
+                  'CARI KLUB',
+                  small: true,
+                  icon: LucideIcons.search,
+                  onTap: () => context.push(R.explore),
+                ),
+                KButton(
+                  'BUAT KLUB',
+                  small: true,
+                  icon: LucideIcons.plus,
+                  onTap: () => _createClub(context),
+                ),
+              ];
+              final availableWidth =
+                  (MediaQuery.sizeOf(context).width - 32 - 10) / 2;
+              final labelsFit = ['CARI KLUB', 'BUAT KLUB'].every((label) {
+                final painter = TextPainter(
+                  text: TextSpan(
+                    text: label,
+                    style: AppText.button(AppColors.ink, 14),
+                  ),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout();
+                // Small button padding, icon, icon gap, and outlined border.
+                final requiredWidth = painter.width + 28 + 17 + 8 + 4;
+                painter.dispose();
+                return requiredWidth <= availableWidth;
+              });
+              return labelsFit ? KSplit(actions) : KActions(actions, gap: 12);
+            },
           ),
         ],
       ),
       children: [
-        if (mine.isNotEmpty)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const FieldLabel('MABAR KAMU MINGGU INI'),
-              const SizedBox(height: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const FieldLabel('MABAR KAMU MINGGU INI'),
+            const SizedBox(height: 8),
+            if (mine.isEmpty)
+              const KCard(
+                padding: EdgeInsets.all(16),
+                child: KContentState(
+                  compact: true,
+                  title: 'Belum ada mabar minggu ini',
+                  message: 'Jadwal mabar yang kamu ikuti muncul di sini.',
+                ),
+              )
+            else
               KSplit([
                 for (final (s, r) in mine.take(2))
                   _MyMabarCard(session: s, rsvp: r),
               ]),
-            ],
-          ),
+          ],
+        ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -99,10 +148,20 @@ class ClubsPage extends StatelessWidget {
                       ),
                     _ClubRow(club: c),
                   ],
-                  if (clubs.mine.isEmpty)
+                  if (clubs.loading)
+                    const KContentState(
+                      loading: true,
+                      title: 'Menyiapkan klubmu',
+                      message: 'Sebentar, daftar klub sedang dimuat.',
+                    )
+                  else if (clubs.mine.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('Belum gabung klub. Yuk cari yang dekat!'),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: KContentState(
+                        compact: true,
+                        title: 'Belum gabung klub',
+                        message: 'Cari klub atau buat klub pertamamu.',
+                      ),
                     ),
                 ],
               ),
@@ -114,20 +173,6 @@ class ClubsPage extends StatelessWidget {
             key: ValueKey(inv.club.id),
             child: _InviteCard(invite: inv),
           ),
-        KSplit([
-          KButton.secondary(
-            'CARI KLUB',
-            small: true,
-            icon: LucideIcons.search,
-            onTap: () => context.push(R.explore),
-          ),
-          KButton(
-            'BUAT KLUB',
-            small: true,
-            icon: LucideIcons.plus,
-            onTap: () => _createClub(context),
-          ),
-        ]),
       ],
     );
   }
@@ -669,23 +714,30 @@ class _ClubPageState extends State<ClubPage> {
                         onTap: () => context.push(R.invite(club.id)),
                       ),
                     ),
-                  for (final name in _memberNames(context, club).take(5))
-                    KRow(
-                      title: name,
-                      subtitle: 'Anggota contoh',
-                      icon: LucideIcons.user,
-                      onTap: () => showUserSheet(
-                        context,
-                        name: name,
-                        subtitle: club.name,
-                        sportId: club.sportId,
+                  if (club.admin && member)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: KButton.secondary(
+                        'PERMINTAAN',
+                        icon: LucideIcons.userCheck,
+                        onTap: () => showKSheet<void>(
+                          context,
+                          (ctx) => KSheet(
+                            children: [
+                              Text(
+                                'Permintaan Bergabung',
+                                style: AppText.title(),
+                              ),
+                              _ClubMemberList(club: club, pending: true),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  if (club.members > 5)
-                    KLink(
-                      'LIHAT SEMUA ANGGOTA',
-                      onTap: () => _members(context, club),
-                    ),
+                  if (member)
+                    _ClubMemberList(key: ValueKey(club.id), club: club),
+                  if (!member)
+                    KBanner.info('Gabung klub untuk melihat daftar anggota.'),
                 ],
               ],
             ),
@@ -904,11 +956,12 @@ class _ChatViewState extends State<_ChatView> {
     bool sticker = false,
     Color? stickerBg,
   }) async {
-    await context.read<ClubChatCubit>().send(
+    final sent = await context.read<ClubChatCubit>().send(
       text,
       sticker: sticker,
       stickerBg: stickerBg,
     );
+    if (!sent || !mounted) return;
     _text.clear();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     if (_scroll.hasClients) {
@@ -966,7 +1019,7 @@ class _ChatViewState extends State<_ChatView> {
                           style: AppText.custom(17),
                         ),
                         Text(
-                          '${club.members} anggota · ${club.online} online',
+                          '${club.members} anggota',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppText.custom(
@@ -991,6 +1044,13 @@ class _ChatViewState extends State<_ChatView> {
                 controller: _scroll,
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 children: [
+                  if (chat.error != null) ...[
+                    KBanner.error(chat.error!),
+                    KButton.secondary(
+                      'COBA LAGI',
+                      onTap: () => context.read<ClubChatCubit>().load(),
+                    ),
+                  ],
                   if (chat.pinned != null)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -1057,7 +1117,7 @@ class _ChatViewState extends State<_ChatView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Kirim sebagai pengumuman lokal (demo)',
+                        'Kirim Sebagai Pengumuman',
                         style: AppText.custom(
                           13,
                           w: FontWeight.w800,
@@ -1155,7 +1215,7 @@ class _ChatViewState extends State<_ChatView> {
                   ),
                   const SizedBox(width: 8),
                   Pressable(
-                    onTap: _text.text.trim().isEmpty
+                    onTap: chat.sending || _text.text.trim().isEmpty
                         ? null
                         : () => _send(_text.text),
                     child: Container(
@@ -1339,8 +1399,12 @@ class _NewClubPageState extends State<NewClubPage> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _busy = false);
-        toast(context, apiFeedback(error, fallback: 'Klub belum tersimpan. Coba lagi.'));
-        if (error is DevApiException && error.status == 401 &&
+        toast(
+          context,
+          apiFeedback(error, fallback: 'Klub belum tersimpan. Coba lagi.'),
+        );
+        if (error is DevApiException &&
+            error.status == 401 &&
             !sl<DevApi>().isSignedIn) {
           context.go(R.expiredSession);
         }
@@ -1358,9 +1422,12 @@ class _NewClubPageState extends State<NewClubPage> {
       }
     }
     if (!mounted) return;
-    toast(context, failed == 0
-        ? 'Klub berhasil dibuat.'
-        : 'Klub dibuat. $failed anggota gagal ditambahkan. $memberError');
+    toast(
+      context,
+      failed == 0
+          ? 'Klub berhasil dibuat.'
+          : 'Klub dibuat. $failed anggota gagal ditambahkan. $memberError',
+    );
     // Callers decide what comes next: the Klub tab opens the new club,
     // onboarding and the host form return to their own step.
     context.canPop() ? context.pop(club) : context.go(R.club(club.id));
@@ -1570,7 +1637,9 @@ class _NewClubPageState extends State<NewClubPage> {
                 final center = area.center;
                 setState(() {
                   _area = area.label;
-                  _areaCenter = center == null ? null : (lat: center.lat, lng: center.lng);
+                  _areaCenter = center == null
+                      ? null
+                      : (lat: center.lat, lng: center.lng);
                 });
               },
             ),

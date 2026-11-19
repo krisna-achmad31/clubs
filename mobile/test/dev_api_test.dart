@@ -10,6 +10,43 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test(
+    'account email reads and updates use the authenticated Auth endpoint',
+    () async {
+      final methods = <String>[];
+      final api = DevApi(
+        MockClient((request) async {
+          if (request.url.path == '/auth/v1/token') {
+            return http.Response(
+              '{"access_token":"session","user":{"id":"me"}}',
+              200,
+            );
+          }
+          expect(request.url.path, '/auth/v1/user');
+          expect(request.headers['Authorization'], 'Bearer session');
+          expect(request.headers.containsKey('Content-Profile'), isFalse);
+          methods.add(request.method);
+          if (request.method == 'PUT') {
+            expect(jsonDecode(request.body), {'email': 'new@example.test'});
+            return http.Response(
+              '{"email":"old@example.test","new_email":"new@example.test"}',
+              200,
+            );
+          }
+          return http.Response('{"email":"old@example.test"}', 200);
+        }),
+        'sb_publishable_test',
+        mode: AppMode.LIVE,
+      );
+      addTearDown(api.close);
+      await api.signIn('old@example.test', 'password');
+      expect((await api.authAccount())['email'], 'old@example.test');
+      final updated = await api.updateAccountEmail('new@example.test');
+      expect(updated['email'], 'old@example.test');
+      expect(updated['new_email'], 'new@example.test');
+      expect(methods, ['GET', 'PUT']);
+    },
+  );
   test('an expired saved session is rejected before the request', () async {
     final payload = base64Url.encode(utf8.encode('{"exp":1}'));
     SharedPreferences.setMockInitialValues({

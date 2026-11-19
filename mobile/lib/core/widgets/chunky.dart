@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../animations/motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
+import 'states.dart';
 
 /// Border used by chunky cards/tiles/chips: 2px sides, thicker bottom lip.
 Border chunkyBorder(Color c, {double bottom = 5, double side = 2}) => Border(
@@ -84,9 +85,9 @@ class KButton extends StatelessWidget {
     this.expand = true,
     this.textColor,
     this.small = false,
+    this.loading = false,
   }) : kind = BtnKind.secondary,
-       hue = Hue.primary,
-       loading = false;
+       hue = Hue.primary;
 
   final String label;
   final VoidCallback? onTap;
@@ -100,7 +101,7 @@ class KButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final disabled = onTap == null;
+    final disabled = onTap == null && !loading;
     final primary = kind == BtnKind.primary;
     final fill = primary
         ? (disabled ? AppColors.line : hue.base)
@@ -119,25 +120,22 @@ class KButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (loading)
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 3, color: fg),
-          )
-        else ...[
-          if (icon != null) ...[
-            Icon(icon, color: fg, size: size + 3),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Text(
-              label.toUpperCase(),
-              style: AppText.button(fg, size),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: KLoading(size: 18, color: fg),
           ),
+        if (!loading && icon != null) ...[
+          Icon(icon, color: fg, size: size + 3),
+          const SizedBox(width: 8),
         ],
+        Flexible(
+          child: Text(
+            label.toUpperCase(),
+            style: AppText.button(fg, size),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
     return Pressable(
@@ -168,6 +166,7 @@ class KMiniButton extends StatelessWidget {
     this.hue,
     this.icon,
     this.textColor,
+    this.loading = false,
   });
 
   final String label;
@@ -177,10 +176,11 @@ class KMiniButton extends StatelessWidget {
   final Hue? hue;
   final IconData? icon;
   final Color? textColor;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = onTap == null;
+    final disabled = onTap == null && !loading;
     final h = disabled && hue != null
         ? const Hue(AppColors.line, AppColors.faint, AppColors.soft)
         : hue;
@@ -188,7 +188,7 @@ class KMiniButton extends StatelessWidget {
         ? AppColors.faint
         : textColor ?? (h == null ? AppColors.muted : AppColors.white);
     return Pressable(
-      onTap: onTap,
+      onTap: loading ? null : onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -201,7 +201,10 @@ class KMiniButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
+            if (loading) ...[
+              KLoading(size: 16, color: fg),
+              const SizedBox(width: 6),
+            ] else if (icon != null) ...[
               Icon(icon, size: 16, color: fg),
               const SizedBox(width: 6),
             ],

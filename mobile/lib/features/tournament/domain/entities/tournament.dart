@@ -45,7 +45,7 @@ class CourtMatch extends Equatable {
   );
 
   @override
-  List<Object?> get props => [court, game, scoreA, scoreB, done];
+  List<Object?> get props => [court, game, teamA, teamB, scoreA, scoreB, done];
 }
 
 class PlayerScore extends Equatable {

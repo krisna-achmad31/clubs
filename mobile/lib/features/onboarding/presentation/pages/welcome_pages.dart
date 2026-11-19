@@ -30,6 +30,11 @@ class _SplashPageState extends State<SplashPage>
   }
 
   Future<void> _route() async {
+    try {
+      await sl<DevApi>().restoreSession();
+    } on Object {
+      // Keep the saved session available when the network is temporarily down.
+    }
     final onboarded = await sl<ProfileRepository>().isOnboarded();
     await Future<void>.delayed(const Duration(milliseconds: 1900));
     if (!mounted) return;

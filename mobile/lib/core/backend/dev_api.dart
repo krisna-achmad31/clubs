@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:realtime_client/realtime_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_data.dart';
@@ -24,7 +25,8 @@ class ExploreResult {
       fee = json['fee'] as int?,
       status = json['status'] as String?,
       sessionId = json['session_id'] as String?,
-      startsAt = DateTime.tryParse(json['starts_at'] as String? ?? '')?.toLocal();
+      startsAt = DateTime.tryParse(json['starts_at'] as String? ?? '')
+          ?.toLocal();
 
   final String id;
   final String title;
@@ -88,17 +90,22 @@ class DevApiException implements Exception {
 }
 
 String apiFeedback(Object error, {required String fallback}) {
-  if (error is TimeoutException) return 'Server terlalu lama merespons. Coba lagi.';
-  if (error is http.ClientException) return 'Koneksi terputus. Cek internet lalu coba lagi.';
+  if (error is TimeoutException) {
+    return 'Server terlalu lama merespons. Coba lagi.';
+  }
+  if (error is http.ClientException) {
+    return 'Koneksi terputus. Cek internet lalu coba lagi.';
+  }
   if (error is! DevApiException) return fallback;
-  return error.userMessage ?? switch (error.status) {
-    401 => 'Sesi berakhir. Masuk ulang lalu coba lagi.',
-    403 => 'Kamu tidak punya izin untuk tindakan ini.',
-    409 => 'Data bentrok dengan perubahan lain. Muat ulang lalu coba lagi.',
-    429 => 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
-    >= 500 => 'Server sedang bermasalah. Coba lagi nanti.',
-    _ => fallback,
-  };
+  return error.userMessage ??
+      switch (error.status) {
+        401 => 'Sesi berakhir. Masuk ulang lalu coba lagi.',
+        403 => 'Kamu tidak punya izin untuk tindakan ini.',
+        409 => 'Data bentrok dengan perubahan lain. Muat ulang lalu coba lagi.',
+        429 => 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
+        >= 500 => 'Server sedang bermasalah. Coba lagi nanti.',
+        _ => fallback,
+      };
 }
 
 /// The Dev build always targets its own schema; no request falls back to Prod.
@@ -109,11 +116,25 @@ class DevApi {
     : mode = mode ?? AppData.appMode {
     _accessToken = _prefs?.getString(_kTokenKey);
     _userId = _prefs?.getString(_kUserKey);
+    final saved = _prefs?.getString(_kSessionKey);
+    if (saved != null) {
+      _accessToken = null;
+      _userId = null;
+      try {
+        final session = jsonDecode(saved) as ApiRow;
+        _accessToken = session['access_token'] as String?;
+        _refreshToken = session['refresh_token'] as String?;
+        _userId = session['user_id'] as String?;
+      } on Object {
+        // A corrupt saved session must not fall back to older credentials.
+      }
+    }
   }
 
   static const _host = AppData.supabaseHost;
   static const _kTokenKey = 'dev_api_token';
   static const _kUserKey = 'dev_api_user_id';
+  static const _kSessionKey = 'dev_api_session';
   final AppMode mode;
   bool get isDev => mode == AppMode.DEV;
   String get _schema => AppData.schemaFor(mode);
@@ -122,10 +143,18 @@ class DevApi {
   final SharedPreferences? _prefs;
   String? _accessToken;
   String? _userId;
+  String? _refreshToken;
+  Future<void>? _refreshing;
+  Future<void> _sessionWrites = Future.value();
+  int _sessionEpoch = 0;
+  int _credentialVersion = 0;
   bool get isSignedIn {
     final token = _accessToken;
-    return token != null && _userId != null && !_jwtExpired(token);
+    return token != null &&
+        _userId != null &&
+        (!_jwtExpired(token) || _refreshToken != null);
   }
+
   String? get currentUserId => _userId;
   static final oauthCallback = Uri.parse('klubby://auth-callback');
   String? _oauthVerifier;
@@ -183,7 +212,7 @@ class DevApi {
     if (verifier == null) return false;
     final isSignup = _oauthVerifier == null;
     cancelOAuth();
-    signOut();
+    await signOut();
     final result = await _request(
       'POST',
       '/auth/v1/token',
@@ -220,7 +249,7 @@ class DevApi {
   }
 
   Future<void> signIn(String email, String password) async {
-    signOut();
+    await signOut();
     final result = await _request(
       'POST',
       '/auth/v1/token',
@@ -232,7 +261,7 @@ class DevApi {
   }
 
   Future<bool> signUp(String email, String password) async {
-    signOut();
+    await signOut();
     cancelOAuth();
     final result = await _request(
       'POST',
@@ -257,7 +286,7 @@ class DevApi {
   }
 
   Future<void> signInWithPhoneOtp(String phone, String code) async {
-    signOut();
+    await signOut();
     final result = await _request(
       'POST',
       '/auth/v1/verify',
@@ -268,23 +297,116 @@ class DevApi {
   }
 
   Future<void> _acceptSession(ApiRow result) async {
-    _accessToken = result['access_token'] as String;
-    _userId = (result['user'] as ApiRow)['id'] as String;
-    await _prefs?.setString(_kTokenKey, _accessToken!);
-    await _prefs?.setString(_kUserKey, _userId!);
+    _sessionEpoch++;
+    _refreshing = null;
+    await _saveSession(result);
     try {
       if (isDev) await _rpc('provision_dev_profile', const {});
     } on Object {
-      signOut();
+      await signOut();
       rethrow;
     }
   }
 
-  void signOut() {
+  Future<void> signOut() {
+    _sessionEpoch++;
+    _refreshing = null;
     _accessToken = null;
     _userId = null;
-    _prefs?.remove(_kTokenKey);
-    _prefs?.remove(_kUserKey);
+    _refreshToken = null;
+    return _persistSession(null);
+  }
+
+  Future<void> _saveSession(ApiRow result) async {
+    final token = result['access_token'] as String;
+    final userId = (result['user'] as ApiRow)['id'] as String;
+    final refresh = result['refresh_token'] as String?;
+    if (token.isEmpty || userId.isEmpty || refresh == '') {
+      throw const FormatException('Invalid authentication session');
+    }
+    _accessToken = token;
+    _userId = userId;
+    _refreshToken = refresh;
+    _credentialVersion++;
+    await _persistSession(
+      jsonEncode({
+        'access_token': token,
+        'refresh_token': refresh,
+        'user_id': userId,
+      }),
+    );
+  }
+
+  Future<void> _persistSession(String? saved) {
+    final prefs = _prefs;
+    if (prefs == null) return Future.value();
+    // Keep writes ordered across refresh, logout, and a subsequent login.
+    return _sessionWrites = _sessionWrites.catchError((Object _) {}).then((
+      _,
+    ) async {
+      final stored = saved == null
+          ? await prefs.remove(_kSessionKey)
+          : await prefs.setString(_kSessionKey, saved);
+      if (!stored) throw StateError('Unable to persist authentication session');
+      await prefs.remove(_kTokenKey);
+      await prefs.remove(_kUserKey);
+    });
+  }
+
+  Future<bool> restoreSession() async {
+    try {
+      await _ensureSession();
+      return isSignedIn;
+    } on DevApiException catch (error) {
+      if (error.status == 401) return false;
+      rethrow;
+    }
+  }
+
+  Future<void> _ensureSession() async {
+    if (_accessToken == null || _userId == null) {
+      throw const DevApiException(401);
+    }
+    if (_jwtExpired(_accessToken!)) await _refreshSession();
+  }
+
+  Future<void> _refreshSession() {
+    final pending = _refreshing;
+    if (pending != null) return pending;
+    late final Future<void> operation;
+    operation = _performRefresh().whenComplete(() {
+      if (identical(_refreshing, operation)) _refreshing = null;
+    });
+    return _refreshing = operation;
+  }
+
+  Future<void> _performRefresh() async {
+    final refresh = _refreshToken;
+    if (refresh == null) throw const DevApiException(401);
+    final epoch = _sessionEpoch;
+    final userId = _userId;
+    try {
+      final result = await _request(
+        'POST',
+        '/auth/v1/token',
+        dataApi: false,
+        query: const {'grant_type': 'refresh_token'},
+        body: {'refresh_token': refresh},
+      ) as ApiRow;
+      if (epoch != _sessionEpoch) return;
+      if (result['refresh_token'] is! String ||
+          (result['user'] as ApiRow)['id'] != userId) {
+        throw const FormatException('Invalid refreshed authentication session');
+      }
+      await _saveSession(result);
+    } on DevApiException catch (error) {
+      if (epoch == _sessionEpoch &&
+          const {400, 401, 403}.contains(error.status)) {
+        await signOut();
+        throw const DevApiException(401);
+      }
+      rethrow;
+    }
   }
 
   void close() => _client.close();
@@ -509,6 +631,25 @@ class DevApi {
     });
   }
 
+  Future<ApiRow> authAccount() async =>
+      await _request('GET', '/auth/v1/user') as ApiRow;
+
+  Future<void> updateAccountProfile(ApiRow fields) async {
+    final rows = await _requestRaw(
+      'PATCH',
+      '/rest/v1/users',
+      query: {'id': 'eq.$_userId'},
+      headers: const {'Prefer': 'return=representation'},
+      body: fields,
+    ) as List;
+    if (rows.length != 1) {
+      throw const DevApiException(409);
+    }
+  }
+
+  Future<ApiRow> updateAccountEmail(String email) async =>
+      await _request('PUT', '/auth/v1/user', body: {'email': email}) as ApiRow;
+
   Future<ApiRow> fullProfile() async {
     final profile = (await _list('users', {
       'select': '*',
@@ -672,12 +813,134 @@ class DevApi {
     body: {'status': status},
   );
 
-  Future<List<ApiRow>> clubKas(String clubId) => _list('club_kas_entries', {
-    'select': 'id,title,amount,is_income,counts,created_at',
-    'club_id': 'eq.$clubId',
-    'order': 'created_at.desc',
-    'limit': '100',
-  });
+  Future<List<ApiRow>> clubKas(String clubId) async {
+    final entries = <ApiRow>[];
+    for (var offset = 0; ; offset += 1000) {
+      final page = await _list('club_kas_entries', {
+        'select': 'id,title,amount,is_income,counts,created_at',
+        'club_id': 'eq.$clubId',
+        'order': 'created_at.desc,id.desc',
+        'limit': '1000',
+        'offset': '$offset',
+      });
+      entries.addAll(page);
+      if (page.length < 1000) return entries;
+    }
+  }
+
+  Future<List<ApiRow>> clubMembers(
+    String clubId, {
+    bool pending = false,
+  }) async => (await _rpc('list_club_members', {
+    'p_club_id': clubId,
+    'p_pending': pending,
+  }) as List).cast<ApiRow>();
+
+  Future<void> setMemberAdmin(String clubId, String userId, bool admin) async {
+    await _rpc('set_club_member_admin', {
+      'p_club_id': clubId,
+      'p_user_id': userId,
+      'p_admin': admin,
+    });
+  }
+
+  Future<void> reviewClubRequest(
+    String clubId,
+    String userId,
+    bool approve,
+  ) async {
+    await _rpc('review_club_request', {
+      'p_club_id': clubId,
+      'p_user_id': userId,
+      'p_approve': approve,
+    });
+  }
+
+  Stream<void> chatChanges(String clubId) {
+    late StreamController<void> controller;
+    RealtimeClient? client;
+    Timer? authTimer;
+    var stopped = false;
+    final accountId = currentUserId;
+    Future<void> connect() async {
+      try {
+        await _ensureSession();
+        if (stopped || controller.isClosed || currentUserId != accountId) {
+          return;
+        }
+        final realtime = RealtimeClient(
+          'wss://$_host/realtime/v1',
+          params: {'apikey': _publishableKey},
+          customAccessToken: () async {
+            await _ensureSession();
+            return currentUserId == accountId ? _accessToken : null;
+          },
+        );
+        client = realtime;
+        await realtime.setAuth(_accessToken);
+        if (stopped || controller.isClosed) {
+          await realtime.disconnect();
+          return;
+        }
+        realtime
+            .channel('club-chat-$_schema-$clubId')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: _schema,
+              table: 'club_messages',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'club_id',
+                value: clubId,
+              ),
+              callback: (_) {
+                if (!stopped && !controller.isClosed) controller.add(null);
+              },
+            )
+            .subscribe((status, error) {
+              if (stopped || controller.isClosed) return;
+              if (status == RealtimeSubscribeStatus.subscribed) {
+                controller.add(null);
+              }
+              if (status == RealtimeSubscribeStatus.channelError ||
+                  status == RealtimeSubscribeStatus.timedOut) {
+                controller.addError(
+                  error ?? StateError('Chat terputus. Menghubungkan ulang.'),
+                );
+              }
+            });
+        authTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+          try {
+            if (currentUserId != accountId) {
+              await controller.close();
+              return;
+            }
+            await _ensureSession();
+            await realtime.setAuth(_accessToken);
+          } catch (error, stack) {
+            if (!stopped && !controller.isClosed) {
+              controller.addError(error, stack);
+            }
+          }
+        });
+      } catch (error, stack) {
+        if (!stopped && !controller.isClosed) controller.addError(error, stack);
+      }
+    }
+
+    controller = StreamController<void>(
+      onListen: () {
+        unawaited(connect());
+      },
+      onCancel: () async {
+        stopped = true;
+        authTimer?.cancel();
+        await client?.removeAllChannels();
+        await client?.disconnect();
+      },
+    );
+    return controller.stream;
+  }
 
   Future<void> addClubKas(String clubId, ApiRow body) => _request(
     'POST',
@@ -686,9 +949,10 @@ class DevApi {
   );
 
   Future<List<ApiRow>> chatFull(String id) => _list('club_messages', {
-    'select': 'id,user_id,body,sticker,created_at,users(name,avatar)',
+    'select':
+        'id,user_id,body,sticker,announcement,created_at,users(name,avatar)',
     'club_id': 'eq.$id',
-    'order': 'created_at.asc,id.asc',
+    'order': 'created_at.desc,id.desc',
     'limit': '100',
   });
 
@@ -696,6 +960,7 @@ class DevApi {
     String id,
     String message, {
     bool sticker = false,
+    bool announcement = false,
   }) async {
     final rows = await _requestRaw(
       'POST',
@@ -706,6 +971,7 @@ class DevApi {
         'user_id': _userId,
         'body': message,
         'sticker': sticker,
+        'announcement': announcement,
       },
     ) as List;
     return (rows.first as Map).cast<String, dynamic>();
@@ -736,7 +1002,7 @@ class DevApi {
   );
 
   Future<List<ApiRow>> activitiesFull() => _list('activities', const {
-    'select': '*,users(name,username,avatar),clubs(name)',
+    'select': '*,users:users!activities_user_id_fkey(name,username,avatar),clubs(name)',
     'order': 'occurred_at.desc,id.desc',
     'limit': '100',
   });
@@ -746,7 +1012,7 @@ class DevApi {
     caseSensitive: false,
   );
 
-  String _remoteActivityId(String id) {
+  String remoteActivityId(String id) {
     if (_uuid.hasMatch(id)) return id;
     // Use the same UUID for retries and edits. QR activity IDs can be shared
     // by people attending the same session, so scope the hash to the account.
@@ -756,28 +1022,42 @@ class DevApi {
         '${hex.substring(20, 32)}';
   }
 
+  Future<Set<String>> existingActivityIds(Iterable<String> activityIds) async {
+    final ids = activityIds.map(remoteActivityId).toSet().toList();
+    final existing = <String>{};
+    for (var offset = 0; offset < ids.length; offset += 100) {
+      final batch = ids.skip(offset).take(100);
+      final rows = await _list('activities', {
+        'select': 'id',
+        'user_id': 'eq.$_userId',
+        'id': 'in.(${batch.join(',')})',
+        'limit': '100',
+      });
+      existing.addAll(rows.map((row) => (row['id'] as String).toLowerCase()));
+    }
+    return existing;
+  }
+
   Future<void> saveActivityFull(ApiRow body) async {
     await _requestRaw(
       'POST',
       '/rest/v1/activities',
-      headers: const {
-        'Prefer': 'resolution=ignore-duplicates',
-      },
-      body: {...body, 'id': _remoteActivityId(body['id'] as String)},
+      headers: const {'Prefer': 'resolution=ignore-duplicates'},
+      body: {...body, 'id': remoteActivityId(body['id'] as String)},
     );
   }
 
   Future<void> updateActivityFull(String id, ApiRow body) => _request(
     'PATCH',
     '/rest/v1/activities',
-    query: {'id': 'eq.${_remoteActivityId(id)}'},
+    query: {'id': 'eq.${remoteActivityId(id)}'},
     body: body,
   );
 
   Future<void> deleteActivity(String id) => _request(
     'DELETE',
     '/rest/v1/activities',
-    query: {'id': 'eq.${_remoteActivityId(id)}'},
+    query: {'id': 'eq.${remoteActivityId(id)}'},
   );
 
   Future<List<ApiRow>> activityReactions(List<String> ids) async {
@@ -926,7 +1206,9 @@ class DevApi {
     Map<String, String>? query,
     Map<String, String>? headers,
     Object? body,
+    bool retrySession = true,
   }) async {
+    final epoch = _sessionEpoch;
     final requestId = kDebugMode ? ++_debugRequestSequence : 0;
     final timer = kDebugMode ? (Stopwatch()..start()) : null;
     if (kDebugMode) {
@@ -950,13 +1232,12 @@ class DevApi {
       }
       throw const DevApiException(0);
     }
-    final token = _accessToken;
-    if (dataApi && !isSignedIn) {
-      if (kDebugMode) {
-        debugPrint('[Klubby API #$requestId] blocked: no session');
-      }
-      throw const DevApiException(401);
+    if (dataApi) {
+      await _ensureSession();
+      if (epoch != _sessionEpoch) throw const DevApiException(401);
     }
+    final token = _accessToken;
+    final credentialVersion = _credentialVersion;
     final request =
         http.Request(
             method,
@@ -1000,9 +1281,29 @@ class DevApi {
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final error = _responseError(response);
-      if (dataApi && token == _accessToken && error.status == 401 &&
-          const {'PGRST301', 'PGRST303'}.contains(error.code)) {
-        signOut();
+      if (dataApi &&
+          epoch == _sessionEpoch &&
+          error.status == 401 &&
+          const {
+            'PGRST301',
+            'PGRST303',
+            'bad_jwt',
+            'jwt_expired',
+          }.contains(error.code)) {
+        if (retrySession && _refreshToken != null) {
+          if (credentialVersion == _credentialVersion) await _refreshSession();
+          if (epoch != _sessionEpoch) throw const DevApiException(401);
+          return _requestRaw(
+            method,
+            path,
+            dataApi: dataApi,
+            query: query,
+            headers: headers,
+            body: body,
+            retrySession: false,
+          );
+        }
+        if (credentialVersion == _credentialVersion) await signOut();
       }
       throw error;
     }
@@ -1022,14 +1323,17 @@ class DevApi {
     try {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
       if (body is Map<String, dynamic>) {
-        final code = body['code'];
+        final code = body['error_code'] ?? body['code'];
         final message = body['message'];
         return DevApiException(
           status,
           code: code is String ? code : null,
-          userMessage: const {400, 401, 403, 404, 409}.contains(status) &&
-                  code == 'PT$status' && message is String &&
-                  message.trim().isNotEmpty && message.length <= 160
+          userMessage:
+              const {400, 401, 403, 404, 409}.contains(status) &&
+                  code == 'PT$status' &&
+                  message is String &&
+                  message.trim().isNotEmpty &&
+                  message.length <= 160
               ? message.trim()
               : null,
         );

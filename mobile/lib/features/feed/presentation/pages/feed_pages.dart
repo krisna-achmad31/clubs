@@ -77,7 +77,15 @@ class _FeedPageState extends State<FeedPage> {
                 last != null && DateUtils.isSameDay(last, DateTime.now()),
           ),
           for (final p in feed.posts) _PostCard(post: p),
-          if (feed.posts.isEmpty)
+          if (feed.errorMessage != null)
+            KContentState(
+              error: true,
+              title: 'Feed belum bisa dimuat',
+              message: feed.errorMessage!,
+              action: 'Coba lagi',
+              onAction: () => context.read<FeedCubit>().load(),
+            ),
+          if (feed.posts.isEmpty && feed.errorMessage == null)
             Padding(
               padding: const EdgeInsets.only(top: 40),
               child: MascotSays(

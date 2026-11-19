@@ -20,6 +20,10 @@ abstract interface class ClubRepository {
     PayoutAccount? payout,
   });
   Future<void> markRead(String clubId);
+  Future<List<ClubMember>> members(String clubId, {bool pending = false});
+  Future<void> setMemberAdmin(String clubId, String userId, bool admin);
+  Future<void> reviewRequest(String clubId, String userId, bool approve);
+  Stream<void> chatChanges(String clubId);
 
   /// Klubby accounts whose number or username matches; the server-side
   /// contact match in production, a demo directory for now.

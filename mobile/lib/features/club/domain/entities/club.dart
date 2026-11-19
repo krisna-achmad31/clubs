@@ -173,6 +173,25 @@ class ClubInvite extends Equatable {
 
 enum MessageKind { text, sticker }
 
+class ClubMember extends Equatable {
+  const ClubMember({
+    required this.userId,
+    required this.name,
+    required this.role,
+    required this.status,
+    this.owner = false,
+  });
+  final String userId, name, role, status;
+  final bool owner;
+  String get roleLabel => owner
+      ? 'Pemilik'
+      : role == 'admin'
+      ? 'Admin'
+      : 'Anggota';
+  @override
+  List<Object?> get props => [userId, name, role, status, owner];
+}
+
 class ChatMessage extends Equatable {
   const ChatMessage({
     required this.id,

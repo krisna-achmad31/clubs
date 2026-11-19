@@ -76609,7 +76609,7 @@
                               "id": "WfBcl",
                               "name": "Feel",
                               "width": "fill_container",
-                              "height": 52,
+                              "height": 56,
                               "fill": "$soft",
                               "cornerRadius": 16,
                               "stroke": "$line",
@@ -76619,18 +76619,22 @@
                                 "bottom": 4,
                                 "left": 2
                               },
+                              "padding": 4,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "U1ue8t",
-                                  "name": "Text",
-                                  "fill": "$ink",
-                                  "content": "😵",
-                                  "fontFamily": "$font",
-                                  "fontSize": 24,
-                                  "fontWeight": "900"
+                                  "type": "rectangle",
+                                  "id": "BUMuy",
+                                  "name": "Perasaan · feel_exhausted",
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "mobile/assets/icons/feel_exhausted.png",
+                                    "mode": "contain"
+                                  },
+                                  "width": 28,
+                                  "height": 28
                                 }
                               ]
                             },
@@ -76639,7 +76643,7 @@
                               "id": "c5j1b",
                               "name": "Feel",
                               "width": "fill_container",
-                              "height": 52,
+                              "height": 56,
                               "fill": "$soft",
                               "cornerRadius": 16,
                               "stroke": "$line",
@@ -76649,18 +76653,22 @@
                                 "bottom": 4,
                                 "left": 2
                               },
+                              "padding": 4,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "ffUMm",
-                                  "name": "Text",
-                                  "fill": "$ink",
-                                  "content": "😮‍💨",
-                                  "fontFamily": "$font",
-                                  "fontSize": 24,
-                                  "fontWeight": "900"
+                                  "type": "rectangle",
+                                  "id": "CvDWa",
+                                  "name": "Perasaan · feel_tired",
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "mobile/assets/icons/feel_tired.png",
+                                    "mode": "contain"
+                                  },
+                                  "width": 28,
+                                  "height": 28
                                 }
                               ]
                             },
@@ -76669,7 +76677,7 @@
                               "id": "oBxvL",
                               "name": "Feel",
                               "width": "fill_container",
-                              "height": 52,
+                              "height": 56,
                               "fill": "$soft",
                               "cornerRadius": 16,
                               "stroke": "$line",
@@ -76679,18 +76687,22 @@
                                 "bottom": 4,
                                 "left": 2
                               },
+                              "padding": 4,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "zXhfV",
-                                  "name": "Text",
-                                  "fill": "$ink",
-                                  "content": "🙂",
-                                  "fontFamily": "$font",
-                                  "fontSize": 24,
-                                  "fontWeight": "900"
+                                  "type": "rectangle",
+                                  "id": "WWpEa",
+                                  "name": "Perasaan · feel_okay",
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "mobile/assets/icons/feel_okay.png",
+                                    "mode": "contain"
+                                  },
+                                  "width": 28,
+                                  "height": 28
                                 }
                               ]
                             },
@@ -76699,7 +76711,7 @@
                               "id": "VB9hz",
                               "name": "Feel",
                               "width": "fill_container",
-                              "height": 52,
+                              "height": 56,
                               "fill": "$yellow-l",
                               "cornerRadius": 16,
                               "stroke": "$yellow",
@@ -76709,18 +76721,22 @@
                                 "bottom": 4,
                                 "left": 2
                               },
+                              "padding": 4,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "b1lSl9",
-                                  "name": "Text",
-                                  "fill": "$ink",
-                                  "content": "😄",
-                                  "fontFamily": "$font",
-                                  "fontSize": 24,
-                                  "fontWeight": "900"
+                                  "type": "rectangle",
+                                  "id": "Gkig9",
+                                  "name": "Perasaan · feel_happy",
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "mobile/assets/icons/feel_happy.png",
+                                    "mode": "contain"
+                                  },
+                                  "width": 30.24,
+                                  "height": 30.24
                                 }
                               ]
                             },
@@ -76729,7 +76745,7 @@
                               "id": "ibRN8",
                               "name": "Feel",
                               "width": "fill_container",
-                              "height": 52,
+                              "height": 56,
                               "fill": "$soft",
                               "cornerRadius": 16,
                               "stroke": "$line",
@@ -76739,18 +76755,22 @@
                                 "bottom": 4,
                                 "left": 2
                               },
+                              "padding": 4,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "JTzbB",
-                                  "name": "Text",
-                                  "fill": "$ink",
-                                  "content": "🔥",
-                                  "fontFamily": "$font",
-                                  "fontSize": 24,
-                                  "fontWeight": "900"
+                                  "type": "rectangle",
+                                  "id": "f3gn0",
+                                  "name": "Perasaan · feel_fired_up",
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "mobile/assets/icons/feel_fired_up.png",
+                                    "mode": "contain"
+                                  },
+                                  "width": 28,
+                                  "height": 28
                                 }
                               ]
                             }
@@ -165217,6 +165237,1334 @@
               "fontWeight": "600"
             }
           ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "PgGJN",
+      "x": 3906,
+      "y": 3620,
+      "name": "Komponen · State & Loading",
+      "width": 1100,
+      "height": 460,
+      "fill": "$soft",
+      "cornerRadius": 32,
+      "gap": 40,
+      "padding": 40,
+      "children": [
+        {
+          "type": "frame",
+          "id": "q41WN",
+          "name": "State / Kosong",
+          "reusable": true,
+          "width": 358,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            28,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "OpdzJ",
+              "name": "Maskot dalam lingkaran pastel",
+              "width": 112,
+              "height": 112,
+              "fill": "$primary-l",
+              "cornerRadius": 56,
+              "padding": 11.2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "HwBgg",
+                  "name": "Ciko · Teman main",
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "mobile/assets/mascots/head/ciko_gesit.webp",
+                    "mode": "contain"
+                  },
+                  "width": 89.6,
+                  "height": 89.6
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "LkHjb",
+              "name": "Judul state kosong",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Teman mainmu menunggu!",
+              "textAlign": "center",
+              "fontFamily": "$font",
+              "fontSize": 20,
+              "fontWeight": "900"
+            },
+            {
+              "type": "text",
+              "id": "nRhWg",
+              "name": "Pesan state kosong",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Belum gabung klub. Yuk cari yang dekat!",
+              "textAlign": "center",
+              "fontFamily": "$font",
+              "fontSize": 13,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "HjAxR",
+          "name": "Loading / Kartu maskot",
+          "context": "Maskot memakai animasi Lottie ciko_gesit.json berulang. Gerakan dihentikan ketika pengaturan kurangi gerakan aktif.",
+          "reusable": true,
+          "width": 208,
+          "fill": "$bg",
+          "cornerRadius": 24,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 24,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ArW8n",
+              "name": "Pratinjau Ciko · Animasi Lottie saat berjalan",
+              "context": "Pratinjau statis. Implementasi memakai assets/lottie/ciko_gesit.json, berulang, dengan maskot dan latar lingkaran.",
+              "width": 104,
+              "height": 104,
+              "fill": "$blue-l",
+              "cornerRadius": 52,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "CEESQ",
+                  "name": "Ciko bergerak · Lottie berulang",
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "mobile/assets/mascots/body/ciko_gesit.webp",
+                    "mode": "contain"
+                  },
+                  "width": 104,
+                  "height": 104
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "o47omb",
+              "name": "Label loading",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Sebentar, ya…",
+              "textAlign": "center",
+              "fontFamily": "$font",
+              "fontSize": 17,
+              "fontWeight": "900"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "jISHg",
+          "name": "State / Gagal memuat",
+          "reusable": true,
+          "width": 358,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            28,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "r1LRG",
+              "name": "Maskot dalam lingkaran pastel",
+              "width": 112,
+              "height": 112,
+              "fill": "$orange-l",
+              "cornerRadius": 56,
+              "padding": 11.2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "q5MmV",
+                  "name": "Kiki · Coba lagi",
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "mobile/assets/mascots/head/kiki_gesit.webp",
+                    "mode": "contain"
+                  },
+                  "width": 89.6,
+                  "height": 89.6
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "Agysd",
+              "name": "Judul gagal memuat",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Belum bisa dimuat",
+              "textAlign": "center",
+              "fontFamily": "$font",
+              "fontSize": 20,
+              "fontWeight": "900"
+            },
+            {
+              "type": "text",
+              "id": "rdLnp",
+              "name": "Petunjuk pemulihan",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Cek koneksi internet lalu coba lagi.",
+              "textAlign": "center",
+              "fontFamily": "$font",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "id": "QkAXK",
+              "type": "ref",
+              "ref": "KmTta",
+              "name": "Tombol coba lagi",
+              "width": 180,
+              "descendants": {
+                "xFqzc": {
+                  "content": "COBA LAGI"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "bP9Vj",
+      "x": 3906,
+      "y": 6006,
+      "name": "B1 · Klub kosong · State terpusat",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "Z25GLG",
+          "type": "ref",
+          "ref": "lIgni",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "S4dFib",
+          "name": "Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "e1YPFa",
+              "name": "Group",
+              "width": "fill_container",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "R2tB7E",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Klub",
+                  "fontFamily": "$font",
+                  "fontSize": 26,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "icon",
+                  "id": "JWuk0",
+                  "name": "search",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$faint"
+                },
+                {
+                  "type": "icon",
+                  "id": "h6O8Je",
+                  "name": "plus",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "$blue"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "S0bUvk",
+              "name": "Area state terpusat dalam viewport",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "KS6BJ",
+                  "type": "ref",
+                  "ref": "q41WN",
+                  "name": "Klub kosong",
+                  "width": "fill_container"
+                },
+                {
+                  "type": "frame",
+                  "id": "RYTgF",
+                  "name": "Aksi klub",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "id": "xWBMg",
+                      "type": "ref",
+                      "ref": "KmTta",
+                      "name": "Cari klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "xFqzc": {
+                          "content": "CARI KLUB",
+                          "fontSize": 13
+                        }
+                      }
+                    },
+                    {
+                      "id": "YOlmk",
+                      "type": "ref",
+                      "ref": "A2iyl",
+                      "name": "Buat klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "AQjkq": {
+                          "content": "BUAT KLUB",
+                          "fontSize": 13
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "Z9UMsQ",
+          "type": "ref",
+          "ref": "LoVhe",
+          "name": "Tab Bar",
+          "width": "fill_container",
+          "descendants": {
+            "e8jcZ": {
+              "fill": "$blue-l",
+              "stroke": "$blue-m"
+            },
+            "gUKyV": {
+              "fill": "$blue"
+            },
+            "TKPzY": {
+              "fill": "$blue"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "G1afjF",
+      "x": 4336,
+      "y": 6006,
+      "name": "B1 · Klub gagal dimuat · Retry",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "a8Ifa",
+          "type": "ref",
+          "ref": "lIgni",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "P6MLO7",
+          "name": "Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "vBqjB",
+              "name": "Group",
+              "width": "fill_container",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "y4l82Z",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Klub",
+                  "fontFamily": "$font",
+                  "fontSize": 26,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "icon",
+                  "id": "X0G3tG",
+                  "name": "search",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$faint"
+                },
+                {
+                  "type": "icon",
+                  "id": "Kiht5",
+                  "name": "plus",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "$blue"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "SPUWk",
+              "name": "Area state terpusat dalam viewport",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "tMA49",
+                  "type": "ref",
+                  "ref": "jISHg",
+                  "name": "Gagal memuat daftar klub",
+                  "width": "fill_container"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SepLo",
+          "type": "ref",
+          "ref": "LoVhe",
+          "name": "Tab Bar",
+          "width": "fill_container",
+          "descendants": {
+            "e8jcZ": {
+              "fill": "$blue-l",
+              "stroke": "$blue-m"
+            },
+            "gUKyV": {
+              "fill": "$blue"
+            },
+            "TKPzY": {
+              "fill": "$blue"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "yiQRy",
+      "x": 4766,
+      "y": 6006,
+      "name": "M4a · Akun · Loading overlay",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "z3FXe",
+          "type": "ref",
+          "ref": "lIgni",
+          "name": "Status bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "gnda5",
+          "name": "Form akun",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "I0SPg",
+              "name": "Header akun",
+              "width": "fill_container",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "W0IcU",
+                  "name": "Kembali",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "arrow-left",
+                  "library": "lucide",
+                  "fill": "$faint"
+                },
+                {
+                  "type": "text",
+                  "id": "cQweC",
+                  "name": "Judul akun",
+                  "fill": "$ink",
+                  "content": "Akun",
+                  "fontFamily": "$font",
+                  "fontSize": 20,
+                  "fontWeight": "900"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "RV0t0",
+              "name": "Avatar akun",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "CDpEw",
+                  "name": "Kapi",
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "mobile/assets/avatars/kapi.webp",
+                    "mode": "contain"
+                  },
+                  "width": 88,
+                  "height": 88
+                },
+                {
+                  "type": "text",
+                  "id": "iC6qW",
+                  "name": "Ganti avatar",
+                  "fill": "$primary",
+                  "content": "Ganti avatar",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "qqM2D",
+              "name": "Field NAMA",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "nTO8A",
+                  "name": "Label NAMA",
+                  "fill": "$muted",
+                  "content": "NAMA",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "N4cfPh",
+                  "name": "Input NAMA",
+                  "width": "fill_container",
+                  "height": 52,
+                  "fill": "$soft",
+                  "cornerRadius": 14,
+                  "stroke": "$line",
+                  "strokeWidth": 2,
+                  "gap": 10,
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "CxRXb",
+                      "name": "Ikon NAMA",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "user",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "O0WG2",
+                      "name": "Nilai NAMA",
+                      "fill": "$muted",
+                      "content": "Nama lengkap",
+                      "fontFamily": "$font",
+                      "fontSize": 15,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "U6qwDB",
+              "name": "Field USERNAME",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "K1paF",
+                  "name": "Label USERNAME",
+                  "fill": "$muted",
+                  "content": "USERNAME",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "g4ggZA",
+                  "name": "Input USERNAME",
+                  "width": "fill_container",
+                  "height": 52,
+                  "fill": "$soft",
+                  "cornerRadius": 14,
+                  "stroke": "$line",
+                  "strokeWidth": 2,
+                  "gap": 10,
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "eKfEL",
+                      "name": "Ikon USERNAME",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "at-sign",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Estja",
+                      "name": "Nilai USERNAME",
+                      "fill": "$muted",
+                      "content": "raka",
+                      "fontFamily": "$font",
+                      "fontSize": 15,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "NBUAJ",
+              "name": "Field EMAIL",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "M9i8h",
+                  "name": "Label EMAIL",
+                  "fill": "$muted",
+                  "content": "EMAIL",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "EGrqG",
+                  "name": "Input EMAIL",
+                  "width": "fill_container",
+                  "height": 52,
+                  "fill": "$soft",
+                  "cornerRadius": 14,
+                  "stroke": "$line",
+                  "strokeWidth": 2,
+                  "gap": 10,
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "dIYUp",
+                      "name": "Ikon EMAIL",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "mail",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "dHK4K",
+                      "name": "Nilai EMAIL",
+                      "fill": "$muted",
+                      "content": "raka@email.com",
+                      "fontFamily": "$font",
+                      "fontSize": 15,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Yalw2",
+              "name": "Field NOMOR HP",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "fS1Xx",
+                  "name": "Label NOMOR HP",
+                  "fill": "$muted",
+                  "content": "NOMOR HP",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "tW0Tk",
+                  "name": "Input NOMOR HP",
+                  "width": "fill_container",
+                  "height": 52,
+                  "fill": "$soft",
+                  "cornerRadius": 14,
+                  "stroke": "$line",
+                  "strokeWidth": 2,
+                  "gap": 10,
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "o80qTM",
+                      "name": "Ikon NOMOR HP",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "phone",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "xVmp3",
+                      "name": "Nilai NOMOR HP",
+                      "fill": "$muted",
+                      "content": "Belum ada",
+                      "fontFamily": "$font",
+                      "fontSize": 15,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "RDdzV",
+              "name": "Jenis kelamin",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "P6iXn5",
+                  "name": "Label jenis kelamin",
+                  "fill": "$muted",
+                  "content": "JENIS KELAMIN",
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "F9lco",
+                  "name": "Pilihan jenis kelamin",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "XvNbT",
+                      "name": "Laki-laki",
+                      "width": "fill_container",
+                      "height": 36,
+                      "fill": "$bg",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 2,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "mMoFJ",
+                          "name": "Label Laki-laki",
+                          "fill": "$muted",
+                          "content": "Laki-laki",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "900"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "F0318",
+                      "name": "Perempuan",
+                      "width": "fill_container",
+                      "height": 36,
+                      "fill": "$bg",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 2,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "pQiqC",
+                          "name": "Label Perempuan",
+                          "fill": "$muted",
+                          "content": "Perempuan",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "900"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "B0Q0Ja",
+                      "name": "Rahasia",
+                      "width": "fill_container",
+                      "height": 36,
+                      "fill": "$primary-l",
+                      "cornerRadius": 12,
+                      "stroke": "$primary-m",
+                      "strokeWidth": 2,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Mquik",
+                          "name": "Label Rahasia",
+                          "fill": "$primary-d",
+                          "content": "Rahasia",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "900"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kgpxK",
+              "name": "Ruang fleksibel",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "id": "JGGis",
+              "type": "ref",
+              "ref": "A2iyl",
+              "name": "Simpan akun",
+              "width": "fill_container",
+              "descendants": {
+                "AQjkq": {
+                  "content": "SIMPAN"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QklQT",
+          "layoutPosition": "absolute",
+          "x": 0,
+          "y": 0,
+          "name": "Overlay modal · Seluruh layar",
+          "context": "Menghalangi interaksi dan tombol kembali selama request. Hilang saat sukses atau gagal. Menutup header, form dan navigasi.",
+          "width": 390,
+          "height": 844,
+          "fill": "#0000006B",
+          "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "xX3A2",
+              "type": "ref",
+              "ref": "HjAxR",
+              "name": "Loading maskot terpusat"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "tkZnb",
+      "x": 5196,
+      "y": 6006,
+      "name": "B1 · Loading · Overlay termasuk navigasi",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "x40oTG",
+          "type": "ref",
+          "ref": "lIgni",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "xyo9t",
+          "name": "Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "UowBw",
+              "name": "Group",
+              "width": "fill_container",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "liPkB",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Klub",
+                  "fontFamily": "$font",
+                  "fontSize": 26,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "icon",
+                  "id": "waMvd",
+                  "name": "search",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$faint"
+                },
+                {
+                  "type": "icon",
+                  "id": "FrXhB",
+                  "name": "plus",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "$blue"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rRtmj",
+              "name": "Area state terpusat dalam viewport",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "QZByb",
+                  "type": "ref",
+                  "ref": "q41WN",
+                  "name": "Klub kosong",
+                  "width": "fill_container"
+                },
+                {
+                  "type": "frame",
+                  "id": "o8Jm9",
+                  "name": "Aksi klub",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "id": "VMmZ5",
+                      "type": "ref",
+                      "ref": "KmTta",
+                      "name": "Cari klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "xFqzc": {
+                          "content": "CARI KLUB",
+                          "fontSize": 13
+                        }
+                      }
+                    },
+                    {
+                      "id": "TsXtt",
+                      "type": "ref",
+                      "ref": "A2iyl",
+                      "name": "Buat klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "AQjkq": {
+                          "content": "BUAT KLUB",
+                          "fontSize": 13
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fVh71",
+          "type": "ref",
+          "ref": "LoVhe",
+          "name": "Tab Bar",
+          "width": "fill_container",
+          "descendants": {
+            "e8jcZ": {
+              "fill": "$blue-l",
+              "stroke": "$blue-m"
+            },
+            "gUKyV": {
+              "fill": "$blue"
+            },
+            "TKPzY": {
+              "fill": "$blue"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "z4Qzg",
+          "layoutPosition": "absolute",
+          "x": 0,
+          "y": 0,
+          "name": "Overlay termasuk header dan tab bar",
+          "width": 390,
+          "height": 844,
+          "fill": "#0000006B",
+          "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "pO0cf",
+              "type": "ref",
+              "ref": "HjAxR",
+              "name": "Maskot loading"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "QfqhH",
+      "x": 5626,
+      "y": 6006,
+      "name": "B1 · Klub kosong · 320 px / Teks besar",
+      "clip": true,
+      "width": 320,
+      "height": 720,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "LjpZU",
+          "type": "ref",
+          "ref": "lIgni",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "rvTNF",
+          "name": "Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "Kgnsl",
+              "name": "Group",
+              "width": "fill_container",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ECtoR",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Klub",
+                  "fontFamily": "$font",
+                  "fontSize": 26,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "icon",
+                  "id": "i4ig1",
+                  "name": "search",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$faint"
+                },
+                {
+                  "type": "icon",
+                  "id": "ZqjBo",
+                  "name": "plus",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "$blue"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "m8xudy",
+              "name": "Area state terpusat dalam viewport",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "n1cUK",
+                  "type": "ref",
+                  "ref": "q41WN",
+                  "name": "Klub kosong",
+                  "width": "fill_container",
+                  "descendants": {
+                    "LkHjb": {
+                      "fontSize": 26
+                    },
+                    "nRhWg": {
+                      "fontSize": 17
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "CgMn5",
+                  "name": "Aksi klub",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "id": "N437jg",
+                      "type": "ref",
+                      "ref": "KmTta",
+                      "name": "Cari klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "xFqzc": {
+                          "content": "CARI KLUB",
+                          "fontSize": 18
+                        }
+                      }
+                    },
+                    {
+                      "id": "I5jQmw",
+                      "type": "ref",
+                      "ref": "A2iyl",
+                      "name": "Buat klub",
+                      "width": "fill_container",
+                      "descendants": {
+                        "AQjkq": {
+                          "content": "BUAT KLUB",
+                          "fontSize": 18
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "KhKZl",
+          "type": "ref",
+          "ref": "LoVhe",
+          "name": "Tab Bar",
+          "width": "fill_container",
+          "descendants": {
+            "EOSJ5": {
+              "width": 56
+            },
+            "e8jcZ": {
+              "fill": "$blue-l",
+              "stroke": "$blue-m",
+              "width": 56
+            },
+            "gUKyV": {
+              "fill": "$blue"
+            },
+            "TKPzY": {
+              "fill": "$blue"
+            },
+            "w3E4DZ": {
+              "width": 56
+            },
+            "wL45N": {
+              "width": 56
+            }
+          }
         }
       ]
     }

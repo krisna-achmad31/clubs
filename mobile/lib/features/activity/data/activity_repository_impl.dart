@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/backend/dev_api.dart';
 import '../../profile/domain/usecases/streak_rules.dart';
 import '../domain/entities/activity.dart';
+import '../domain/entities/activity_sample.dart';
 import '../domain/repositories/activity_repository.dart';
 
 class ActivityRepositoryImpl implements ActivityRepository {
@@ -13,58 +14,126 @@ class ActivityRepositoryImpl implements ActivityRepository {
   SharedPreferences? _preferences;
   final DevApi? _api;
   Future<void>? _loading;
+  String? _loadedUserId;
+  Future<void> _persisting = Future<void>.value();
+  Future<ActivitySyncResult>? _healthSync;
 
   final _items = <Activity>[
     // Hardcoded demo seed disabled — data now comes from DevApi.
     // Activity(id: 'gbk', ...),
   ];
 
-  Future<void> _load() async {
+  Future<void> _load(String? accountId) async {
+    final prefs = _preferences ??= await SharedPreferences.getInstance();
+    if (_api?.currentUserId != accountId) return;
+    final owner = prefs.getString('activities_user_id');
+    final raw = prefs.getString('activities');
+    final cacheAllowed = _api == null || owner == null || owner == accountId;
+    _items.clear();
+    if (raw != null && cacheAllowed) {
+      try {
+        final items = (jsonDecode(raw) as List)
+            .map((j) => Activity.fromJson((j as Map).cast<String, dynamic>()))
+            .toList();
+        _items
+          ..clear()
+          ..addAll(items);
+      } on Object {
+        // Ignore corrupt cache.
+      }
+    }
     final api = _api;
     if (api != null && api.isSignedIn) {
       try {
         final rows = await api.activitiesFull();
-        final myId = api.currentUserId;
+        if (api.currentUserId != accountId) return;
+        final cached = {
+          for (final a in _items) api.remoteActivityId(a.id).toLowerCase(): a,
+        };
+        Activity hydrate(ApiRow row) {
+          final remote = fromApiRow(row);
+          final local = cached[remote.id.toLowerCase()];
+          if (local == null) return remote;
+          return Activity.fromJson({
+            ...remote.toJson(),
+            'source': row['recording_source'] == null
+                ? local.source.name
+                : remote.source.name,
+            'samples':
+                remote.samples.isEmpty ||
+                    (local.hideHr && local.samples.isNotEmpty)
+                ? [for (final sample in local.samples) sample.toJson()]
+                : [for (final sample in remote.samples) sample.toJson()],
+            'device': remote.device ?? local.device,
+            'elapsedSeconds':
+                remote.elapsedTime?.inSeconds ?? local.elapsedTime?.inSeconds,
+          });
+        }
+
         final synced = <Activity>[
           for (final r in rows)
-            if (r['user_id'] == myId) _fromApiRow(r),
+            if (r['user_id'] == accountId)
+              // Old server rows lack recording metadata. Keep the original
+              // sensor recording until those fields have been synchronized.
+              hydrate(r),
         ];
+        final remoteIds = synced.map((a) => a.id.toLowerCase()).toSet();
+        final localWearable = _items
+            .where(
+              (a) =>
+                  a.source == ActivitySource.wearable &&
+                  !remoteIds.contains(api.remoteActivityId(a.id).toLowerCase()),
+            )
+            .toList();
         _items
           ..clear()
-          ..addAll(synced);
-        if (_preferences != null) {
-          await _persist();
-        }
-        return;
+          ..addAll(synced)
+          ..addAll(localWearable)
+          ..sort((a, b) => b.start.compareTo(a.start));
+        await _persist();
       } on Object {
         // Fall through to local cache when offline.
       }
     }
-    final prefs = _preferences ??= await SharedPreferences.getInstance();
-    final raw = prefs.getString('activities');
-    if (raw == null) return;
-    try {
-      final items = (jsonDecode(raw) as List)
-          .map((j) => Activity.fromJson((j as Map).cast<String, dynamic>()))
-          .toList();
-      _items
-        ..clear()
-        ..addAll(items);
-    } on Object {
-      // Ignore corrupt cache.
-    }
   }
 
-  Future<void> _ensureLoaded() => _loading ??= _load();
+  Future<void> _ensureLoaded() {
+    final accountId = _api?.currentUserId;
+    if (_loading == null || _loadedUserId != accountId) {
+      _loadedUserId = accountId;
+      _loading = _load(accountId);
+    }
+    return _loading!;
+  }
 
-  Future<void> _persist() async {
+  Future<void> _persist() {
     final prefs = _preferences;
-    if (prefs == null) return;
-    final ok = await prefs.setString(
-      'activities',
-      jsonEncode(_items.map((a) => a.toJson()).toList()),
+    if (prefs == null) return Future<void>.value();
+    final payload = jsonEncode(_items.map((a) => a.toJson()).toList());
+    final accountId = _loadedUserId;
+    final api = _api;
+    final write = _persisting.then((_) async {
+      if (api != null && api.currentUserId != accountId) {
+        throw const DevApiException(401);
+      }
+      if (api != null && accountId != null) {
+        // An interrupted write must never associate another account's payload.
+        final pending = await prefs.setString('activities_user_id', '');
+        if (!pending) throw StateError('Activity owner could not be saved');
+      }
+      final ok = await prefs.setString('activities', payload);
+      if (!ok) throw StateError('Activity could not be saved');
+      if (api != null && accountId != null) {
+        if (api.currentUserId != accountId) throw const DevApiException(401);
+        final owned = await prefs.setString('activities_user_id', accountId);
+        if (!owned) throw StateError('Activity owner could not be saved');
+      }
+    });
+    _persisting = write.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
     );
-    if (!ok) throw StateError('Activity could not be saved');
+    return write;
   }
 
   @override
@@ -76,31 +145,103 @@ class ActivityRepositoryImpl implements ActivityRepository {
   @override
   Future<void> save(Activity a) async {
     await _ensureLoaded();
+    final accountId = _loadedUserId;
     _items.removeWhere((old) => old.id == a.id);
     _items.insert(0, a);
     await _persist();
     final api = _api;
-    if (api != null && api.isSignedIn) {
-      await api.saveActivityFull({
-        'id': a.id,
-        'sport_id': a.sportId,
-        'title': a.title,
-        'occurred_at': a.start.toUtc().toIso8601String(),
-        'duration_seconds': a.duration.inSeconds.clamp(1, 86400),
-        'visibility': switch (a.privacy) {
-          Privacy.publik => 'public',
-          Privacy.klub => 'club',
-          Privacy.pengikut => 'private',
-        },
-        'note': a.note,
-        'distance_km': a.distanceKm,
-        'avg_hr': a.avgHr,
-        'route': [
-          for (final p in a.route) {'dx': p.dx, 'dy': p.dy},
-        ],
-        'splits': a.splits,
-      });
+    if (api != null && api.currentUserId != accountId) {
+      throw const DevApiException(401);
     }
+    if (api != null && api.isSignedIn) {
+      await api.saveActivityFull(_activityPayload(a));
+    }
+  }
+
+  static ApiRow _activityPayload(Activity a) => {
+    'id': a.id,
+    'sport_id': a.sportId,
+    'title': a.title,
+    'occurred_at': a.start.toUtc().toIso8601String(),
+    'duration_seconds': a.duration.inSeconds.clamp(1, 86400),
+    'visibility': switch (a.privacy) {
+      Privacy.publik => 'public',
+      Privacy.klub => 'club',
+      Privacy.pengikut => 'private',
+    },
+    'note': a.note,
+    'distance_km': a.distanceKm,
+    'avg_hr': a.hideHr ? null : a.avgHr,
+    'route': [
+      for (final p in a.route) {'dx': p.dx, 'dy': p.dy},
+    ],
+    'splits': a.splits,
+    'recording_source': a.source.name,
+    'elapsed_seconds': a.elapsedTime?.inSeconds,
+    'device': a.device,
+    'samples': [
+      for (final sample in a.samples)
+        {...sample.toJson(), if (a.hideHr) 'hr': null},
+    ],
+    'hide_hr': a.hideHr,
+  };
+
+  @override
+  Future<ActivitySyncResult> syncHealthActivities() => _healthSync ??=
+      _syncHealthActivities().whenComplete(() => _healthSync = null);
+
+  Future<ActivitySyncResult> _syncHealthActivities() async {
+    final api = _api;
+    if (api == null) throw StateError('Activity backend is not configured');
+    if (!api.isSignedIn) throw const DevApiException(401);
+    final accountId = api.currentUserId;
+    await _ensureLoaded();
+    if (!api.isSignedIn || api.currentUserId != accountId) {
+      throw const DevApiException(401);
+    }
+    await _persist();
+    if (!api.isSignedIn || api.currentUserId != accountId) {
+      throw const DevApiException(401);
+    }
+    final wearable = _items
+        .where((a) => a.source == ActivitySource.wearable)
+        .toList();
+    final existing = await api.existingActivityIds(wearable.map((a) => a.id));
+    var uploaded = 0;
+    var failed = 0;
+    for (final activity in wearable) {
+      if (api.currentUserId != accountId) throw const DevApiException(401);
+      final canonicalId = api.remoteActivityId(activity.id).toLowerCase();
+      if (existing.contains(canonicalId)) {
+        try {
+          final payload = _activityPayload(activity);
+          await api.updateActivityFull(activity.id, {
+            for (final key in [
+              'recording_source',
+              'elapsed_seconds',
+              'device',
+              'samples',
+              'hide_hr',
+            ])
+              key: payload[key],
+          });
+        } on Object {
+          failed++;
+        }
+        continue;
+      }
+      try {
+        if (!api.isSignedIn || api.currentUserId != accountId) {
+          throw const DevApiException(401);
+        }
+        await api.saveActivityFull(_activityPayload(activity));
+        existing.add(canonicalId);
+        uploaded++;
+      } on Object {
+        failed++;
+      }
+    }
+    return ActivitySyncResult(uploaded: uploaded, failed: failed);
   }
 
   @override
@@ -162,17 +303,21 @@ class ActivityRepositoryImpl implements ActivityRepository {
     return uri.pathSegments.first;
   }
 
-  static Activity _fromApiRow(ApiRow r) {
+  static Activity fromApiRow(ApiRow r) {
     final vis = r['visibility'] as String? ?? 'private';
     final privacy = switch (vis) {
       'public' => Privacy.publik,
       'club' => Privacy.klub,
       _ => Privacy.pengikut,
     };
-    final src = ActivitySource.values
-            .where((v) => v.name == r['source'])
+    final recordingSource = r['recording_source'] ?? r['source'];
+    final src =
+        ActivitySource.values
+            .where((v) => v.name == recordingSource)
             .firstOrNull ??
-        ActivitySource.manual;
+        (recordingSource == 'checkin'
+            ? ActivitySource.qr
+            : ActivitySource.manual);
     final clubMap = r['clubs'] as Map?;
     return Activity(
       id: r['id'] as String,
@@ -194,6 +339,15 @@ class ActivityRepositoryImpl implements ActivityRepository {
       privacy: privacy,
       note: r['note'] as String? ?? '',
       clubName: clubMap?['name'] as String?,
+      device: r['device'] as String?,
+      elapsedTime: r['elapsed_seconds'] == null
+          ? null
+          : Duration(seconds: (r['elapsed_seconds'] as num).toInt()),
+      samples: [
+        for (final sample in r['samples'] as List? ?? const [])
+          ActivitySample.fromJson((sample as Map).cast<String, dynamic>()),
+      ],
+      hideHr: r['hide_hr'] as bool? ?? false,
       published: vis != 'private',
     );
   }

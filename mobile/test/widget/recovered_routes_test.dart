@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,10 @@ import 'package:klubby/features/club/presentation/cubit/clubs_cubit.dart';
 import 'package:klubby/features/club/presentation/pages/club_pages.dart';
 import 'package:klubby/features/club/data/club_repository_impl.dart';
 import 'package:klubby/features/club/domain/entities/club.dart';
+import 'package:klubby/features/club/domain/repositories/club_repository.dart';
 import 'package:klubby/features/feed/presentation/cubit/feed_cubit.dart';
+import 'package:klubby/features/feed/domain/repositories/feed_repository.dart';
+import 'package:klubby/features/feed/domain/entities/feed_post.dart';
 import 'package:klubby/features/feed/presentation/pages/feed_pages.dart';
 import 'package:klubby/features/activity/presentation/widgets/activity_data_sections.dart';
 
@@ -40,6 +44,7 @@ import 'package:klubby/features/profile/domain/usecases/streak_rules.dart';
 import 'package:klubby/features/profile/domain/entities/stamp_entry.dart';
 import 'package:klubby/features/profile/domain/entities/stamp_calendar.dart';
 import 'package:klubby/features/profile/domain/repositories/profile_repository.dart';
+import 'package:klubby/features/profile/data/profile_repository_impl.dart';
 import 'package:klubby/features/activity/domain/entities/activity.dart';
 import 'package:klubby/features/activity/domain/repositories/activity_repository.dart';
 import 'package:klubby/features/tournament/domain/entities/tournament.dart';
@@ -47,6 +52,8 @@ import 'package:klubby/features/league/presentation/cubit/league_cubit.dart';
 import 'package:klubby/features/profile/presentation/cubit/me_cubit.dart';
 import 'package:klubby/features/profile/presentation/pages/profile_pages.dart';
 import 'package:klubby/features/profile/presentation/pages/people_page.dart';
+import 'package:klubby/features/onboarding/presentation/pages/signup_pages.dart';
+import 'package:klubby/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:klubby/features/profile/presentation/pages/streak_pages.dart';
 import 'package:klubby/features/session/presentation/cubit/sessions_cubit.dart';
 import 'package:klubby/features/shop/presentation/pages/misc_pages.dart';
@@ -70,6 +77,121 @@ class _FontManifest extends Fake implements AssetManifest {
       ])
         'test-fonts/$family-$weight.ttf',
   ];
+}
+
+class _ClubListRepository extends Fake implements ClubRepository {
+  _ClubListRepository(this.clubs);
+  final List<Club> clubs;
+  @override
+  Future<List<Club>> myClubs() async => clubs;
+  @override
+  Future<List<Club>> nearby({String? sportId}) async => const [];
+  @override
+  Future<List<ClubInvite>> invites() async => const [];
+}
+
+class _SyncActivityRepository extends Fake implements ActivityRepository {
+  final pending = Completer<ActivitySyncResult>();
+  int calls = 0;
+  @override
+  Future<List<Activity>> recent() async => const [];
+  @override
+  Future<ActivitySyncResult> syncHealthActivities() {
+    calls++;
+    return pending.future;
+  }
+}
+
+class _ManagedClubRepository extends _ClubListRepository {
+  _ManagedClubRepository(super.clubs);
+  bool promoted = false;
+  bool reviewed = false;
+  KasSummary summary = const KasSummary(
+    balance: 0,
+    monthIn: 0,
+    monthOut: 0,
+    weeksIn: [0, 0, 0, 0],
+    weeksOut: [0, 0, 0, 0],
+    entries: [],
+  );
+  @override
+  Future<KasSummary> kas(String clubId) async => summary;
+  @override
+  Future<KasSummary> addKas(
+    String clubId,
+    KasEntry entry, {
+    bool counts = true,
+  }) async {
+    summary = KasSummary(
+      balance: summary.balance + entry.amount,
+      monthIn: entry.amount > 0
+          ? summary.monthIn + entry.amount
+          : summary.monthIn,
+      monthOut: entry.amount < 0
+          ? summary.monthOut - entry.amount
+          : summary.monthOut,
+      weeksIn: summary.weeksIn,
+      weeksOut: summary.weeksOut,
+      entries: [...summary.entries, entry],
+    );
+    return summary;
+  }
+
+  @override
+  Future<Club> byId(String id) async => clubs.single;
+  @override
+  Future<List<ClubMember>> members(
+    String clubId, {
+    bool pending = false,
+  }) async => pending
+      ? reviewed
+            ? []
+            : [
+                const ClubMember(
+                  userId: 'request',
+                  name: 'Sari Nyata',
+                  role: 'member',
+                  status: 'pending',
+                ),
+              ]
+      : [
+          const ClubMember(
+            userId: 'owner',
+            name: 'Pemilik Nyata',
+            role: 'admin',
+            status: 'active',
+            owner: true,
+          ),
+          ClubMember(
+            userId: 'member',
+            name: 'Budi Nyata',
+            role: promoted ? 'admin' : 'member',
+            status: 'active',
+          ),
+        ];
+  @override
+  Future<void> setMemberAdmin(String clubId, String userId, bool admin) async {
+    promoted = admin;
+  }
+
+  @override
+  Future<void> reviewRequest(String clubId, String userId, bool approve) async {
+    reviewed = true;
+  }
+}
+
+class _ReloadFeedRepository extends Fake implements FeedRepository {
+  int reads = 0;
+  Object? failure;
+  @override
+  Future<List<FeedPost>> feed({required bool publik}) async {
+    reads++;
+    if (failure != null) throw failure!;
+    return const [];
+  }
+
+  @override
+  Future<List<AppNotification>> notifications() async => const [];
 }
 
 void main() {
@@ -129,19 +251,25 @@ void main() {
     WidgetTester tester,
     Widget page, {
     ClubsCubit? clubsCubit,
+    String initialLocation = '/',
+    Size size = const Size(320, 720),
+    double textScale = 1.3,
   }) async {
-    tester.view.physicalSize = const Size(320, 720);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     router = GoRouter(
+      initialLocation: initialLocation,
       routes: [
         GoRoute(path: '/', builder: (_, _) => page),
         GoRoute(path: R.geng, builder: (_, _) => const GengPage()),
         GoRoute(
           path: R.newClub,
-          pageBuilder: (_, state) =>
-              MaterialPage<Club>(key: state.pageKey, child: const NewClubPage()),
+          pageBuilder: (_, state) => MaterialPage<Club>(
+            key: state.pageKey,
+            child: const NewClubPage(),
+          ),
         ),
         GoRoute(
           path: R.peopleSearch,
@@ -167,6 +295,7 @@ void main() {
       MultiBlocProvider(
         providers: [
           BlocProvider.value(value: sl<MeCubit>()),
+          BlocProvider.value(value: sl<OnboardingCubit>()),
           BlocProvider.value(value: clubsCubit ?? sl<ClubsCubit>()),
           BlocProvider.value(value: sl<SessionsCubit>()),
           BlocProvider.value(value: sl<FeedCubit>()),
@@ -178,7 +307,7 @@ void main() {
           routerConfig: router,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(1.3)),
+                .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
         ),
@@ -186,6 +315,652 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
   }
+
+  testWidgets('Tournament setup labels use the same size and weight', (
+    tester,
+  ) async {
+    await mount(tester, const TournamentNewPage());
+    final labels = [
+      'Nama Turnamen',
+      'Lapangan',
+      'Poin Untuk Menang',
+      'Jumlah Pemain',
+    ];
+    final styles = [
+      for (final label in labels) tester.widget<Text>(find.text(label)).style!,
+    ];
+    expect(styles.map((s) => s.fontSize).toSet(), {15.0});
+    expect(styles.map((s) => s.fontWeight).toSet(), {FontWeight.w900});
+    expect(
+      tester.getTopLeft(find.text('Nama Turnamen')).dy,
+      lessThan(tester.getTopLeft(find.text('Lapangan')).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Club members come from repository and admin can review requests',
+    (tester) async {
+      const club = Club(
+        id: 'managed',
+        name: 'Klub Nyata',
+        initials: 'KN',
+        sportId: 'badminton',
+        members: 2,
+        color: AppColors.primary,
+        emoji: '',
+        area: 'Kediri',
+        admin: true,
+      );
+      final repository = _ManagedClubRepository([club]);
+      await sl.unregister<ClubRepository>();
+      sl.registerSingleton<ClubRepository>(repository);
+      final cubit = ClubsCubit(repository);
+      await cubit.load();
+      addTearDown(cubit.close);
+      await mount(
+        tester,
+        const ClubPage(id: 'managed'),
+        clubsCubit: cubit,
+        size: const Size(390, 844),
+        textScale: 1,
+      );
+      await tester.tap(find.text('Anggota'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pemilik Nyata'), findsOneWidget);
+      expect(find.text('Budi Nyata'), findsOneWidget);
+      expect(find.text('Anggota contoh'), findsNothing);
+      expect(find.text('Pemilik'), findsOneWidget);
+      await tester.tap(find.text('JADIKAN ADMIN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('UBAH PERAN'));
+      await tester.pumpAndSettle();
+      expect(repository.promoted, isTrue);
+      expect(find.text('Admin'), findsOneWidget);
+      await tester.tap(find.text('PERMINTAAN'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sari Nyata'), findsOneWidget);
+      await tester.tap(find.text('SETUJUI'));
+      await tester.pumpAndSettle();
+      expect(repository.reviewed, isTrue);
+      expect(find.text('Tidak ada permintaan bergabung.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Club admin can record cash income from an empty balance', (
+    tester,
+  ) async {
+    const club = Club(
+      id: 'managed',
+      name: 'Klub Nyata',
+      initials: 'KN',
+      sportId: 'badminton',
+      members: 2,
+      color: AppColors.primary,
+      emoji: '',
+      area: 'Kediri',
+      admin: true,
+    );
+    final repository = _ManagedClubRepository([club]);
+    await sl.unregister<ClubRepository>();
+    sl.registerSingleton<ClubRepository>(repository);
+    final cubit = ClubsCubit(repository);
+    await cubit.load();
+    addTearDown(cubit.close);
+    await mount(
+      tester,
+      const KasPage(id: 'managed'),
+      clubsCubit: cubit,
+      size: const Size(390, 844),
+      textScale: 1,
+    );
+    expect(find.text('PENGATURAN KAS'), findsOneWidget);
+    expect(find.textContaining('Kas demo'), findsNothing);
+    await tester.tap(find.text('CATAT MASUK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Jumlah rupiah'),
+      '50000',
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.text('SIMPAN PEMASUKAN'));
+    await tester.tap(find.text('SIMPAN PEMASUKAN'));
+    await tester.pumpAndSettle();
+    expect(repository.summary.balance, 50000);
+    expect(repository.summary.entries.single.title, 'Iuran');
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is KRow && widget.title == 'Iuran',
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Smartwatch without pause data shows one pace and explains missing data',
+    (tester) async {
+      await mount(
+        tester,
+        Scaffold(
+          body: SingleChildScrollView(
+            child: ActivityDataSections(
+              activity: Activity(
+                id: 'watch',
+                sportId: 'jalan',
+                title: 'Jalan (smartwatch)',
+                start: DateTime(2026, 11, 18),
+                duration: const Duration(minutes: 54),
+                distanceKm: 4.7,
+                source: ActivitySource.wearable,
+              ),
+              owner: true,
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Durasi tercatat'), findsOneWidget);
+      expect(find.text('Perangkat terhubung'), findsOneWidget);
+      expect(find.text('Catatan manual'), findsNothing);
+      expect(find.text('Pace termasuk jeda'), findsNothing);
+      expect(
+        find.textContaining('Waktu bergerak dan jeda belum tersedia'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Feed failure shows retry and recovers without a false empty state',
+    (tester) async {
+      final repository = _ReloadFeedRepository()
+        ..failure = StateError('API unavailable');
+      await sl<FeedCubit>().close();
+      await sl.unregister<FeedCubit>();
+      sl.registerSingleton<FeedCubit>(FeedCubit(repository));
+      await mount(tester, const FeedPage());
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(sl<FeedCubit>().state.errorMessage, isNotNull);
+      await tester.scrollUntilVisible(
+        find.text('Feed belum bisa dimuat'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Feed belum bisa dimuat'), findsOneWidget);
+      expect(
+        find.text('Belum ada aktivitas di sini. Yuk jadi yang pertama!'),
+        findsNothing,
+      );
+      repository.failure = null;
+      await tester.ensureVisible(find.text('COBA LAGI'));
+      await Scrollable.ensureVisible(
+        tester.element(find.text('COBA LAGI')),
+        alignment: .5,
+      );
+      await tester.tap(find.text('COBA LAGI'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(sl<FeedCubit>().state.errorMessage, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
+
+  testWidgets(
+    'Profile sync uploads pending Health sessions and reloads the feed',
+    (tester) async {
+      final activities = _SyncActivityRepository();
+      final feed = _ReloadFeedRepository();
+      await sl.unregister<ActivityRepository>();
+      sl.registerSingleton<ActivityRepository>(activities);
+      await sl<FeedCubit>().close();
+      await sl.unregister<FeedCubit>();
+      sl.registerSingleton<FeedCubit>(FeedCubit(feed));
+      await mount(tester, const ProfilePage());
+      await tester.scrollUntilVisible(
+        find.text('SINKRONKAN'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await Scrollable.ensureVisible(
+        tester.element(find.text('SINKRONKAN')),
+        alignment: .5,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('AKTIVITAS MINGGU INI'), findsOneWidget);
+      await tester.tap(find.text('SINKRONKAN'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Menyinkronkan aktivitas…'), findsOneWidget);
+      expect(activities.calls, 1);
+      activities.pending.complete(
+        const ActivitySyncResult(uploaded: 1, failed: 1),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(feed.reads, 1);
+      expect(
+        find.text(
+          '1 berhasil, 1 belum tersinkron. Ketuk Sinkronkan untuk mencoba lagi.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Menyinkronkan aktivitas…'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
+
+  testWidgets('Loading overlay covers navigation, blocks input and cleans up', (
+    tester,
+  ) async {
+    final loading = ValueNotifier(true);
+    addTearDown(loading.dispose);
+    var taps = 0;
+    await mount(
+      tester,
+      Scaffold(
+        body: ValueListenableBuilder<bool>(
+          valueListenable: loading,
+          builder: (context, busy, _) => KLoadingOverlay(
+            loading: busy,
+            child: const Center(child: Text('Contoh halaman')),
+          ),
+        ),
+        bottomNavigationBar: TextButton(
+          onPressed: () => taps++,
+          child: const Text('Navigasi'),
+        ),
+      ),
+    );
+    await tester.pump();
+    final barrier = find.byWidgetPredicate(
+      (widget) =>
+          widget is ModalBarrier && widget.color == const Color(0x6B000000),
+    );
+    expect(tester.getRect(barrier), const Rect.fromLTWH(0, 0, 320, 720));
+    expect(find.text('Sebentar, ya…'), findsOneWidget);
+    expect(
+      tester.widget<PopScope>(find.byType(PopScope).first).canPop,
+      isFalse,
+    );
+    await tester.tap(find.text('Navigasi'), warnIfMissed: false);
+    expect(taps, 0);
+    loading.value = false;
+    await tester.pumpAndSettle();
+    expect(barrier, findsNothing);
+    await tester.tap(find.text('Navigasi'));
+    expect(taps, 1);
+    loading.value = true;
+    await tester.pump();
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(ModalBarrier), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(320, 720), const Size(390, 844)]) {
+    testWidgets(
+      'Empty clubs keep both sections and top actions at ${size.width}px',
+      (tester) async {
+        await mount(tester, const ClubsPage(), size: size);
+        final action = tester.getRect(
+          find.widgetWithText(KButton, 'BUAT KLUB'),
+        );
+        expect(find.text('MABAR KAMU MINGGU INI'), findsOneWidget);
+        expect(find.text('KLUBKU · 0'), findsOneWidget);
+        expect(find.text('Belum ada mabar minggu ini'), findsOneWidget);
+        expect(find.text('Belum gabung klub'), findsOneWidget);
+        expect(
+          tester
+              .widgetList<KContentState>(find.byType(KContentState))
+              .every((state) => state.compact),
+          isTrue,
+        );
+        expect(
+          action.bottom,
+          lessThan(tester.getTopLeft(find.text('MABAR KAMU MINGGU INI')).dy),
+        );
+        expect(
+          find.ancestor(
+            of: find.text('BUAT KLUB'),
+            matching: find.byType(Scrollable),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('Club actions stay visible while a long club list scrolls', (
+    tester,
+  ) async {
+    final clubs = ClubsCubit(
+      _ClubListRepository(
+        List.generate(
+          20,
+          (index) => Club(
+            id: 'club-$index',
+            name: 'Klub $index',
+            initials: 'K$index',
+            sportId: 'badminton',
+            members: 1,
+            color: AppColors.primary,
+          ),
+        ),
+      ),
+    );
+    addTearDown(clubs.close);
+    await clubs.load();
+    await mount(tester, const ClubsPage(), clubsCubit: clubs);
+    final before = tester.getRect(find.widgetWithText(KButton, 'BUAT KLUB'));
+    expect(find.text('KLUBKU · 20'), findsOneWidget);
+    expect(find.text('Belum ada mabar minggu ini'), findsOneWidget);
+    expect(find.text('Belum gabung klub'), findsNothing);
+    await tester.drag(find.byType(ListView), const Offset(0, -700));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.widgetWithText(KButton, 'BUAT KLUB')), before);
+    expect(find.text('CARI KLUB'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 1.3, 2.0]) {
+    testWidgets(
+      'Manual feeling artwork stays inside each tile at scale $scale',
+      (tester) async {
+        await mount(tester, const ManualPage(), textScale: scale);
+        final images = find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName.startsWith(
+                'assets/icons/feel_',
+              ),
+        );
+        await tester.scrollUntilVisible(
+          find.text('GIMANA RASANYA?'),
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pump(const Duration(seconds: 1));
+        expect(images, findsNWidgets(5));
+        for (var i = 0; i < 5; i++) {
+          final image = images.at(i);
+          final tile = find
+              .ancestor(of: image, matching: find.byType(KChoice))
+              .first;
+          final imageRect = tester.getRect(image);
+          final tileRect = tester.getRect(tile).deflate(4);
+          expect(tileRect.contains(imageRect.topLeft), isTrue);
+          expect(tileRect.contains(imageRect.bottomRight), isTrue);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(seconds: 3));
+      },
+    );
+  }
+
+  for (final login in [false, true]) {
+    testWidgets(
+      '${login ? 'Login' : 'Register'} validates on submit and keeps the action active',
+      (tester) async {
+        await mount(
+          tester,
+          const SignupPage(),
+          initialLocation: login ? '/?mode=login' : '/',
+        );
+        final label = login ? 'MASUK DENGAN EMAIL' : 'DAFTAR DENGAN EMAIL';
+        final button = tester.widget<KButton>(
+          find.widgetWithText(KButton, label),
+        );
+        expect(button.onTap, isNotNull);
+        await tester.ensureVisible(find.text(label));
+        final emailEditable = find.descendant(
+          of: find.byType(KInput).first,
+          matching: find.byType(EditableText),
+        );
+        final inputBefore = InputDecorator.containerOf(
+          tester.element(emailEditable),
+        )!;
+        final inputHeight = inputBefore.size.height;
+        await tester.tap(find.text(label));
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(find.text('Masukkan alamat email yang valid.'), findsOneWidget);
+        final inputAfter = InputDecorator.containerOf(
+          tester.element(emailEditable),
+        )!;
+        final bottom = inputAfter
+            .localToGlobal(Offset(0, inputAfter.size.height))
+            .dy;
+        expect(inputAfter.size.height, inputHeight);
+        expect(
+          tester.getTopLeft(find.text('Masukkan alamat email yang valid.')).dy,
+          greaterThanOrEqualTo(bottom),
+        );
+        expect(find.text('Kata sandi minimal 6 karakter.'), findsOneWidget);
+        expect(
+          find.text('Periksa email dan kata sandi di atas.'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(seconds: 3));
+      },
+    );
+  }
+
+  testWidgets('Login shows progress and an inline server error after submit', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    var requests = 0;
+    final api = DevApi(
+      MockClient((request) async {
+        requests++;
+        return response.future;
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+    await mount(tester, const SignupPage(), initialLocation: '/?mode=login');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'raka@example.test',
+    );
+    await tester.enterText(find.byType(TextFormField).at(1), 'password');
+    await tester.ensureVisible(find.text('MASUK DENGAN EMAIL'));
+    await tester.tap(find.text('MASUK DENGAN EMAIL'));
+    await tester.pump();
+    expect(find.byType(KLoading), findsOneWidget);
+    await tester.tap(find.text('MASUK DENGAN EMAIL'));
+    expect(requests, 1);
+    response.complete(http.Response('{}', 400));
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      find.widgetWithText(KBanner, 'Email atau kata sandi tidak valid.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  testWidgets(
+    'Account waits for save and retains entered values after a server error',
+    (tester) async {
+      final response = Completer<http.Response>();
+      final api = DevApi(
+        MockClient((request) async {
+          if (request.url.path == '/auth/v1/token') {
+            return http.Response(
+              '{"access_token":"test-session","user":{"id":"me"}}',
+              200,
+            );
+          }
+          if (request.url.path == '/auth/v1/user') {
+            return http.Response('{"email":"raka@example.test"}', 200);
+          }
+          expect(request.method, 'PATCH');
+          return response.future;
+        }),
+        'sb_publishable_test',
+        mode: AppMode.LIVE,
+      );
+      await tester.runAsync(() => api.signIn('raka@example.test', 'password'));
+      addTearDown(api.close);
+      await sl.unregister<DevApi>();
+      sl.registerSingleton<DevApi>(api);
+      final original = ProfileRepositoryImpl.empty.copyWith(
+        name: 'Raka',
+        username: 'raka',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await sl<MeCubit>().close();
+      await sl.unregister<MeCubit>();
+      sl.registerSingleton<MeCubit>(
+        MeCubit(ProfileRepositoryImpl(prefs, api), original),
+      );
+      await mount(tester, const AccountPage());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Raka Baru');
+      await tester.tap(find.text('SIMPAN'));
+      await tester.pump();
+      expect(find.byType(KLoading), findsOneWidget);
+      expect(sl<MeCubit>().state.name, 'Raka');
+      response.complete(http.Response('{}', 500));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(AccountPage), findsOneWidget);
+      expect(find.text('Raka Baru'), findsOneWidget);
+      expect(sl<MeCubit>().state.name, 'Raka');
+      expect(find.text('Akun disimpan'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
+
+  testWidgets('Follow tabs select their own API mode and show empty states', (
+    tester,
+  ) async {
+    final modes = <String>[];
+    final api = DevApi(
+      MockClient((request) async {
+        if (request.url.path == '/auth/v1/token') {
+          return http.Response(
+            '{"access_token":"test-session","user":{"id":"me"}}',
+            200,
+          );
+        }
+        modes.add(jsonDecode(request.body)['p_mode'] as String);
+        return http.Response('[]', 200);
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+    await mount(tester, const PeoplePage(PeopleMode.followers));
+    await tester.pumpAndSettle();
+    expect(find.text('Kamu belum punya pengikut.'), findsOneWidget);
+    await tester.tap(find.text('Mengikuti'));
+    await tester.pumpAndSettle();
+    expect(modes, ['followers', 'following']);
+    expect(find.text('Kamu belum mengikuti siapa pun.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Loading button keeps its label and blocks repeated taps', (
+    tester,
+  ) async {
+    var taps = 0;
+    await mount(tester, KButton('Simpan', loading: true, onTap: () => taps++));
+    expect(find.text('SIMPAN'), findsOneWidget);
+    expect(find.byType(KLoading), findsOneWidget);
+    await tester.tap(find.text('SIMPAN'));
+    expect(taps, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('People loading and errors offer a working retry', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    var reads = 0;
+    final api = DevApi(
+      MockClient((request) async {
+        if (request.url.path == '/auth/v1/token') {
+          return http.Response(
+            '{"access_token":"test-session","user":{"id":"me"}}',
+            200,
+          );
+        }
+        reads++;
+        return reads == 1 ? pending.future : http.Response('[]', 200);
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+    await mount(tester, const PeoplePage(PeopleMode.followers));
+    expect(find.text('Mencari teman main'), findsOneWidget);
+    pending.complete(http.Response('{}', 500));
+    await tester.pumpAndSettle();
+    expect(find.text('Pengguna belum bisa dimuat'), findsOneWidget);
+    await tester.tap(find.text('COBA LAGI'));
+    await tester.pumpAndSettle();
+    expect(reads, 2);
+    expect(find.text('Kamu belum punya pengikut.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Account loads Auth email and hides phone OTP controls', (
+    tester,
+  ) async {
+    final api = DevApi(
+      MockClient((request) async {
+        if (request.url.path == '/auth/v1/token') {
+          return http.Response(
+            '{"access_token":"test-session","user":{"id":"me"}}',
+            200,
+          );
+        }
+        expect(request.url.path, '/auth/v1/user');
+        return http.Response('{"email":"raka@example.test"}', 200);
+      }),
+      'sb_publishable_test',
+      mode: AppMode.LIVE,
+    );
+    await tester.runAsync(() => api.signIn('test@example.test', 'password'));
+    addTearDown(api.close);
+    await sl.unregister<DevApi>();
+    sl.registerSingleton<DevApi>(api);
+    await mount(tester, const AccountPage());
+    await tester.pumpAndSettle();
+    expect(find.text('raka@example.test'), findsOneWidget);
+    expect(find.text('OTP'), findsNothing);
+    expect(find.text('Ubah nomor HP'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Profil has a working entry to Geng Gemoy at narrow width', (
     tester,
@@ -199,7 +974,9 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
-  testWidgets('Profil can search, follow and unfollow at 320px', (tester) async {
+  testWidgets('Profil can search, follow and unfollow at 320px', (
+    tester,
+  ) async {
     var following = false;
     final api = DevApi(
       MockClient((request) async {
@@ -211,15 +988,18 @@ void main() {
             );
           case '/rest/v1/rpc/find_people':
             expect(jsonDecode(request.body)['p_query'], '@raka');
-            return http.Response(jsonEncode([
-              {
-                'id': 'raka',
-                'name': 'Raka Pratama',
-                'username': 'raka',
-                'avatar': 'kapi',
-                'is_following': following,
-              },
-            ]), 200);
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'raka',
+                  'name': 'Raka Pratama',
+                  'username': 'raka',
+                  'avatar': 'kapi',
+                  'is_following': following,
+                },
+              ]),
+              200,
+            );
           case '/rest/v1/rpc/set_user_follow':
             following = jsonDecode(request.body)['p_follow'] as bool;
             return http.Response('', 204);
@@ -271,20 +1051,23 @@ void main() {
         expect(request.headers['Authorization'], 'Bearer test-session');
         switch (request.url.path) {
           case '/rest/v1/rpc/list_challenges':
-            return http.Response(jsonEncode([
-              {
-                'id': 'run',
-                'title': 'Lari 50 km',
-                'description': 'Lari setelah bergabung.',
-                'kind': 'pribadi',
-                'sport_id': 'lari',
-                'goal': 50,
-                'unit': 'km',
-                'joined': joined,
-                'progress': joined ? 2.25 : 0,
-                'completed': false,
-              },
-            ]), 200);
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'run',
+                  'title': 'Lari 50 km',
+                  'description': 'Lari setelah bergabung.',
+                  'kind': 'pribadi',
+                  'sport_id': 'lari',
+                  'goal': 50,
+                  'unit': 'km',
+                  'joined': joined,
+                  'progress': joined ? 2.25 : 0,
+                  'completed': false,
+                },
+              ]),
+              200,
+            );
           case '/rest/v1/rpc/set_challenge_membership':
             final payload = jsonDecode(request.body) as Map<String, dynamic>;
             expect(payload['p_challenge_id'], 'run');
@@ -889,9 +1672,14 @@ void main() {
         final query = request.url.queryParameters;
         expect(request.url.host, 'geoservices.big.go.id');
         expect(query['geometry'], '110.82500,-7.56600');
-        return http.Response(jsonEncode({
-          'features': query['distance'] != null ? [nearby, current] : [current],
-        }), 200);
+        return http.Response(
+          jsonEncode({
+            'features': query['distance'] != null
+                ? [nearby, current]
+                : [current],
+          }),
+          200,
+        );
       }),
     );
     await sl.unregister<AreaDirectory>();

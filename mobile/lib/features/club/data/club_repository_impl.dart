@@ -54,7 +54,8 @@ class ClubRepositoryImpl implements ClubRepository {
         final c = _fromApiRow(
           r,
           memberCount: counts[r['id'] as String] ?? 1,
-          isAdmin: _adminClubs.contains(r['id'] as String) ||
+          isAdmin:
+              _adminClubs.contains(r['id'] as String) ||
               r['created_by'] == api.currentUserId,
         );
         _byId[c.id] = c;
@@ -96,8 +97,11 @@ class ClubRepositoryImpl implements ClubRepository {
               club: Club(
                 id: r['club_id'] as String,
                 name: (r['clubs'] as Map)['name'] as String? ?? '',
-                initials: _initials((r['clubs'] as Map)['name'] as String? ?? ''),
-                sportId: (r['clubs'] as Map)['sport_id'] as String? ?? 'badminton',
+                initials: _initials(
+                  (r['clubs'] as Map)['name'] as String? ?? '',
+                ),
+                sportId:
+                    (r['clubs'] as Map)['sport_id'] as String? ?? 'badminton',
                 members: 1,
                 color: AppColors.primary,
                 emoji: (r['clubs'] as Map)['emoji'] as String? ?? '🏆',
@@ -125,7 +129,9 @@ class ClubRepositoryImpl implements ClubRepository {
         return _byId[id] = _fromApiRow(
           row,
           memberCount: row['member_count'] as int? ?? 1,
-          isAdmin: member?['role'] == 'admin' || row['created_by'] == api.currentUserId,
+          isAdmin:
+              member?['role'] == 'admin' ||
+              row['created_by'] == api.currentUserId,
         );
       }
     }
@@ -186,11 +192,12 @@ class ClubRepositoryImpl implements ClubRepository {
       if (areaCenter != null) 'area_lng': areaCenter.lng,
       'privacy': privacy.name,
       'logo_path': logoPath,
-      if (payout != null) 'payout': {
-        'provider': payout.provider,
-        'number': payout.number,
-        'holder': payout.holder,
-      },
+      if (payout != null)
+        'payout': {
+          'provider': payout.provider,
+          'number': payout.number,
+          'holder': payout.holder,
+        },
     });
     final club = _fromApiRow(row, memberCount: 1, isAdmin: true);
     _byId[club.id] = club;
@@ -208,15 +215,57 @@ class ClubRepositoryImpl implements ClubRepository {
   }
 
   @override
+  Future<List<ClubMember>> members(
+    String clubId, {
+    bool pending = false,
+  }) async {
+    final api = _api;
+    if (api == null || !api.isSignedIn) throw const DevApiException(401);
+    final rows = await api.clubMembers(clubId, pending: pending);
+    return [
+      for (final r in rows)
+        ClubMember(
+          userId: r['user_id'] as String,
+          name: r['name'] as String,
+          role: r['role'] as String,
+          status: r['status'] as String,
+          owner: r['owner'] as bool? ?? false,
+        ),
+    ];
+  }
+
+  @override
+  Future<void> setMemberAdmin(String clubId, String userId, bool admin) async {
+    final api = _api;
+    if (api == null || !api.isSignedIn) throw const DevApiException(401);
+    await api.setMemberAdmin(clubId, userId, admin);
+    await _syncClubs();
+  }
+
+  @override
+  Future<void> reviewRequest(String clubId, String userId, bool approve) async {
+    final api = _api;
+    if (api == null || !api.isSignedIn) throw const DevApiException(401);
+    await api.reviewClubRequest(clubId, userId, approve);
+    await _syncClubs();
+  }
+
+  @override
+  Stream<void> chatChanges(String clubId) =>
+      _api?.chatChanges(clubId) ?? const Stream.empty();
+
+  @override
   Future<List<KlubbyUser>> findUsers(Iterable<String> phonesOrUsernames) async {
     final api = _api;
     if (api == null || !api.isSignedIn) return const [];
     final terms = phonesOrUsernames
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
-        .map((value) => RegExp(r'^[+0-9 ()-]{9,}$').hasMatch(value)
-            ? waNumber(value)
-            : value)
+        .map(
+          (value) => RegExp(r'^[+0-9 ()-]{9,}$').hasMatch(value)
+              ? waNumber(value)
+              : value,
+        )
         .toSet()
         .toList();
     if (terms.isEmpty) return const [];
@@ -237,7 +286,10 @@ class ClubRepositoryImpl implements ClubRepository {
     if (api == null || !api.isSignedIn) throw const DevApiException(401);
     final rows = await api.findUsers(['@${user.username}']);
     if (rows.isEmpty) {
-      throw const DevApiException(404, userMessage: 'Akun anggota sudah tidak tersedia.');
+      throw const DevApiException(
+        404,
+        userMessage: 'Akun anggota sudah tidak tersedia.',
+      );
     }
     await api.addClubMember(clubId, rows.first['id'] as String);
     await _syncClubs();
@@ -274,7 +326,7 @@ class ClubRepositoryImpl implements ClubRepository {
     final rows = await api.chatFull(clubId);
     final me = api.currentUserId;
     return [
-      for (final r in rows)
+      for (final r in rows.reversed)
         ChatMessage(
           id: r['id'] as String,
           author: ((r['users'] as Map?)?['name'] as String?) ?? 'Anggota',
@@ -282,6 +334,7 @@ class ClubRepositoryImpl implements ClubRepository {
           avatarBg: AppColors.primaryL,
           text: r['body'] as String,
           mine: r['user_id'] == me,
+          announcement: r['announcement'] as bool? ?? false,
           kind: (r['sticker'] as bool? ?? false)
               ? MessageKind.sticker
               : MessageKind.text,
@@ -301,7 +354,12 @@ class ClubRepositoryImpl implements ClubRepository {
     if (api == null || !api.isSignedIn) {
       throw StateError('Login required to send chat');
     }
-    final row = await api.sendChatFull(clubId, text, sticker: sticker);
+    final row = await api.sendChatFull(
+      clubId,
+      text,
+      sticker: sticker,
+      announcement: announcement,
+    );
     return ChatMessage(
       id: row['id'] as String,
       author: 'Kamu',
@@ -339,7 +397,9 @@ class ClubRepositoryImpl implements ClubRepository {
       final counts = r['counts'] as bool? ?? true;
       final signed = isIncome ? rawAmount : -rawAmount;
       balance += signed;
-      if (counts) {
+      final at = DateTime.parse(r['created_at'] as String).toLocal();
+      final now = DateTime.now();
+      if (counts && at.year == now.year && at.month == now.month) {
         if (signed > 0) monthIn += signed;
         if (signed < 0) monthOut += -signed;
       }
@@ -389,9 +449,17 @@ class ClubRepositoryImpl implements ClubRepository {
   }
 
   static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return 'KB';
-    if (parts.length == 1) return parts.first.substring(0, parts.first.length.clamp(1, 2)).toUpperCase();
+    if (parts.length == 1) {
+      return parts.first
+          .substring(0, parts.first.length.clamp(1, 2))
+          .toUpperCase();
+    }
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 

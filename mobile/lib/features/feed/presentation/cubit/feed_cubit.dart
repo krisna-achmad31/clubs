@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/backend/dev_api.dart';
+
 import '../../../activity/domain/entities/activity.dart';
 import '../../domain/entities/feed_post.dart';
 import '../../domain/repositories/feed_repository.dart';
@@ -11,11 +13,13 @@ class FeedState extends Equatable {
     this.posts = const [],
     this.notifications = const [],
     this.details = const {},
+    this.errorMessage,
   });
 
   final bool publik;
   final List<FeedPost> posts;
   final List<AppNotification> notifications;
+  final String? errorMessage;
 
   /// Posts opened in J2 that may not be in [posts] (e.g. public ones while on KOMUNITAS).
   final Map<String, FeedPost> details;
@@ -31,15 +35,24 @@ class FeedState extends Equatable {
     List<FeedPost>? posts,
     List<AppNotification>? notifications,
     Map<String, FeedPost>? details,
+    String? errorMessage,
+    bool clearError = false,
   }) => FeedState(
     publik: publik ?? this.publik,
     posts: posts ?? this.posts,
     notifications: notifications ?? this.notifications,
     details: details ?? this.details,
+    errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
   );
 
   @override
-  List<Object?> get props => [publik, posts, notifications, details];
+  List<Object?> get props => [
+    publik,
+    posts,
+    notifications,
+    details,
+    errorMessage,
+  ];
 }
 
 class FeedCubit extends Cubit<FeedState> {
@@ -52,23 +65,35 @@ class FeedCubit extends Cubit<FeedState> {
   // KOMUNITAS when a reload finishes after the user switched tabs).
   Future<void> load() async {
     final publik = state.publik;
-    final posts = await _repo.feed(publik: publik);
-    final notifications = await _repo.notifications();
-    if (isClosed) return;
-    emit(
-      state.copyWith(
-        // Drop posts fetched for a tab the user has since left.
-        posts: state.publik == publik ? posts : null,
-        notifications: notifications,
-      ),
-    );
+    try {
+      final posts = await _repo.feed(publik: publik);
+      final notifications = await _repo.notifications();
+      if (isClosed) return;
+      emit(
+        state.copyWith(
+          // Drop posts fetched for a tab the user has since left.
+          posts: state.publik == publik ? posts : null,
+          notifications: notifications,
+          clearError: state.publik == publik,
+        ),
+      );
+    } on Object catch (error) {
+      if (!isClosed && state.publik == publik) {
+        emit(
+          state.copyWith(
+            errorMessage: apiFeedback(
+              error,
+              fallback: 'Feed belum bisa dimuat. Coba lagi.',
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> setPublik(bool v) async {
-    emit(state.copyWith(publik: v));
-    final posts = await _repo.feed(publik: v);
-    if (isClosed || state.publik != v) return;
-    emit(state.copyWith(posts: posts));
+    emit(state.copyWith(publik: v, posts: const [], clearError: true));
+    await load();
   }
 
   /// A club's own feed: independent of the KOMUNITAS/PUBLIK toggle.

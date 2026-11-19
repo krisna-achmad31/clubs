@@ -2,7 +2,7 @@ name: klubby
 description: "Klubby - main bareng, makin seru."
 publish_to: 'none'
 
-version: 1.4.0+5
+version: 1.4.1+6
 
 environment:
   sdk: ^3.13.5
@@ -47,6 +47,7 @@ dependencies:
   flutter_contacts: ^2.6.0
   flutter_map: 8.3.2
   latlong2: 0.9.1
+  realtime_client: 2.13.2
 
 dev_dependencies:
   flutter_test:
